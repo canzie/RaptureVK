@@ -2,6 +2,7 @@
 #define RAPTURE__SCENE_H
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <rapture/assets/asset_manager/AssetCommon.h>
@@ -22,6 +23,9 @@ namespace Rapture {
 
 class Camera3D;
 class Controller;
+class DynamicDiffuseGI;
+class RtInstanceData;
+struct Counter;
 class Environment;
 class Instance;
 class SceneComponent;
@@ -189,6 +193,23 @@ class Scene {
     TLAS *getTLAS() { return m_tlas.get(); }
 
     /**
+     * @brief Gives this scene ray traced global illumination, doing nothing if it already has it
+     */
+    void enableGlobalIllumination();
+
+    /**
+     * @brief The scene's probe based global illumination
+     * @return The probes, or nullptr until enableGlobalIllumination has been called
+     */
+    DynamicDiffuseGI *globalIllumination() const { return m_globalIllumination.get(); }
+
+    /**
+     * @brief Brings the traced instance data and the probes up to date, once per frame however many views draw this scene
+     * @param frameIndex The frame in flight the probes are updated for
+     */
+    void updateGlobalIllumination(uint32_t frameIndex);
+
+    /**
      * @brief Get the GPU data mirror
      */
     SceneRenderData *getRenderData() { return m_renderData.get(); }
@@ -262,6 +283,11 @@ class Scene {
 
     std::unique_ptr<TLAS> m_tlas;
     ecs::Bookmark m_tlasTransformBookmark;
+
+    std::unique_ptr<RtInstanceData> m_rtInstanceData;
+    std::unique_ptr<DynamicDiffuseGI> m_globalIllumination;
+    std::unique_ptr<Counter> m_globalIlluminationJobs;
+    std::atomic<uint64_t> m_globalIlluminationUpdatedFrame{UINT64_MAX};
 
     std::array<FreeList<Instance *>, TICK_COUNT> m_ticking;
     bool m_runningTickPhase = false;

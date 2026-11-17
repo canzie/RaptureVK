@@ -4,10 +4,8 @@
 #include "renderer/Renderer.h"
 
 #include "core/jobs/Counter.h"
-#include "renderer/RtInstanceData.h"
 #include "renderer/deferred/GBufferPass.h"
 #include "renderer/deferred/LightingPass.h"
-#include "renderer/gi/ddgi/DynamicDiffuseGI.h"
 #include "renderer/passes/DDGIProbeDebugPass.h"
 #include "renderer/passes/GroundTruthAmbientOcclusionPass.h"
 #include "renderer/passes/SkyboxPass.h"
@@ -59,12 +57,6 @@ class DeferredRenderer : public Renderer {
     CommandBufferLease m_lightingCmdBuffer;
     CommandBufferLease m_skyboxCmdBuffer;
     CommandBufferLease m_probeDebugCmdBuffer;
-
-    std::unique_ptr<DynamicDiffuseGI> m_dynamicDiffuseGI;
-    std::unique_ptr<RtInstanceData> m_rtInstanceData;
-
-    bool m_giActive = true;
-    uint32_t m_lightingFlags = RENDER_ALL;
 };
 
 } // namespace Rapture

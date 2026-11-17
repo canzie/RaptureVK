@@ -16,11 +16,6 @@ namespace Rapture {
 
 DeferredRenderer::DeferredRenderer(RenderContext renderContext, const RendererConfig &config) : Renderer(renderContext, config)
 {
-    if (m_config.enableAccelerationStructures) {
-        m_rtInstanceData = std::make_unique<RtInstanceData>(m_renderContext);
-        m_dynamicDiffuseGI = std::make_unique<DynamicDiffuseGI>(m_config.framesInFlight);
-    }
-
     recreateRenderPasses();
 }
 
@@ -33,8 +28,6 @@ DeferredRenderer::~DeferredRenderer()
     m_lightingPass.reset();
     m_ambientOcclusionPass.reset();
     m_gbufferPass.reset();
-    m_dynamicDiffuseGI.reset();
-    m_rtInstanceData.reset();
 }
 
 void DeferredRenderer::onResize(uint32_t width, uint32_t height)
@@ -82,18 +75,18 @@ void DeferredRenderer::recreateRenderPasses()
     m_ambientOcclusionPass = std::make_unique<GroundTruthAmbientOcclusionPass>(static_cast<uint32_t>(m_width),
                                                                                static_cast<uint32_t>(m_height), framesInFlight);
 
-    m_lightingPass = std::make_unique<LightingPass>(m_width, m_height, m_dynamicDiffuseGI.get(), hdrFormat);
+    m_lightingPass = std::make_unique<LightingPass>(m_width, m_height, hdrFormat);
 
     m_skyboxPass = std::make_unique<SkyboxPass>(GBufferPass::getFramebufferSpecification().depthAttachment, hdrFormat);
 
-    if (m_dynamicDiffuseGI) {
+    if (m_config.enableAccelerationStructures) {
         DDGIProbeDebugPassConfig probeDebugConfig{};
         probeDebugConfig.width = static_cast<uint32_t>(m_width);
         probeDebugConfig.height = static_cast<uint32_t>(m_height);
         probeDebugConfig.colorFormat = hdrFormat;
         probeDebugConfig.depthFormat = GBufferPass::getFramebufferSpecification().depthAttachment;
 
-        m_probeDebugPass = std::make_unique<DDGIProbeDebugPass>(probeDebugConfig, m_dynamicDiffuseGI.get());
+        m_probeDebugPass = std::make_unique<DDGIProbeDebugPass>(probeDebugConfig);
     }
 }
 
@@ -104,21 +97,8 @@ void DeferredRenderer::recordSecondaries(const RenderPassContext &frameContext, 
     Scene &activeScene = *frameContext.scene;
     const RenderSettings &settings = *frameContext.settings;
 
-    m_giActive = m_config.enableAccelerationStructures && settings.useGlobalIllumination();
-    m_lightingFlags = settings.flags;
-
-    if (m_rtInstanceData) {
-        m_rtInstanceData->update(activeScene);
-    }
-
-    if (m_giActive) {
-        JobSystem &system = jobs();
-        system.run(JobDeclaration(
-            [ddgi = m_dynamicDiffuseGI.get(), scenePtr = &activeScene, frame = frameContext.frameInFlight](JobContext &ctx) {
-                (void)ctx;
-                ddgi->populateProbesCompute(*scenePtr, frame);
-            },
-            JobPriority::NORMAL, QueueAffinity::COMPUTE, nullptr, "DDGI POPULATE"));
+    if (m_config.enableAccelerationStructures && settings.useGlobalIllumination()) {
+        activeScene.updateGlobalIllumination(frameContext.frameInFlight);
     }
 
     Environment *environment = activeScene.environment();

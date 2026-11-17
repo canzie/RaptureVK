@@ -34,11 +34,9 @@ struct DDGIProbeDebugPushConstants {
     float probeRadius;
 };
 
-DDGIProbeDebugPass::DDGIProbeDebugPass(const DDGIProbeDebugPassConfig &config, const DynamicDiffuseGI *gi)
-    : m_gi(gi), m_config(config), m_width(static_cast<float>(config.width)), m_height(static_cast<float>(config.height))
+DDGIProbeDebugPass::DDGIProbeDebugPass(const DDGIProbeDebugPassConfig &config)
+    : m_config(config), m_width(static_cast<float>(config.width)), m_height(static_cast<float>(config.height))
 {
-    RP_ASSERT(gi != nullptr, "Probe debug pass needs a volume to draw");
-
     m_rc = &Application::getInstance().getVulkanContext().getRenderContext();
 
     const auto shaderPath = EnginePaths::shaderDirectory();
@@ -179,7 +177,12 @@ CommandBufferLease DDGIProbeDebugPass::record(const RenderPassContext &context, 
         return {};
     }
 
-    const ProbeVolume &volume = m_gi->getProbeVolume();
+    const DynamicDiffuseGI *gi = context.scene->globalIllumination();
+    if (gi == nullptr) {
+        return {};
+    }
+
+    const ProbeVolume &volume = gi->getProbeVolume();
     const uint32_t probeCount = volume.gridDimensions.x * volume.gridDimensions.y * volume.gridDimensions.z;
     if (probeCount == 0) {
         return {};
@@ -215,7 +218,7 @@ CommandBufferLease DDGIProbeDebugPass::record(const RenderPassContext &context, 
     pushConstants.cameraSSBOIndex = renderData->getCameras().getDescriptorIndex(context.frameInFlight);
     pushConstants.cameraSlotIndex = (cameraSlot != UINT32_MAX) ? cameraSlot : 0;
     pushConstants.volumeSlot = context.frameInFlight;
-    const DDGIProbeTextureIndices probeTextures = m_gi->getPublishedProbeTextureIndices();
+    const DDGIProbeTextureIndices probeTextures = gi->getPublishedProbeTextureIndices();
     pushConstants.probeIrradianceIndex = probeTextures.irradiance;
     pushConstants.probeDistanceIndex = probeTextures.visibility;
     pushConstants.probeOffsetIndex = probeTextures.offset;

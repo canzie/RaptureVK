@@ -51,8 +51,8 @@ struct LightingPushConstants {
     float skyIntensity;
 };
 
-LightingPass::LightingPass(float width, float height, DynamicDiffuseGI *ddgi, VkFormat colorFormat)
-    : m_colorFormat(colorFormat), m_ddgi(ddgi), m_width(width), m_height(height)
+LightingPass::LightingPass(float width, float height, VkFormat colorFormat)
+    : m_colorFormat(colorFormat), m_width(width), m_height(height)
 {
 
     auto &app = Application::getInstance();
@@ -162,7 +162,8 @@ CommandBufferLease LightingPass::record(const RenderPassContext &context, const 
     pushConstants.GBufferShadingModelHandle = context.targets->gbufferShadingModel->getBindlessIndex();
 
     // DDGI indirect requires the GI system to exist; fall back to ambient otherwise
-    pushConstants.lightingFlags = m_ddgi ? lightingFlags : (lightingFlags & ~RENDER_USE_GLOBAL_ILLUMINATION);
+    DynamicDiffuseGI *ddgi = activeScene.globalIllumination();
+    pushConstants.lightingFlags = ddgi != nullptr ? lightingFlags : (lightingFlags & ~RENDER_USE_GLOBAL_ILLUMINATION);
 
     // Already 0 until the bake finishes, which the shader samples harmlessly
     Environment *environment = activeScene.environment();
@@ -190,9 +191,9 @@ CommandBufferLease LightingPass::record(const RenderPassContext &context, const 
     pushConstants.shadowDynamicCount = shadowStore.getPartition(MOBILITY_DYNAMIC).getCount();
 
     // Get probe texture indices from DDGI system
-    if (m_ddgi) {
+    if (ddgi != nullptr) {
         pushConstants.probeVolumeHandle = 0; // Probe volume data is in set 0, binding 5
-        const DDGIProbeTextureIndices probeTextures = m_ddgi->getPublishedProbeTextureIndices();
+        const DDGIProbeTextureIndices probeTextures = ddgi->getPublishedProbeTextureIndices();
         pushConstants.probeIrradianceHandle = probeTextures.irradiance;
         pushConstants.probeVisibilityHandle = probeTextures.visibility;
         pushConstants.probeOffsetHandle = probeTextures.offset;

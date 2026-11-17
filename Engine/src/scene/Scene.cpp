@@ -1,5 +1,9 @@
 #include <rapture/scene/Scene.h>
 
+#include "core/jobs/Counter.h"
+#include "core/jobs/JobSystem.h"
+#include "renderer/RtInstanceData.h"
+#include "renderer/gi/ddgi/DynamicDiffuseGI.h"
 #include "renderer/shadows/CascadedShadowMapping.h"
 #include "renderer/shadows/ShadowMapping.h"
 #include "scene/components/TerrainComponent.h"
@@ -56,7 +60,50 @@ Scene::Scene(const std::string &sceneName)
     m_physics = std::make_unique<PhysicsSystem>();
 }
 
-Scene::~Scene() = default;
+Scene::~Scene()
+{
+    if (m_globalIllumination == nullptr) {
+        return;
+    }
+
+    // a probe update may still be recording against this scene, and submitted frames may still trace it
+    jobs().waitFor(*m_globalIlluminationJobs, 0);
+    Application::getInstance().getVulkanContext().waitIdle();
+}
+
+void Scene::enableGlobalIllumination()
+{
+    if (m_globalIllumination != nullptr) {
+        return;
+    }
+
+    Application &app = Application::getInstance();
+    m_rtInstanceData = std::make_unique<RtInstanceData>(app.getVulkanContext().getRenderContext());
+    m_globalIllumination = std::make_unique<DynamicDiffuseGI>(app.getFramesInFlight());
+    m_globalIlluminationJobs = std::make_unique<Counter>();
+}
+
+void Scene::updateGlobalIllumination(uint32_t frameIndex)
+{
+    if (m_globalIllumination == nullptr) {
+        return;
+    }
+
+    const uint64_t frame = Application::getInstance().getMonotonicFrameCount();
+    if (m_globalIlluminationUpdatedFrame.exchange(frame) == frame) {
+        return;
+    }
+
+    m_rtInstanceData->update(*this);
+
+    m_globalIlluminationJobs->increment();
+    jobs().run(JobDeclaration(
+        [this, frameIndex](JobContext &context) {
+            (void)context;
+            m_globalIllumination->populateProbesCompute(*this, frameIndex);
+        },
+        JobPriority::NORMAL, QueueAffinity::COMPUTE, m_globalIlluminationJobs.get(), "DDGI POPULATE"));
+}
 
 ecs::EntityAccessor Scene::createEntity(const std::string &name)
 {

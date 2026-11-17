@@ -23,7 +23,7 @@ namespace Rapture {
 
 class LightingPass : public RenderPass {
   public:
-    LightingPass(float width, float height, DynamicDiffuseGI *ddgi, VkFormat colorFormat = VK_FORMAT_B8G8R8A8_SRGB);
+    LightingPass(float width, float height, VkFormat colorFormat = VK_FORMAT_B8G8R8A8_SRGB);
     ~LightingPass();
 
     FramebufferSpecification getFramebufferSpecification();
@@ -51,8 +51,6 @@ class LightingPass : public RenderPass {
     std::vector<std::shared_ptr<UniformBuffer>> m_lightUBOs;
     std::vector<std::shared_ptr<UniformBuffer>> m_shadowDataUBOs;
     std::vector<std::shared_ptr<DescriptorSet>> m_descriptorSets; // all sets are in set 0
-
-    DynamicDiffuseGI *m_ddgi = nullptr;
 
     float m_width;
     float m_height;

@@ -14,7 +14,6 @@
 
 namespace Rapture {
 
-class DynamicDiffuseGI;
 
 /**
  * @brief Creation-time configuration for a probe debug pass
@@ -31,7 +30,7 @@ struct DDGIProbeDebugPassConfig {
  */
 class DDGIProbeDebugPass : public RenderPass {
   public:
-    DDGIProbeDebugPass(const DDGIProbeDebugPassConfig &config, const DynamicDiffuseGI *gi);
+    DDGIProbeDebugPass(const DDGIProbeDebugPassConfig &config);
     ~DDGIProbeDebugPass();
 
     CommandBufferLease record(const RenderPassContext &context, const SecondaryBufferInheritance &inheritance) override;
@@ -46,7 +45,6 @@ class DDGIProbeDebugPass : public RenderPass {
     void createPipeline();
 
   private:
-    const DynamicDiffuseGI *m_gi;
     DDGIProbeDebugPassConfig m_config;
 
     const RenderContext *m_rc = nullptr;
