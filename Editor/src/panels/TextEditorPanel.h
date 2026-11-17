@@ -8,8 +8,6 @@
 #include <components/text_area.h>
 
 #include <rapture/assets/asset_manager/AssetCommon.h>
-#include <rapture/assets/scripts/AScript.h>
-#include <rapture/core/utils/Ref.h>
 
 #include <cstdint>
 #include <filesystem>
@@ -32,9 +30,9 @@ class TextEditorPanel : public Panel {
     bool openFile(const std::filesystem::path &path);
 
     /**
-     * @brief Read a script asset into the editor, replacing whatever it holds.
-     * @param handle The script asset to edit
-     * @return Whether the asset could be read
+     * @brief Read a script's Lua file into the editor, replacing whatever it holds.
+     * @param handle The script asset whose Lua to edit
+     * @return Whether the Lua file could be read
      */
     bool openScript(Rapture::AssetHandle handle);
 
@@ -59,12 +57,6 @@ class TextEditorPanel : public Panel {
     void refreshStatus();
 
     /**
-     * @brief Puts the edited text back into the script asset and out to wherever its Lua lives
-     * @return Whether the Lua could be written
-     */
-    bool saveScript();
-
-    /**
      * @brief Shows text in the editor as the whole of what is open, with the cursor back at the top
      * @param text The text to show
      */
@@ -73,8 +65,6 @@ class TextEditorPanel : public Panel {
   private:
     TextBuffer m_buffer;
     std::filesystem::path m_path;
-    Rapture::AssetHandle m_script = Rapture::INVALID_ASSET_HANDLE;
-    Rapture::Ref<Rapture::AScript> m_scriptAsset;
     uint64_t m_savedRevision = 0;
 
     Amethyst::TextArea *m_editor = nullptr;

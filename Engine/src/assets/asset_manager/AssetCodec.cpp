@@ -3,6 +3,7 @@
 #include <rapture/assets/asset_manager/Asset.h>
 #include <rapture/assets/asset_manager/AssetRegistry.h>
 #include <rapture/core/utils/Log.h>
+#include <rapture/core/utils/PathUtils.h>
 #include <rapture/scene/instances/InstanceRegistry.h>
 
 #include <cstring>
@@ -100,27 +101,6 @@ struct ByteReader {
     }
 };
 
-// relative to the asset file, so a project keeps its sources when it is moved or checked out elsewhere
-static std::filesystem::path s_sourcePathToStore(const std::filesystem::path &sourcePath, const std::filesystem::path &assetFolder)
-{
-    if (sourcePath.is_relative()) {
-        return sourcePath;
-    }
-
-    std::error_code ec;
-    std::filesystem::path relative = std::filesystem::relative(sourcePath, assetFolder, ec);
-    return ec || relative.empty() ? sourcePath : relative;
-}
-
-static std::filesystem::path s_sourcePathFromStore(const std::filesystem::path &stored, const std::filesystem::path &assetFolder)
-{
-    if (stored.empty() || stored.is_absolute()) {
-        return stored;
-    }
-
-    return (assetFolder / stored).lexically_normal();
-}
-
 // TODO: importConfig (variant) is not encoded yet; assets reload from the payload, reimport config comes later
 static std::vector<uint8_t> s_serializeMetadata(const AssetMetadata &metadata, const std::filesystem::path &assetFolder)
 {
@@ -134,7 +114,8 @@ static std::vector<uint8_t> s_serializeMetadata(const AssetMetadata &metadata, c
     bool hasProvenance = metadata.provenance.has_value();
     s_append(out, static_cast<uint8_t>(hasProvenance ? 1 : 0));
     if (hasProvenance) {
-        s_appendString(out, s_sourcePathToStore(metadata.provenance->sourcePath, assetFolder).generic_string());
+        // relative to the asset file, so a project keeps its sources when it is moved or checked out elsewhere
+        s_appendString(out, Path_relativeToFolder(metadata.provenance->sourcePath, assetFolder).generic_string());
         bool hasSubIndex = metadata.provenance->sourceSubIndex.has_value();
         s_append(out, static_cast<uint8_t>(hasSubIndex ? 1 : 0));
         s_append(out, hasSubIndex ? *metadata.provenance->sourceSubIndex : uint32_t{0});
@@ -160,7 +141,7 @@ static std::unique_ptr<AssetMetadata> s_deserializeMetadata(std::span<const uint
 
     if (reader.read<uint8_t>() != 0) {
         AssetProvenance provenance;
-        provenance.sourcePath = s_sourcePathFromStore(reader.readString(), assetFolder);
+        provenance.sourcePath = Path_resolveFromFolder(reader.readString(), assetFolder);
         bool hasSubIndex = reader.read<uint8_t>() != 0;
         uint32_t subIndex = reader.read<uint32_t>();
         if (hasSubIndex) {

@@ -3,8 +3,6 @@
 
 #include <rapture/assets/asset_manager/Asset.h>
 
-#include <memory>
-#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -30,25 +28,12 @@ class AScript : public Asset {
     std::string_view source() const { return m_source; }
 
     /**
-     * @brief Replaces the Lua this holds, without writing it anywhere
-     * @param source The Lua to run
-     */
-    void setSource(std::string source);
-
-    /**
-     * @brief Writes nothing, the Lua lives in its own file
+     * @brief Writes nothing, the Lua file is the content
      * @return An empty payload
      */
     std::vector<uint8_t> serialize() const override;
 
     bool reimport(const AssetMetadata &metadata) override;
-
-    /**
-     * @brief Builds a script, reading its Lua out of the file the metadata names
-     * @param metadata The asset metadata
-     * @return The script, or nullptr if its Lua file could not be read
-     */
-    static std::unique_ptr<AScript> deserialize(const AssetMetadata &metadata);
 
   private:
     std::string m_source;

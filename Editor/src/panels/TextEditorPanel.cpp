@@ -108,8 +108,6 @@ bool TextEditorPanel::openFile(const std::filesystem::path &path)
         return false;
     }
 
-    m_script = Rapture::INVALID_ASSET_HANDLE;
-    m_scriptAsset = {};
     m_path = path;
     loadText(contents);
     return true;
@@ -117,27 +115,17 @@ bool TextEditorPanel::openFile(const std::filesystem::path &path)
 
 bool TextEditorPanel::openScript(Rapture::AssetHandle handle)
 {
-    Rapture::Ref<Rapture::AScript> script = Rapture::AssetManager::getAsset<Rapture::AScript>(handle);
-    if (!script) {
-        RP_ERROR("script {} could not be read", handle);
+    const std::filesystem::path source = Rapture::AssetManager::getAssetMetadata(handle).getSourcePath();
+    if (source.empty()) {
+        RP_ERROR("script {} names no Lua file", handle);
         return false;
     }
 
-    m_script = handle;
-    m_path = Rapture::AssetManager::getAssetMetadata(handle).getSourcePath();
-
-    std::string contents{script->source()};
-    m_scriptAsset = std::move(script);
-    loadText(contents);
-    return true;
+    return openFile(source);
 }
 
 bool TextEditorPanel::save()
 {
-    if (m_scriptAsset) {
-        return saveScript();
-    }
-
     if (m_path.empty()) {
         RP_WARN("Nothing to save, no file is open");
         return false;
@@ -153,21 +141,6 @@ bool TextEditorPanel::save()
     return true;
 }
 
-bool TextEditorPanel::saveScript()
-{
-    std::string text = m_buffer.text();
-    if (!s_writeFile(m_path, text)) {
-        RP_ERROR("Could not write {}", m_path.string());
-        return false;
-    }
-
-    m_scriptAsset->setSource(std::move(text));
-
-    m_savedRevision = m_buffer.revision();
-    refreshStatus();
-    return true;
-}
-
 void TextEditorPanel::refreshStatus()
 {
     if (m_status == nullptr) {
@@ -175,9 +148,7 @@ void TextEditorPanel::refreshStatus()
     }
 
     std::string label;
-    if (m_scriptAsset) {
-        label = Rapture::AssetManager::getAssetMetadata(m_script).getName();
-    } else if (m_path.empty()) {
+    if (m_path.empty()) {
         label = "No file";
     } else {
         label = m_path.filename().string();

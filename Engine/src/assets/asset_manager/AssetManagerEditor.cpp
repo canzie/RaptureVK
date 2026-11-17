@@ -136,12 +136,12 @@ static std::unique_ptr<Asset> s_buildImportData(AssetImportDataVariant &data, st
 }
 
 /**
- * @brief Where a script's Lua lives once imported, which is beside its asset file, since the Lua file is the script
- * @param source The Lua file being imported
+ * @brief Where an imported file lives when it is the asset's content, which is beside the asset file
+ * @param source The file being imported
  * @param outputFolder The folder the asset file goes into
- * @return The Lua file beside the asset file
+ * @return The file beside the asset file
  */
-static std::filesystem::path s_scriptSourceBesideAsset(const std::filesystem::path &source, const std::filesystem::path &outputFolder)
+static std::filesystem::path s_contentBesideAssetFile(const std::filesystem::path &source, const std::filesystem::path &outputFolder)
 {
     std::filesystem::path destination = outputFolder / source.filename();
 
@@ -150,12 +150,12 @@ static std::filesystem::path s_scriptSourceBesideAsset(const std::filesystem::pa
 }
 
 /**
- * @brief Copies a Lua file to where its script lives
- * @param source The Lua file being imported
- * @param destination Where the script's Lua lives
- * @return True if the Lua is now at the destination
+ * @brief Copies an imported file to where it lives as the asset's content
+ * @param source The file being imported
+ * @param destination Where the content lives
+ * @return True if the content is now at the destination
  */
-static bool s_copyScriptSource(const std::filesystem::path &source, const std::filesystem::path &destination)
+static bool s_copyContentBesideAssetFile(const std::filesystem::path &source, const std::filesystem::path &destination)
 {
     if (std::filesystem::exists(destination)) {
         RP_CORE_ERROR("'{}' already exists, so '{}' cannot be imported beside it", destination.string(), source.string());
@@ -266,8 +266,8 @@ Asset *AssetManagerEditor::importAsset(const AssetImportFileRequest &request)
     AssetType assetType = determineAssetType(request.source.string());
 
     std::filesystem::path source = request.source;
-    if (assetType == ASSET_SCRIPT && !request.output.empty()) {
-        source = s_scriptSourceBesideAsset(request.source, request.output);
+    if (AssetRegistry::contentIsSourceFile(assetType) && !request.output.empty()) {
+        source = s_contentBesideAssetFile(request.source, request.output);
     }
 
     // A reimport of the same source with the same config lands on the same type, so only that bucket can hold it
@@ -277,7 +277,7 @@ Asset *AssetManagerEditor::importAsset(const AssetImportFileRequest &request)
         }
     }
 
-    if (source != request.source && !s_copyScriptSource(request.source, source)) {
+    if (source != request.source && !s_copyContentBesideAssetFile(request.source, source)) {
         return nullptr;
     }
 
@@ -527,7 +527,8 @@ Asset *AssetManagerEditor::registerReservedAsset(AssetHandle handle, std::unique
 
 std::unique_ptr<Asset> AssetManagerEditor::loadFromMetadata(AssetHandle handle, AssetMetadata &metadata)
 {
-    if (!metadata.assetPath.empty() && std::filesystem::exists(metadata.assetPath)) {
+    const bool hasPayload = !AssetRegistry::contentIsSourceFile(metadata.assetType);
+    if (hasPayload && !metadata.assetPath.empty() && std::filesystem::exists(metadata.assetPath)) {
         std::vector<uint8_t> payload = AssetCodec::readRaptureAssetPayload(metadata.assetPath);
         if (std::unique_ptr<Asset> asset = s_deserializeAsset(metadata, payload)) {
             asset->setHandle(handle);

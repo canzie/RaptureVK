@@ -20,11 +20,6 @@ const TypeInfo &AScript::type() const
     return staticType();
 }
 
-void AScript::setSource(std::string source)
-{
-    m_source = std::move(source);
-}
-
 std::vector<uint8_t> AScript::serialize() const
 {
     return {};
@@ -34,7 +29,7 @@ bool AScript::reimport(const AssetMetadata &metadata)
 {
     std::filesystem::path path = metadata.getSourcePath();
     if (path.empty()) {
-        RP_CORE_ERROR("'{}' names no Lua file, recreate it so its Lua lives in a file of its own", metadata.getName());
+        RP_CORE_ERROR("'{}' names no Lua file", metadata.getName());
         return false;
     }
 
@@ -46,12 +41,6 @@ bool AScript::reimport(const AssetMetadata &metadata)
 
     m_source.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
     return true;
-}
-
-std::unique_ptr<AScript> AScript::deserialize(const AssetMetadata &metadata)
-{
-    auto script = std::make_unique<AScript>(std::string{});
-    return script->reimport(metadata) ? std::move(script) : nullptr;
 }
 
 } // namespace Rapture

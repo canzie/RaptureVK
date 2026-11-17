@@ -6,7 +6,6 @@
 #include <rapture/assets/meshes/ASkeletalMesh.h>
 #include <rapture/assets/meshes/AStaticMesh.h>
 #include <rapture/assets/modules/AModule.h>
-#include <rapture/assets/scripts/AScript.h>
 #include <rapture/assets/shaders/AShader.h>
 #include <rapture/assets/skeletons/ASkeleton.h>
 #include <rapture/assets/textures/ATexture.h>
@@ -123,11 +122,8 @@ static constexpr std::array<AssetClass, ASSET_TYPE_COUNT> ASSET_CLASSES = {{
      .fileMagic = Asset_fourCC("LUA "),
      .fileExtension = ".rscript",
      .displayName = "Script",
-     .deserialize = [](const AssetMetadata &metadata, std::span<const uint8_t> payload) -> std::unique_ptr<Asset> {
-         (void)payload;
-         return AScript::deserialize(metadata);
-     },
-     .import = Asset_importScript},
+     .import = Asset_importScript,
+     .contentIsSourceFile = true},
 }};
 
 // the table is read by indexing it with an AssetType, so an entry in the wrong slot would answer for another class
@@ -187,6 +183,12 @@ std::string_view AssetRegistry::displayName(AssetType type)
 {
     const AssetClass *entry = find(type);
     return entry != nullptr ? entry->displayName : "Unknown";
+}
+
+bool AssetRegistry::contentIsSourceFile(AssetType type)
+{
+    const AssetClass *entry = find(type);
+    return entry != nullptr && entry->contentIsSourceFile;
 }
 
 bool AssetRegistry::isRaptureExtension(std::string_view extension)
