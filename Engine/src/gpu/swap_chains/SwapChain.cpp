@@ -104,6 +104,10 @@ void SwapChain::invalidate()
         createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     }
 
+    // lets a presented frame be read back, for screenshots
+    createInfo.imageUsage |= swapChainSupport.capabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    m_imageUsage = createInfo.imageUsage;
+
     if (m_queueFamilyIndices.familyIndices[GRAPHICS] != m_queueFamilyIndices.familyIndices[PRESENT]) {
         createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         createInfo.queueFamilyIndexCount = 2;

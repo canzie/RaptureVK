@@ -50,6 +50,7 @@ class SwapChain {
 
     VkExtent2D getExtent() const { return m_swapChainExtent; }
     VkFormat getImageFormat() const { return m_swapChainImageFormat; }
+    VkImageUsageFlags getImageUsage() const { return m_imageUsage; }
     std::vector<VkImageView> getImageViews() const { return m_swapChainImageViews; }
     std::vector<VkImage> getImages() const { return m_swapChainImages; }
     VkSwapchainKHR getSwapChainVk() const { return m_swapChain; }
@@ -90,6 +91,7 @@ class SwapChain {
     std::vector<VkImage> m_swapChainImages;
     std::vector<VkImageView> m_swapChainImageViews;
     VkFormat m_swapChainImageFormat = VK_FORMAT_UNDEFINED;
+    VkImageUsageFlags m_imageUsage = 0;
     VkExtent2D m_swapChainExtent{};
 
     uint32_t m_imageCount = 0;

@@ -2,6 +2,7 @@
 #define RAPTURE__RENDER_WINDOW_H
 
 #include <rapture/core/events/EventSignal.h>
+#include <rapture/core/utils/Rgba8Image.h>
 #include <rapture/gpu/command_buffers/CommandBufferLease.h>
 #include <rapture/platform/WindowContext.h>
 
@@ -10,6 +11,7 @@
 #include <cstddef>
 #include <functional>
 #include <memory>
+#include <vector>
 
 namespace Rapture {
 
@@ -59,6 +61,14 @@ class RenderWindow {
 
     void onUpdate();
 
+    using CaptureCallback = std::function<void(const Rgba8Image &image)>;
+
+    /**
+     * @brief Reads back the next frame this window presents
+     * @param onCaptured Receives the frame once the GPU has drawn it, or an empty image if it cannot be read back
+     */
+    void captureNextFrame(CaptureCallback onCaptured);
+
     using FrameCallback = std::function<void(RenderWindow &)>;
     using CloseCallback = std::function<void(void)>;
 
@@ -82,6 +92,8 @@ class RenderWindow {
     std::shared_ptr<SwapChain> m_swapChain;
     EventConnection m_swapchainRecreateConn;
     EventConnection m_windowResizeConn;
+
+    std::vector<CaptureCallback> m_pendingCaptures;
 
     CommandBufferLease m_currentCommandBuffer;
     uint32_t m_currentFrame = 0;
