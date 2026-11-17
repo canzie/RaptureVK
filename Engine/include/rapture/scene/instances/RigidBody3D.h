@@ -63,6 +63,8 @@ class RigidBody3D : public PhysicsBody3D {
     void serialize(WriteNode node) const override;
     void deserialize(ReadNode node) override;
 
+    void onOwnerWorldTransformChanged() override;
+
   protected:
     void onAttach() override;
     void onDetach() override;

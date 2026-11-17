@@ -268,6 +268,9 @@ void Node3D::updateWorldTransform()
     }
 
     onWorldTransformChanged();
+    for (const auto &attached : components()) {
+        attached->onOwnerWorldTransformChanged();
+    }
     updateDescendantWorldTransforms(*this);
 }
 

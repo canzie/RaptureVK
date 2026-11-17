@@ -165,6 +165,16 @@ void RigidBody3D::applySimulatedTransform(const glm::vec3 &position, const glm::
         transform::compose(transform::translation(world), transform::rotation(world), target->scale()));
 }
 
+void RigidBody3D::onOwnerWorldTransformChanged()
+{
+    if (m_body == nullptr) {
+        return;
+    }
+
+    const glm::mat4 body = bodyTransform(scaledLocalTransform());
+    m_body->setTransform(transform::translation(body), transform::rotation(body));
+}
+
 void RigidBody3D::setShape(const physics::CollisionShape &shape)
 {
     m_shape = shape;

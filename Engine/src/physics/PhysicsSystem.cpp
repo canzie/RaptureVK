@@ -135,6 +135,17 @@ PhysicsSystem::~PhysicsSystem()
     s_unregisterJoltGlobals();
 }
 
+void PhysicsSystem::stopAllMotion()
+{
+    JPH::BodyIDVector bodies;
+    m_physicsSystem.GetBodies(bodies);
+    for (const JPH::BodyID &body : bodies) {
+        m_bodyInterface->SetLinearAndAngularVelocity(body, JPH::Vec3::sZero(), JPH::Vec3::sZero());
+    }
+
+    m_accumulator = 0.0f;
+}
+
 void PhysicsSystem::onUpdate(float deltaTime)
 {
     if (deltaTime <= 0.0f) {

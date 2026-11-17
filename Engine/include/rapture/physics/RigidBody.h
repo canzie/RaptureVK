@@ -30,6 +30,13 @@ class RigidBody {
      */
     void getTransform(glm::vec3 &outPosition, glm::quat &outRotation) const;
 
+    /**
+     * @brief Moves this body to a world transform and wakes it
+     * @param position The world space position
+     * @param rotation The world space orientation
+     */
+    void setTransform(const glm::vec3 &position, const glm::quat &rotation);
+
     void setLinearVelocity(const glm::vec3 &velocity);
     glm::vec3 linearVelocity() const;
 

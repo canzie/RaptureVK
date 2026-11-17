@@ -396,6 +396,10 @@ void Scene::beginSimulation()
 void Scene::endSimulation()
 {
     m_scriptRuntime.reset();
+
+    if (m_physics != nullptr) {
+        m_physics->stopAllMotion();
+    }
 }
 
 SerialDocument Scene::snapshot() const

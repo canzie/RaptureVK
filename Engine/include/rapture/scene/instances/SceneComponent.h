@@ -46,6 +46,11 @@ class SceneComponent : public Instance {
      */
     void detach();
 
+    /**
+     * @brief Called each time the owner's world transform is rebuilt by anything other than the simulation
+     */
+    virtual void onOwnerWorldTransformChanged() {}
+
   protected:
     /**
      * @brief Called once this component has been attached to an owner, for claiming what it needs

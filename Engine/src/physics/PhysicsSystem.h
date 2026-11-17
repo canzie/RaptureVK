@@ -56,6 +56,11 @@ class PhysicsSystem {
      */
     void getSimulatedStates(std::vector<physics::BodyState> &outStates) const;
 
+    /**
+     * @brief Brings every body to rest and drops the time not yet stepped
+     */
+    void stopAllMotion();
+
     void setGravity(const glm::vec3 &gravity);
     glm::vec3 getGravity() const;
 

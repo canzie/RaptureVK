@@ -31,6 +31,16 @@ void RigidBody::getTransform(glm::vec3 &outPosition, glm::quat &outRotation) con
     outRotation = joltToGlmQuat(rotation);
 }
 
+void RigidBody::setTransform(const glm::vec3 &position, const glm::quat &rotation)
+{
+    if (!m_id.isValid()) {
+        return;
+    }
+
+    m_system->bodyInterface().SetPositionAndRotation(JPH::BodyID(m_id.value), glmToJoltPosition(position), glmToJoltQuat(rotation),
+                                                     JPH::EActivation::Activate);
+}
+
 void RigidBody::setLinearVelocity(const glm::vec3 &velocity)
 {
     if (!m_id.isValid()) {
