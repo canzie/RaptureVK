@@ -84,7 +84,6 @@ class PhysicsSystem {
     physics::ObjectVsBroadPhaseLayerFilterImpl m_objectVsBroadPhaseLayerFilter;
     physics::ObjectLayerPairFilterImpl m_objectLayerPairFilter;
     std::unique_ptr<JPH::TempAllocatorImpl> m_tempAllocator;
-    JPH::JobSystemThreadPool m_jobSystem;
     JPH::PhysicsSystem m_physicsSystem;
     JPH::BodyInterface *m_bodyInterface = nullptr;
     FreeList<physics::CharacterRecord> m_characterRecords;

@@ -1,5 +1,7 @@
 #include "physics/PhysicsSystem.h"
 
+#include "physics/JoltFiberJobSystem.h"
+
 #include <Jolt/Core/Factory.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <Jolt/Physics/Body/BodyLock.h>
@@ -14,7 +16,6 @@
 
 #include <atomic>
 #include <cstdarg>
-#include <thread>
 
 JPH_SUPPRESS_WARNINGS
 
@@ -39,6 +40,7 @@ static bool s_assertFailedImpl(const char *inExpression, const char *inMessage, 
 #endif // JPH_ENABLE_ASSERTS
 
 static std::atomic<int> gWorldCount{0};
+static std::unique_ptr<physics::JoltFiberJobSystem> gJoltJobSystem;
 
 static void s_registerJoltGlobals()
 {
@@ -50,6 +52,7 @@ static void s_registerJoltGlobals()
     JPH_IF_ENABLE_ASSERTS(JPH::AssertFailed = s_assertFailedImpl;)
     JPH::Factory::sInstance = new JPH::Factory();
     JPH::RegisterTypes();
+    gJoltJobSystem = std::make_unique<physics::JoltFiberJobSystem>(JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers);
 }
 
 static void s_unregisterJoltGlobals()
@@ -57,15 +60,10 @@ static void s_unregisterJoltGlobals()
     if (gWorldCount.fetch_sub(1) != 1) {
         return;
     }
+    gJoltJobSystem.reset();
     JPH::UnregisterTypes();
     delete JPH::Factory::sInstance;
     JPH::Factory::sInstance = nullptr;
-}
-
-static int s_jobThreadCount()
-{
-    const int hardwareThreads = static_cast<int>(std::thread::hardware_concurrency());
-    return std::max(1, hardwareThreads - 1);
 }
 
 // A jump that arrives mid air is served by the first step that finds ground, but only for as long
@@ -124,7 +122,6 @@ PhysicsSystem::PhysicsSystem(const physics::SystemConfig &config)
     s_registerJoltGlobals();
 
     m_tempAllocator = std::make_unique<JPH::TempAllocatorImpl>(config.tempAllocatorSize);
-    m_jobSystem.Init(JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers, s_jobThreadCount());
 
     m_physicsSystem.Init(config.maxBodies, config.numBodyMutexes, config.maxBodyPairs, config.maxContactConstraints,
                          m_broadPhaseLayerInterface, m_objectVsBroadPhaseLayerFilter, m_objectLayerPairFilter);
@@ -148,7 +145,7 @@ void PhysicsSystem::onUpdate(float deltaTime)
 
     uint32_t stepsTaken = 0;
     while (m_accumulator >= m_fixedTimeStep && stepsTaken < m_maxStepsPerUpdate) {
-        m_physicsSystem.Update(m_fixedTimeStep, 1, m_tempAllocator.get(), &m_jobSystem);
+        m_physicsSystem.Update(m_fixedTimeStep, 1, m_tempAllocator.get(), gJoltJobSystem.get());
         stepCharacters(m_fixedTimeStep);
         m_accumulator -= m_fixedTimeStep;
         ++stepsTaken;

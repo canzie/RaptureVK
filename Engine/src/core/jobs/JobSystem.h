@@ -57,6 +57,8 @@ class JobSystem {
     };
     Stats getStats() const;
 
+    uint32_t getWorkerCount() const { return static_cast<uint32_t>(m_workers.size()); }
+
   private:
     JobSystem();
     void close();
