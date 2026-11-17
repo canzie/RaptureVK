@@ -61,13 +61,13 @@ Scene::Scene(const std::string &sceneName)
 
 Scene::~Scene()
 {
-    if (m_globalIllumination == nullptr) {
-        return;
+    if (m_globalIllumination != nullptr) {
+        // a probe update may still be recording against this scene, and submitted frames may still trace it
+        jobs().waitFor(*m_globalIlluminationJobs, 0);
+        Application::getInstance().getVulkanContext().waitIdle();
     }
 
-    // a probe update may still be recording against this scene, and submitted frames may still trace it
-    jobs().waitFor(*m_globalIlluminationJobs, 0);
-    Application::getInstance().getVulkanContext().waitIdle();
+    clearInstances();
 }
 
 void Scene::enableGlobalIllumination()
@@ -377,7 +377,7 @@ void Scene::destroyInstance(SceneObject *instance)
         return;
     }
 
-    SceneObject::destroy(parent->removeChild(instance));
+    parent->destroyChild(instance);
 }
 
 void Scene::serialize(WriteNode node) const
@@ -397,7 +397,7 @@ void Scene::serialize(WriteNode node) const
 void Scene::clearInstances()
 {
     while (!m_root->children().empty()) {
-        SceneObject::destroy(m_root->removeChild(m_root->children().front().get()));
+        m_root->destroyChild(m_root->children().front().get());
     }
 }
 
@@ -528,7 +528,7 @@ static void s_destroyInstancesNotInSnapshot(SceneObject &parent, const std::unor
         SceneObject *child = parent.children()[i - 1].get();
 
         if (gained.contains(child->id())) {
-            SceneObject::destroy(parent.removeChild(child));
+            parent.destroyChild(child);
             continue;
         }
 

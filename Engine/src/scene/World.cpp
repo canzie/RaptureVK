@@ -33,7 +33,7 @@ static Module *s_spawnModule(AssetHandle handle, Scene &scene)
 
     Module *placedModule = scene.root()->add<Module>(metadata.getName());
     if (!placedModule->setAssetHandle(handle)) {
-        SceneObject::destroy(scene.root()->removeChild(placedModule));
+        scene.root()->destroyChild(placedModule);
         return nullptr;
     }
 

@@ -127,7 +127,7 @@ static void s_spawnModule(Rapture::AssetHandle handle, Rapture::Scene *scene)
     Rapture::Module *placedModule = scene->root()->add<Rapture::Module>(metadata.getName());
 
     if (!placedModule->setAssetHandle(handle)) {
-        Rapture::SceneObject::destroy(scene->root()->removeChild(placedModule));
+        scene->root()->destroyChild(placedModule);
         RP_WARN("Failed to spawn asset {} into the scene", handle);
     }
 }

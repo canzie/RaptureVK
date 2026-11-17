@@ -149,17 +149,6 @@ class Instance : public Typed {
     virtual void onReady();
 
   private:
-    /**
-     * @brief Fires onDestroy, once however often it is asked
-     */
-    void notifyDestroy();
-
-    /**
-     * @brief Clears the alive flag every unowned reference to this instance holds
-     */
-    void markDead();
-
-  private:
     Scene *m_scene;
     InstanceId m_id;
     std::string m_name;
@@ -167,7 +156,6 @@ class Instance : public Typed {
     uint32_t m_tickSlot;
     bool m_isReady = false;
     bool m_isBeingDestroyed = false;
-    bool m_destroyNotified = false;
     std::shared_ptr<bool> m_alive;
 
     friend class SceneObject;

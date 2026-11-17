@@ -7,6 +7,8 @@
 #include <rapture/scene/components/Components.h>
 #include <rapture/scene/instances/InstanceRegistry.h>
 
+#include <algorithm>
+
 namespace Rapture {
 
 static constexpr std::string_view KEY_ID = "id";
@@ -36,11 +38,6 @@ static void s_collectSubtree(SceneObject &object, std::vector<Instance *> &out)
 
 SceneObject::~SceneObject()
 {
-    // reached without destroy() when an owner simply drops the object
-    if (!m_destroyNotified) {
-        beginSubtreeDestruction(*this);
-    }
-
     for (const auto &component : m_components) {
         component->detach();
     }
@@ -82,24 +79,10 @@ void SceneObject::beginSubtreeDestruction(SceneObject &object)
         instance->m_isBeingDestroyed = true;
     }
 
-    // all of the subtree is told before any of it dies, so a listener still finds the rest intact
+    // all of the subtree is marked before any of it is told, so no listener can pull a part of it out
     for (Instance *instance : dying) {
-        instance->notifyDestroy();
+        instance->onDestroy.fire(instance);
     }
-
-    for (Instance *instance : dying) {
-        instance->markDead();
-    }
-}
-
-void SceneObject::destroy(std::unique_ptr<SceneObject> object)
-{
-    if (object == nullptr) {
-        return;
-    }
-
-    beginSubtreeDestruction(*object);
-    object.reset();
 }
 
 void SceneObject::setSerialized(bool serialized)
@@ -123,7 +106,7 @@ SceneObject *SceneObject::addChild(std::unique_ptr<SceneObject> child, InternalM
 
     if (isBeingDestroyed()) {
         RP_CORE_ERROR("'{}' is being destroyed and cannot adopt '{}'", name(), child->name());
-        destroy(std::move(child));
+        beginSubtreeDestruction(*child);
         return nullptr;
     }
 
@@ -181,20 +164,19 @@ void SceneObject::destroyChild(SceneObject *child)
 {
     RP_ASSERT(child != nullptr, "a scene object cannot destroy nothing");
 
-    for (size_t i = 0; i < m_children.size(); i++) {
-        if (m_children[i].get() != child) {
-            continue;
-        }
-
-        if (child->isInternal()) {
-            m_internalCount--;
-        }
-
-        std::unique_ptr<SceneObject> owned = std::move(m_children[i]);
-        m_children.erase(m_children.begin() + static_cast<ptrdiff_t>(i));
-        destroy(std::move(owned));
+    if (child->parent() != this || child->isBeingDestroyed()) {
         return;
     }
+
+    beginSubtreeDestruction(*child);
+
+    // looked up after the listeners ran, since they may have changed the other children
+    auto found = std::find_if(m_children.begin(), m_children.end(),
+                              [child](const std::unique_ptr<SceneObject> &owned) { return owned.get() == child; });
+    if (child->isInternal()) {
+        m_internalCount--;
+    }
+    m_children.erase(found);
 }
 
 void SceneObject::onParentChanged()
@@ -288,10 +270,9 @@ void SceneObject::removeComponent(SceneComponent *component)
     }
 
     component->m_isBeingDestroyed = true;
-    component->notifyDestroy();
-    component->markDead();
+    component->onDestroy.fire(component);
 
-    detachComponent(component);
+    std::unique_ptr<SceneComponent> removed = detachComponent(component);
 }
 
 void SceneObject::serialize(WriteNode node) const

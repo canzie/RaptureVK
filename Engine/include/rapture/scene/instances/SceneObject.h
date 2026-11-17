@@ -76,13 +76,13 @@ class SceneObject : public Instance {
      * @param child The child to release
      * @return The child, or nullptr if it is not a child of this object, is internal, or either is being destroyed
      */
-    std::unique_ptr<SceneObject> removeChild(SceneObject *child);
+    [[nodiscard]] std::unique_ptr<SceneObject> removeChild(SceneObject *child);
 
     /**
-     * @brief Destroys a scene object and its subtree, telling every listener in the subtree before any of it is torn down
-     * @param object The object to destroy, which may be null
+     * @brief Destroys a child and its subtree, telling every listener in the subtree before any of it is torn down
+     * @param child The child to destroy, internal or not
      */
-    static void destroy(std::unique_ptr<SceneObject> object);
+    void destroyChild(SceneObject *child);
 
     bool isInternal() const { return (m_flags & SCENE_OBJECT_FLAG_INTERNAL) != 0; }
 
@@ -209,7 +209,7 @@ class SceneObject : public Instance {
      * @param component The component to release
      * @return The component, or nullptr if it is not attached to this object or this object is being destroyed
      */
-    std::unique_ptr<SceneComponent> detachComponent(SceneComponent *component);
+    [[nodiscard]] std::unique_ptr<SceneComponent> detachComponent(SceneComponent *component);
 
     /**
      * @brief Detaches and destroys a component, telling its listeners before it is torn down
@@ -304,12 +304,6 @@ class SceneObject : public Instance {
      */
     bool loadContents(const DocumentHeader &header, SceneLoadContext &context);
 
-    /**
-     * @brief Unlinks a child and destroys it, whether it is internal or not
-     * @param child The child to destroy
-     */
-    void destroyChild(SceneObject *child);
-
   protected:
     ecs::EntityAccessor m_entity;
 
@@ -323,7 +317,7 @@ class SceneObject : public Instance {
     bool loadComponents(const DocumentHeader &header, SceneLoadContext &context);
 
     /**
-     * @brief Marks a subtree as being destroyed, tells every listener in it, then marks it dead
+     * @brief Marks a subtree as being destroyed, then tells every listener in it
      * @param object The root of the subtree
      */
     static void beginSubtreeDestruction(SceneObject &object);
