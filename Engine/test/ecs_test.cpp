@@ -60,6 +60,20 @@ TEST(EcsEntity, ReusedSlotLeavesStaleHandleInvalid)
     EXPECT_TRUE(registry.isValid(second));
 }
 
+TEST(EcsEntity, GenerationSkipsTheTombstone)
+{
+    Registry registry;
+    Entity entity = registry.create();
+    for (uint32_t i = 0; i < ENTITY_GENERATION_MASK + 1; i++) {
+        EXPECT_NE(EntityGeneration(entity), ENTITY_GENERATION_TOMBSTONE);
+        registry.destroy(entity);
+        entity = registry.create();
+    }
+
+    EXPECT_EQ(EntityIndex(entity), 0u);
+    EXPECT_EQ(EntityGeneration(entity), 1u);
+}
+
 TEST(EcsEntity, StaleHandleDoesNotSeeNewOccupantsComponents)
 {
     Registry registry;

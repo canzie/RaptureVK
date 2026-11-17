@@ -19,6 +19,7 @@ inline constexpr uint32_t ENTITY_GENERATION_BITS = 12;
 inline constexpr uint32_t ENTITY_INDEX_MASK = (1u << ENTITY_INDEX_BITS) - 1u;
 inline constexpr uint32_t ENTITY_GENERATION_MASK = (1u << ENTITY_GENERATION_BITS) - 1u;
 inline constexpr uint32_t ENTITY_MAX_COUNT = 1u << ENTITY_INDEX_BITS;
+inline constexpr uint32_t ENTITY_GENERATION_TOMBSTONE = ENTITY_GENERATION_MASK;
 inline constexpr Entity ENTITY_NULL = ~Entity(0);
 
 /**

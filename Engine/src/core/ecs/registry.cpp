@@ -78,6 +78,9 @@ void Registry::destroy(Entity entity)
 
     record.components = 0;
     record.generation = (record.generation + 1) & ENTITY_GENERATION_MASK;
+    if (record.generation == ENTITY_GENERATION_TOMBSTONE) {
+        record.generation = 0;
+    }
     record.flags &= ~ENTITY_FLAG_ALIVE;
     record.nextFree = m_freeHead;
     m_freeHead = index;
