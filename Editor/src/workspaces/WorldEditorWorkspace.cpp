@@ -9,6 +9,7 @@
 #include "panels/PropertiesPanel.h"
 #include "panels/ViewportPanel.h"
 #include "panels/WorldSettingsPanel.h"
+#include "scene/EditorCamera.h"
 #include "ui/AssetVisuals.h"
 #include "ui/menus/ContextMenuItems.h"
 
@@ -49,6 +50,7 @@ WorldEditorWorkspace::~WorldEditorWorkspace()
 {
     destroyPanels();
     Rapture::Application::getInstance().getViewportManager().destroyViewport(m_viewport);
+    m_editorCamera.reset();
 }
 
 std::string_view WorldEditorWorkspace::tabIcon() const
@@ -60,9 +62,11 @@ void WorldEditorWorkspace::setupViewport()
 {
     auto &app = Rapture::Application::getInstance();
 
+    m_editorCamera = std::make_unique<EditorCamera>(*m_context.scene);
+
     m_viewport = app.getViewportManager().createViewport({
         .scene = m_context.scene,
-        .camera = {},
+        .camera = m_editorCamera->camera().accessor(),
         .name = m_world->getName(),
         .targetType = Rapture::SceneRenderTarget::TargetType::OFFSCREEN,
         .width = INITIAL_VIEWPORT_WIDTH,
@@ -72,6 +76,7 @@ void WorldEditorWorkspace::setupViewport()
     m_viewport.viewport->createRenderer(Rapture::RendererType::DEFERRED);
 
     m_context.viewport = m_viewport.viewport;
+    m_context.editorCamera = m_editorCamera.get();
 }
 
 void WorldEditorWorkspace::build()

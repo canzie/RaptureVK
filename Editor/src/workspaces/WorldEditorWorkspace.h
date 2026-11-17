@@ -10,6 +10,9 @@
 #include <rapture/renderer/viewport/Viewport.h>
 #include <rapture/scene/World.h>
 
+#include <memory>
+
+class EditorCamera;
 class PlayLayer;
 
 /**
@@ -86,6 +89,7 @@ class WorldEditorWorkspace : public AssetWorkspace {
     Rapture::Ref<Rapture::AWorld> m_world;
     PlayLayer *m_playLayer = nullptr;
     Rapture::EventConnection m_viewportClickedConn;
+    std::unique_ptr<EditorCamera> m_editorCamera;
     Rapture::ViewportContext m_viewport;
 };
 

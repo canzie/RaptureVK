@@ -21,6 +21,7 @@ SkeletalMeshWorkspace::SkeletalMeshWorkspace(const EditorContext &context, Raptu
     mesh->setMesh(handle);
 
     m_context.viewport = preview().createViewport();
+    m_context.editorCamera = preview().editorCamera();
 
     Rapture::Mesh3D *placed[] = {mesh};
     preview().centreMeshOnOrigin(placed);

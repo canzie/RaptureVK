@@ -5,6 +5,7 @@
 
 #include <amethyst/Amethyst.h>
 #include <rapture/assets/asset_manager/AssetCommon.h>
+#include <rapture/input/ControlInput.h>
 
 #include <cstdint>
 #include <filesystem>
@@ -23,6 +24,7 @@ class Viewport;
 class World;
 } // namespace Rapture
 
+class EditorCamera;
 class EditorConfig;
 class WindowManager;
 class WorkspaceManager;
@@ -53,6 +55,15 @@ class UiTextures {
 };
 
 /**
+ * @brief The editor camera controls, read from the keyboard and mouse once per frame
+ */
+struct EditorCameraInput {
+    Rapture::ControlInput intent;
+    /// Whether an editor camera holds the cursor this frame
+    bool cursorCaptured = false;
+};
+
+/**
  * @brief What every part of the editor can reach, held by the shell and handed down by reference.
  */
 struct EditorContext {
@@ -63,6 +74,7 @@ struct EditorContext {
     ShortcutRegistry *shortcuts = nullptr;
     EditorConfig *config = nullptr;
     Rapture::Project *project = nullptr;
+    EditorCameraInput *cameraInput = nullptr;
 };
 
 /**
@@ -76,6 +88,8 @@ struct WorkspaceContext {
     /// Set only by a workspace whose scene belongs to a world
     Rapture::World *world = nullptr;
     Rapture::Viewport *viewport = nullptr;
+    /// Set only when the viewport looks through a camera the editor flies
+    EditorCamera *editorCamera = nullptr;
     /// Owned by the workspace, so what one workspace selects never reaches the panels of another
     EntitySelection *selection = nullptr;
     Amethyst::DockingLayer *contentDock = nullptr;

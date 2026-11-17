@@ -31,6 +31,7 @@ SkeletonWorkspace::SkeletonWorkspace(const EditorContext &context, Rapture::Asse
 {
     preview().addGroundAndSky();
     m_context.viewport = preview().createViewport();
+    m_context.editorCamera = preview().editorCamera();
 
     setupPose();
     spawnPreviewMeshes();

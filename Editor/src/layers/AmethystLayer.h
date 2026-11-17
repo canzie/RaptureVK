@@ -87,6 +87,16 @@ class AmethystLayer : public Rapture::Layer {
 
     void updateShortcuts();
 
+    /**
+     * @brief Reads this frame's editor camera controls
+     */
+    void readEditorCameraInput();
+
+    /**
+     * @brief Holds the cursor while an editor camera wants it and frees it after
+     */
+    void applyEditorCameraCursor();
+
     void openDemoWindow(void);
 
     /**
@@ -111,6 +121,8 @@ class AmethystLayer : public Rapture::Layer {
     EditorConfig m_config;
     UiTextures m_textures{m_backend};
     EditorContext m_editorContext;
+    EditorCameraInput m_cameraInput;
+    bool m_editorCameraHoldsCursor = false;
 
     std::unique_ptr<WindowManager> m_windowManager;
     std::unique_ptr<WorkspaceManager> m_workspaceManager;

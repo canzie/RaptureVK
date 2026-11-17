@@ -1,10 +1,13 @@
 #include "PreviewScene.h"
 
+#include "scene/EditorCamera.h"
+
 #include <rapture/app/Application.h>
 #include <rapture/assets/asset_manager/ReservedAssets.h>
 #include <rapture/gpu/render_targets/SceneRenderTarget.h>
 #include <rapture/renderer/viewport/ViewportManager.h>
 #include <rapture/scene/Scene.h>
+#include <rapture/scene/instances/Camera3D.h>
 #include <rapture/scene/instances/DirectionalLight3D.h>
 #include <rapture/scene/instances/Environment.h>
 #include <rapture/scene/instances/StaticMesh3D.h>
@@ -31,6 +34,7 @@ PreviewScene::~PreviewScene()
 {
     Rapture::Application::getInstance().getViewportManager().destroyViewport(m_viewport);
     m_viewport = {};
+    m_editorCamera.reset();
     m_scene.reset();
 }
 
@@ -59,6 +63,11 @@ Rapture::Viewport *PreviewScene::createViewport(Rapture::ecs::EntityAccessor cam
 {
     auto &app = Rapture::Application::getInstance();
 
+    if (!camera.isValid()) {
+        m_editorCamera = std::make_unique<EditorCamera>(*m_scene);
+        camera = m_editorCamera->camera().accessor();
+    }
+
     m_viewport = app.getViewportManager().createViewport({
         .scene = m_scene.get(),
         .camera = camera,
@@ -78,17 +87,12 @@ Rapture::Viewport *PreviewScene::createViewport(Rapture::ecs::EntityAccessor cam
 
 void PreviewScene::focusOn(const glm::vec3 &min, const glm::vec3 &max)
 {
-    if (m_viewport.viewport == nullptr) {
-        return;
-    }
-
-    Rapture::CameraController *controller = m_viewport.viewport->editorBinding().controller;
-    if (controller == nullptr) {
+    if (m_editorCamera == nullptr) {
         return;
     }
 
     const glm::vec3 center = (min + max) * 0.5f;
-    controller->focusOn(center, glm::length(max - min) * 0.5f, FOCUS_DIRECTION);
+    m_editorCamera->controller().focusOn(center, glm::length(max - min) * 0.5f, FOCUS_DIRECTION);
 }
 
 glm::vec3 PreviewScene::centreMeshOnOrigin(std::span<Rapture::Mesh3D *const> meshes)

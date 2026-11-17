@@ -16,6 +16,8 @@ class Mesh3D;
 class Scene;
 } // namespace Rapture
 
+class EditorCamera;
+
 /**
  * @brief A scene made to show one thing in, thrown away with whatever opened it.
  *
@@ -40,7 +42,7 @@ class PreviewScene {
 
     /**
      * @brief Creates the viewport this scene is drawn through
-     * @param camera Camera to draw from, invalid to let the viewport bring its own and a controller for it
+     * @param camera Camera to draw from, invalid to draw from an editor camera this scene creates
      * @return The viewport
      */
     Rapture::Viewport *createViewport(Rapture::ecs::EntityAccessor camera = {});
@@ -64,9 +66,16 @@ class PreviewScene {
     Rapture::Scene *scene() const { return m_scene.get(); }
     Rapture::Viewport *viewport() const { return m_viewport.viewport; }
 
+    /**
+     * @brief The camera the viewport is drawn from, when the viewport was not handed one
+     * @return The editor camera, or nullptr
+     */
+    EditorCamera *editorCamera() const { return m_editorCamera.get(); }
+
   private:
     std::string m_name;
     std::unique_ptr<Rapture::Scene> m_scene;
+    std::unique_ptr<EditorCamera> m_editorCamera;
     Rapture::ViewportContext m_viewport;
 };
 

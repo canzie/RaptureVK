@@ -11,6 +11,7 @@
 #include <rapture/core/utils/TracyProfiler.h>
 #include <rapture/gpu/command_buffers/CommandPool.h>
 #include <rapture/gpu/swap_chains/SwapChain.h>
+#include <rapture/input/Input.h>
 
 #include <components/common.h>
 #include <components/extensions/ui_drag_detector.h>
@@ -32,6 +33,21 @@ static constexpr int32_t LAUNCHER_WINDOW_WIDTH = 640;
 static constexpr int32_t LAUNCHER_WINDOW_HEIGHT = 520;
 
 static constexpr std::string_view LAYOUT_CONFIG_FILE = "layout.conf";
+
+static Rapture::ControlInput s_mapEditorCameraInput(const Rapture::Input &input)
+{
+    using namespace Rapture;
+    ControlInput intent;
+    intent.move.x = (input.isKeyPressed(KEY_D) ? 1.0f : 0.0f) - (input.isKeyPressed(KEY_A) ? 1.0f : 0.0f);
+    intent.move.y = (input.isKeyPressed(KEY_SPACE) ? 1.0f : 0.0f) - (input.isKeyPressed(KEY_LEFT_SHIFT) ? 1.0f : 0.0f);
+    intent.move.z = (input.isKeyPressed(KEY_W) ? 1.0f : 0.0f) - (input.isKeyPressed(KEY_S) ? 1.0f : 0.0f);
+    intent.look = input.mouseDelta();
+    intent.zoom = input.scrollDelta();
+    intent.orbit = input.isMouseButtonPressed(MOUSE_BUTTON_MIDDLE);
+    intent.pan = intent.orbit && input.isKeyPressed(KEY_LEFT_SHIFT);
+    intent.releaseControl = input.isKeyPressed(KEY_ESCAPE);
+    return intent;
+}
 
 VkDescriptorPool AmethystLayer::createUiDescriptorPool()
 {
@@ -176,6 +192,7 @@ void AmethystLayer::setupEditorContext()
         .shortcuts = &m_shortcutRegistry,
         .config = &m_config,
         .project = &Rapture::Application::getInstance().getProject(),
+        .cameraInput = &m_cameraInput,
     };
 
     m_workspaceManager = std::make_unique<WorkspaceManager>(m_editorContext);
@@ -229,6 +246,11 @@ void AmethystLayer::onDetach()
 {
     RP_INFO("Detaching AmethystLayer...");
 
+    if (m_editorCameraHoldsCursor) {
+        m_input->setCursorMode(Rapture::CursorMode::NORMAL);
+        m_editorCameraHoldsCursor = false;
+    }
+
     if (m_workspaceManager == nullptr) {
         return;
     }
@@ -259,10 +281,13 @@ void AmethystLayer::onUpdate(float dt)
     }
 
     updateShortcuts();
+    readEditorCameraInput();
 
     if (m_workspaceManager != nullptr) {
         m_workspaceManager->onUpdate(dt);
     }
+
+    applyEditorCameraCursor();
 
     m_window.tick(dt);
 
@@ -498,6 +523,24 @@ void AmethystLayer::updateShortcuts()
     // the cursor comes back in window pixels while the UI is placed in framebuffer ones
     const glm::vec2 cursor = windowContext.getCursorPosition() * windowContext.getContentScale();
     m_shortcutRegistry.onUpdate(*m_input, cursor);
+}
+
+void AmethystLayer::readEditorCameraInput()
+{
+    m_input->onUpdate();
+    m_cameraInput.intent = s_mapEditorCameraInput(*m_input);
+    m_cameraInput.cursorCaptured = false;
+}
+
+void AmethystLayer::applyEditorCameraCursor()
+{
+    // only on a change, so a play session holding the cursor is left alone
+    if (m_cameraInput.cursorCaptured == m_editorCameraHoldsCursor) {
+        return;
+    }
+
+    m_editorCameraHoldsCursor = m_cameraInput.cursorCaptured;
+    m_input->setCursorMode(m_editorCameraHoldsCursor ? Rapture::CursorMode::DISABLED : Rapture::CursorMode::NORMAL);
 }
 
 void AmethystLayer::openDemoWindow(void)

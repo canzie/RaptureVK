@@ -17,7 +17,6 @@
 
 namespace Rapture {
 
-class CameraController;
 
 /**
  * @brief Creation-time configuration for a viewport and its render target.
@@ -63,18 +62,6 @@ class Viewport {
 
     void setCamera(ecs::EntityAccessor camera);
     ecs::EntityAccessor getCamera() const { return m_camera; }
-
-    /**
-     * @brief Editor-only conveniences attached to this viewport, not required for rendering
-     */
-    struct EditorBinding {
-        CameraController *controller = nullptr; ///< Non-owning controller driving this viewport's camera
-        bool hovered = false;                   ///< Cursor is over this viewport's on-screen display
-        bool displayed = false;                 ///< A ViewportPanel is bound to this viewport
-    };
-
-    EditorBinding &editorBinding() { return m_editorBinding; }
-    const EditorBinding &editorBinding() const { return m_editorBinding; }
 
     RenderSettings &renderSettings() { return m_renderSettings; }
     const RenderSettings &renderSettings() const { return m_renderSettings; }
@@ -155,7 +142,6 @@ class Viewport {
 
     Scene *m_scene = nullptr;
     ecs::EntityAccessor m_camera;
-    EditorBinding m_editorBinding;
     RenderSettings m_renderSettings;
 
     bool m_active = true;

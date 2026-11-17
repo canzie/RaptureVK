@@ -119,6 +119,12 @@ class ViewportPanel : public Panel {
     void buildRenderMenu(void);
     void applyLightingMode(ViewportLightingMode mode);
     Rapture::CameraController *cameraController(void) const;
+
+    /**
+     * @brief Flies the editor camera with this frame's controls while the cursor is over the image
+     * @param dt Seconds since the last frame
+     */
+    void updateEditorCamera(float dt);
     void updateViewportImage(void);
 
   private:

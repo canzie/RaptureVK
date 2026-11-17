@@ -2,8 +2,8 @@
 
 #include "EntitySelection.h"
 #include "Icons.h"
+#include "scene/EditorCamera.h"
 #include "ui/menus/ContextMenuItems.h"
-#include <rapture/core/utils/rp_assert.h>
 #include <rapture/gpu/render_targets/SceneRenderTarget.h>
 #include <rapture/renderer/viewport/Viewport.h>
 #include <rapture/scene/World.h>
@@ -103,9 +103,6 @@ ViewportPanel::ViewportPanel(const WorkspaceContext &context) : Panel("Viewport"
         return;
     }
 
-    RP_ASSERT(!m_viewport->editorBinding().displayed, "viewport is already displayed by another panel");
-    m_viewport->editorBinding().displayed = true;
-
     if (context.scene != nullptr) {
         m_viewport->setScene(context.scene);
     }
@@ -194,7 +191,6 @@ ViewportPanel::~ViewportPanel()
 {
     releaseSlotImages();
     if (m_viewport != nullptr) {
-        m_viewport->editorBinding().displayed = false;
         m_viewport->setActive(false);
     }
 }
@@ -379,11 +375,28 @@ void ViewportPanel::applyLightingMode(ViewportLightingMode mode)
 
 Rapture::CameraController *ViewportPanel::cameraController() const
 {
-    auto *viewport = m_viewport;
-    if (viewport == nullptr) {
+    if (m_context.editorCamera == nullptr) {
         return nullptr;
     }
-    return viewport->editorBinding().controller;
+    return &m_context.editorCamera->controller();
+}
+
+void ViewportPanel::updateEditorCamera(float dt)
+{
+    Rapture::CameraController *controller = cameraController();
+    EditorCameraInput *input = m_context.editor->cameraInput;
+    if (controller == nullptr || input == nullptr) {
+        return;
+    }
+
+    // a camera holding the cursor keeps flying once the cursor leaves the image
+    bool driven = m_viewportHovered || controller->capturesCursor();
+    controller->setIntent(driven ? input->intent : Rapture::ControlInput{});
+    controller->onUpdate(dt);
+
+    if (controller->capturesCursor()) {
+        input->cursorCaptured = true;
+    }
 }
 
 void ViewportPanel::setViewportImage(Amethyst::AmTextureId imageId)
@@ -438,14 +451,13 @@ void ViewportPanel::onUpdate(float dt)
 
     updateGizmo();
 
+    updateEditorCamera(dt);
+
     auto *controller = cameraController();
     if (controller != nullptr) {
         m_cameraModeGroup.value = static_cast<int32_t>(controller->getMode());
     }
 
-    if (m_viewport != nullptr) {
-        m_viewport->editorBinding().hovered = m_viewportHovered;
-    }
     updateViewportImage();
 
     auto *viewport = m_viewport;
