@@ -243,9 +243,14 @@ class Scene {
   private:
     /**
      * @brief Re-aims the shadow maps whose light or transform changed since this scene last looked
-     * @param cameraPosition Where the directional shadow volume is centred
      */
-    void updateShadowViews(const glm::vec3 &cameraPosition);
+    void updateShadowViews();
+
+    /**
+     * @brief Streams terrain chunks in and out around the camera
+     * @param frameIndex The frame in flight being prepared
+     */
+    void updateTerrainStreaming(uint32_t frameIndex);
 
     /**
      * @brief Brings the acceleration structure up to date with the scene

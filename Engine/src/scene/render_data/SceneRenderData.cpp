@@ -240,9 +240,18 @@ void SceneRenderData::onCameraRemoved(ecs::Entity entityId)
     m_cameraSlots.erase(entityId);
 }
 
+// a directional light's shadow follows the view drawing it, so the scene keeps none for it
+static const ShadowComponent *s_tryReadSceneShadow(const ecs::Registry &registry, ecs::Entity entity)
+{
+    if (registry.has<DirectionalLightComponent>(entity)) {
+        return nullptr;
+    }
+    return registry.tryRead<ShadowComponent>(entity);
+}
+
 void SceneRenderData::onShadowAdded(ecs::Entity entityId)
 {
-    const ShadowComponent *shadow = m_scene->getRegistry().tryRead<ShadowComponent>(entityId);
+    const ShadowComponent *shadow = s_tryReadSceneShadow(m_scene->getRegistry(), entityId);
     if (shadow == nullptr) {
         return;
     }
@@ -266,7 +275,7 @@ void SceneRenderData::onShadowRemoved(ecs::Entity entityId)
 
 void SceneRenderData::createShadowMap(ecs::Entity entityId)
 {
-    const ShadowComponent *shadow = m_scene->getRegistry().tryRead<ShadowComponent>(entityId);
+    const ShadowComponent *shadow = s_tryReadSceneShadow(m_scene->getRegistry(), entityId);
     if (shadow == nullptr) {
         return;
     }

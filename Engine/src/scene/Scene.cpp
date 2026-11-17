@@ -211,40 +211,40 @@ void Scene::onUpdate(float dt)
     auto &app = Application::getInstance();
     uint32_t frameCounter = app.getFrameInFlightIndex();
 
-    glm::vec3 cameraPosition = glm::vec3(0.0f);
-    Frustum *frustum = nullptr;
-
-    Camera3D *activeCamera = m_activeController != nullptr ? m_activeController->viewCamera() : nullptr;
-    if (activeCamera != nullptr) {
-        ecs::Entity camera = activeCamera->entity();
-        if (m_registry.hasAll<TransformComponent, CameraComponent>(camera)) {
-            cameraPosition = transform::translation(activeCamera->worldTransform());
-            // the frustum holds GPU upload state, so touching it is bookkeeping rather than a camera change
-            frustum = &m_registry.write<CameraComponent>(camera, 0)->frustum;
-        }
-    }
-
-    // the chunk grid is scene wide, so it follows one camera rather than each view that draws it
-    if (frustum != nullptr) {
-        for (auto [entity, terrain] : m_registry.mutableView<TerrainComponent>()) {
-            if (terrain.generator && terrain.isEnabled && terrain.generator->isInitialized()) {
-                terrain.generator->update(cameraPosition, *frustum, frameCounter);
-            }
-        }
-    }
+    updateTerrainStreaming(frameCounter);
 
     if (m_environment != nullptr) {
         m_environment->update();
     }
 
-    updateShadowViews(cameraPosition);
+    updateShadowViews();
 
     m_renderData->onUpdate(frameCounter);
 
     updateTLAS();
 }
 
-void Scene::updateShadowViews(const glm::vec3 &cameraPosition)
+void Scene::updateTerrainStreaming(uint32_t frameIndex)
+{
+    // TODO: stream around every view drawing the scene instead of the active controller's camera, with the terrain sweep
+    Camera3D *activeCamera = m_activeController != nullptr ? m_activeController->viewCamera() : nullptr;
+    if (activeCamera == nullptr || !m_registry.hasAll<TransformComponent, CameraComponent>(activeCamera->entity())) {
+        return;
+    }
+
+    glm::vec3 cameraPosition = transform::translation(activeCamera->worldTransform());
+    // the frustum holds GPU upload state, so touching it is bookkeeping rather than a camera change
+    Frustum &frustum = m_registry.write<CameraComponent>(activeCamera->entity(), 0)->frustum;
+
+    // the chunk grid is scene wide, so it follows one camera rather than each view that draws it
+    for (auto [entity, terrain] : m_registry.mutableView<TerrainComponent>()) {
+        if (terrain.generator != nullptr && terrain.isEnabled && terrain.generator->isInitialized()) {
+            terrain.generator->update(cameraPosition, frustum, frameIndex);
+        }
+    }
+}
+
+void Scene::updateShadowViews()
 {
     ecs::Journal &journal = m_registry.getJournal();
     ecs::Batch transforms = journal.readSince(CHANNEL_TRANSFORM_WORLD, m_shadowTransformBookmark);
@@ -273,7 +273,7 @@ void Scene::updateShadowViews(const glm::vec3 &cameraPosition)
             continue;
         }
 
-        shadowMap->updateViewMatrix(accessor, m_registry.read<TransformComponent>(entity), cameraPosition);
+        shadowMap->updateViewMatrix(accessor, m_registry.read<TransformComponent>(entity));
 
         // the shadow row mirrors the map's matrices, which no component write announces
         journal.record(entity, ecs::ChannelBit(CHANNEL_SHADOW_SETTINGS));

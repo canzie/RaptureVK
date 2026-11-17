@@ -89,8 +89,7 @@ void ShadowMap::transitionToShaderReadableLayout(CommandBuffer *commandBuffer)
                          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 
-void ShadowMap::updateViewMatrix(ecs::EntityAccessor light, const TransformComponent &transformComp,
-                                 const glm::vec3 &cameraPosition)
+void ShadowMap::updateViewMatrix(ecs::EntityAccessor light, const TransformComponent &transformComp)
 {
     RAPTURE_PROFILE_FUNCTION();
 
@@ -111,7 +110,7 @@ void ShadowMap::updateViewMatrix(ecs::EntityAccessor light, const TransformCompo
     glm::mat4 lightProj = glm::mat4(1.0f);
 
     // Calculate light direction based on light type
-    if (type == LightType::DIRECTIONAL || type == LightType::SPOT) {
+    if (type == LightType::SPOT) {
         // Calculate light direction from rotation
         lightDirection = transform::forward(transformComp.world);
     } else {
@@ -126,58 +125,29 @@ void ShadowMap::updateViewMatrix(ecs::EntityAccessor light, const TransformCompo
         lightUp = glm::vec3(0.0f, 0.0f, 1.0f);
     }
 
-    glm::mat4 viewMatrix;
+    // Create the light's view matrix for point/spot lights
+    glm::mat4 viewMatrix = glm::lookAt(lightPosition,                  // Light position
+                                       lightPosition + lightDirection, // Look at point along light direction
+                                       lightUp                         // Up vector
+    );
 
-    if (type == LightType::DIRECTIONAL) {
-        // For directional lights, position the shadow camera to cover the scene properly
-        // Use camera position as scene center for better shadow coverage
-        glm::vec3 sceneCenter = cameraPosition;
+    // Perspective projection for spot/point light
+    float aspect = 1.0f; // Shadow map is square
 
-        float sceneBounds = 100.0f;
-        float shadowDistance = sceneBounds * 1.5f; // Distance to place shadow camera from scene center
+    if (type == LightType::SPOT) {
+        // For spotlights, use more aggressive near plane scaling
+        float nearPlane = glm::max(0.1f, range * 0.001f); // Much closer near plane
+        float farPlane = range * 1.2f;                    // Extend beyond light range for better coverage
 
-        // Position the shadow camera opposite to the light direction
-        // This ensures shadows are cast in the correct direction
-        glm::vec3 shadowCamPos = sceneCenter - (lightDirection * shadowDistance);
+        // Use slightly wider angle for shadows to avoid edge artifacts
+        float shadowConeAngle = outerConeAngle * 1.1f; // 10% wider angle for shadows
+        float fovRadians = glm::max(shadowConeAngle * 2.0f, glm::radians(5.0f));
 
-        // Create view matrix looking from shadow camera position towards scene center
-        viewMatrix = glm::lookAt(shadowCamPos, // Shadow camera position (opposite to light direction)
-                                 sceneCenter,  // Look at scene center
-                                 lightUp       // Up vector
-        );
-
-        // Use orthographic projection for directional lights
-        float orthoSize = sceneBounds * 0.6f; // Slightly larger to avoid edge artifacts
-        float nearPlane = 1.0f;
-        float farPlane = shadowDistance + sceneBounds; // Ensure we capture everything
-
-        lightProj = glm::ortho(-orthoSize, orthoSize, -orthoSize, orthoSize, nearPlane, farPlane);
-
+        lightProj = glm::perspective(fovRadians, aspect, nearPlane, farPlane);
     } else {
-        // Create the light's view matrix for point/spot lights
-        viewMatrix = glm::lookAt(lightPosition,                  // Light position
-                                 lightPosition + lightDirection, // Look at point along light direction
-                                 lightUp                         // Up vector
-        );
-
-        // Perspective projection for spot/point light
-        float aspect = 1.0f; // Shadow map is square
-
-        if (type == LightType::SPOT) {
-            // For spotlights, use more aggressive near plane scaling
-            float nearPlane = glm::max(0.1f, range * 0.001f); // Much closer near plane
-            float farPlane = range * 1.2f;                    // Extend beyond light range for better coverage
-
-            // Use slightly wider angle for shadows to avoid edge artifacts
-            float shadowConeAngle = outerConeAngle * 1.1f; // 10% wider angle for shadows
-            float fovRadians = glm::max(shadowConeAngle * 2.0f, glm::radians(5.0f));
-
-            lightProj = glm::perspective(fovRadians, aspect, nearPlane, farPlane);
-        } else {
-            // Point light settings (default)
-            float nearPlane = 0.1f;
-            lightProj = glm::perspective(glm::radians(90.0f), aspect, nearPlane, range);
-        }
+        // Point light settings (default)
+        float nearPlane = 0.1f;
+        lightProj = glm::perspective(glm::radians(90.0f), aspect, nearPlane, range);
     }
 
     // Update the frustum for culling using the original matrices (before Vulkan fix)

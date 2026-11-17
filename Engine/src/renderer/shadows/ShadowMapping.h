@@ -37,7 +37,12 @@ class ShadowMap {
     void beginDynamicRendering(CommandBuffer *commandBuffer);
     void endDynamicRendering(CommandBuffer *commandBuffer);
 
-    void updateViewMatrix(ecs::EntityAccessor light, const TransformComponent &transformComp, const glm::vec3 &cameraPosition);
+    /**
+     * @brief Fits the map to a spot or point light
+     * @param light The light casting the shadow
+     * @param transformComp Where the light sits
+     */
+    void updateViewMatrix(ecs::EntityAccessor light, const TransformComponent &transformComp);
 
     std::shared_ptr<Texture> getShadowTexture() const { return m_shadowTexture; }
 
