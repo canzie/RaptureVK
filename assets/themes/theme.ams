@@ -184,6 +184,18 @@ text-area {
     
 }
 
+.command-answer {
+    background-transparency: 1.0;
+    text-color: @text-2;
+    font-size: 12px;
+    text-x-alignment: left;
+    text-y-alignment: center;
+}
+
+.command-answer-failed {
+    text-color: @status-error;
+}
+
 
 // stuff like the material node graph editor and spline editor, even viewport bg (if for some reason the image doesnt load)
 .canvas-area {

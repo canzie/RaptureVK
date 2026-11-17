@@ -25,6 +25,7 @@ class World;
 } // namespace Rapture
 
 class EditorCamera;
+class EditorCommands;
 class EditorConfig;
 class WindowManager;
 class WorkspaceManager;
@@ -75,6 +76,7 @@ struct EditorContext {
     EditorConfig *config = nullptr;
     Rapture::Project *project = nullptr;
     EditorCameraInput *cameraInput = nullptr;
+    EditorCommands *commands = nullptr;
 };
 
 /**

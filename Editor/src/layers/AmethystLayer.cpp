@@ -200,6 +200,7 @@ void AmethystLayer::setupEditorContext()
     m_editorContext.workspaces = m_workspaceManager.get();
 
     m_commands = std::make_unique<EditorCommands>(m_config, *m_workspaceManager, Rapture::Application::getInstance().getMainWindow());
+    m_editorContext.commands = m_commands.get();
 }
 
 void AmethystLayer::wireLauncher(ProjectLauncher &launcher)
