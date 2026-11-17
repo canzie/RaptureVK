@@ -100,8 +100,29 @@ struct ByteReader {
     }
 };
 
+// relative to the asset file, so a project keeps its sources when it is moved or checked out elsewhere
+static std::filesystem::path s_sourcePathToStore(const std::filesystem::path &sourcePath, const std::filesystem::path &assetFolder)
+{
+    if (sourcePath.is_relative()) {
+        return sourcePath;
+    }
+
+    std::error_code ec;
+    std::filesystem::path relative = std::filesystem::relative(sourcePath, assetFolder, ec);
+    return ec || relative.empty() ? sourcePath : relative;
+}
+
+static std::filesystem::path s_sourcePathFromStore(const std::filesystem::path &stored, const std::filesystem::path &assetFolder)
+{
+    if (stored.empty() || stored.is_absolute()) {
+        return stored;
+    }
+
+    return (assetFolder / stored).lexically_normal();
+}
+
 // TODO: importConfig (variant) is not encoded yet; assets reload from the payload, reimport config comes later
-static std::vector<uint8_t> s_serializeMetadata(const AssetMetadata &metadata)
+static std::vector<uint8_t> s_serializeMetadata(const AssetMetadata &metadata, const std::filesystem::path &assetFolder)
 {
     std::vector<uint8_t> out;
     s_append(out, AssetRegistry::fileMagic(metadata.assetType));
@@ -113,7 +134,7 @@ static std::vector<uint8_t> s_serializeMetadata(const AssetMetadata &metadata)
     bool hasProvenance = metadata.provenance.has_value();
     s_append(out, static_cast<uint8_t>(hasProvenance ? 1 : 0));
     if (hasProvenance) {
-        s_appendString(out, metadata.provenance->sourcePath.generic_string());
+        s_appendString(out, s_sourcePathToStore(metadata.provenance->sourcePath, assetFolder).generic_string());
         bool hasSubIndex = metadata.provenance->sourceSubIndex.has_value();
         s_append(out, static_cast<uint8_t>(hasSubIndex ? 1 : 0));
         s_append(out, hasSubIndex ? *metadata.provenance->sourceSubIndex : uint32_t{0});
@@ -126,7 +147,7 @@ static std::vector<uint8_t> s_serializeMetadata(const AssetMetadata &metadata)
     return out;
 }
 
-static std::unique_ptr<AssetMetadata> s_deserializeMetadata(std::span<const uint8_t> bytes)
+static std::unique_ptr<AssetMetadata> s_deserializeMetadata(std::span<const uint8_t> bytes, const std::filesystem::path &assetFolder)
 {
     ByteReader reader{bytes.data(), bytes.size()};
     auto metadata = std::make_unique<AssetMetadata>();
@@ -139,7 +160,7 @@ static std::unique_ptr<AssetMetadata> s_deserializeMetadata(std::span<const uint
 
     if (reader.read<uint8_t>() != 0) {
         AssetProvenance provenance;
-        provenance.sourcePath = reader.readString();
+        provenance.sourcePath = s_sourcePathFromStore(reader.readString(), assetFolder);
         bool hasSubIndex = reader.read<uint8_t>() != 0;
         uint32_t subIndex = reader.read<uint32_t>();
         if (hasSubIndex) {
@@ -165,7 +186,7 @@ static std::unique_ptr<AssetMetadata> s_deserializeMetadata(std::span<const uint
 bool AssetCodec::writeRaptureAsset(const std::filesystem::path &path, AssetHandle uuid, const AssetMetadata &metadata,
                                    std::span<const uint8_t> payload)
 {
-    std::vector<uint8_t> metadataBytes = s_serializeMetadata(metadata);
+    std::vector<uint8_t> metadataBytes = s_serializeMetadata(metadata, path.parent_path());
 
     RaptureAssetHeader header;
     header.uuid = uuid;
@@ -236,7 +257,7 @@ std::optional<AssetCodec::RaptureAssetInfo> AssetCodec::readRaptureAssetInfo(con
         return std::nullopt;
     }
 
-    std::unique_ptr<AssetMetadata> metadata = s_deserializeMetadata(metadataBytes);
+    std::unique_ptr<AssetMetadata> metadata = s_deserializeMetadata(metadataBytes, path.parent_path());
     if (!metadata) {
         RP_CORE_ERROR("Rasset '{0}' metadata is malformed", path.string());
         return std::nullopt;

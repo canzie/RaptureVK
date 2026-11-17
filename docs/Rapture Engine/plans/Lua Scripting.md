@@ -1,5 +1,9 @@
 # Lua Scripting
 
+## Storage
+
+A script is a plain `.lua` file in the project's content folder, with a `.rscript` beside it that holds only the asset's identity and the path to its Lua, stored relative to the `.rscript`. Nothing is kept inside the asset file, so any external editor, diff or merge works on the script itself. New Script writes an empty `.lua` and imports it; importing a `.lua` from outside the project copies it beside its asset file. The same shape as Godot's `.gd` with its `.uid`, or Unity's `.cs` with its `.meta`.
+
 ## Instance
 
 ```

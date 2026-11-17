@@ -7,7 +7,7 @@
 
 namespace Rapture {
 
-AScript::AScript(std::string source, bool sourceIsInline) : m_source(std::move(source)), m_sourceIsInline(sourceIsInline) {}
+AScript::AScript(std::string source) : m_source(std::move(source)) {}
 
 const TypeInfo &AScript::staticType()
 {
@@ -27,18 +27,14 @@ void AScript::setSource(std::string source)
 
 std::vector<uint8_t> AScript::serialize() const
 {
-    if (!m_sourceIsInline) {
-        return {};
-    }
-
-    return std::vector<uint8_t>(m_source.begin(), m_source.end());
+    return {};
 }
 
 bool AScript::reimport(const AssetMetadata &metadata)
 {
     std::filesystem::path path = metadata.getSourcePath();
     if (path.empty()) {
-        RP_CORE_ERROR("'{}' keeps its Lua in its own asset file, so there is nothing to read it from", metadata.getName());
+        RP_CORE_ERROR("'{}' names no Lua file, recreate it so its Lua lives in a file of its own", metadata.getName());
         return false;
     }
 
@@ -49,20 +45,13 @@ bool AScript::reimport(const AssetMetadata &metadata)
     }
 
     m_source.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
-    m_sourceIsInline = false;
     return true;
 }
 
-std::unique_ptr<AScript> AScript::deserialize(const AssetMetadata &metadata, std::span<const uint8_t> blob)
+std::unique_ptr<AScript> AScript::deserialize(const AssetMetadata &metadata)
 {
-    if (!metadata.getSourcePath().empty()) {
-        auto script = std::make_unique<AScript>(std::string{}, false);
-        return script->reimport(metadata) ? std::move(script) : nullptr;
-    }
-
-    std::string source;
-    source.assign(blob.begin(), blob.end());
-    return std::make_unique<AScript>(std::move(source), true);
+    auto script = std::make_unique<AScript>(std::string{});
+    return script->reimport(metadata) ? std::move(script) : nullptr;
 }
 
 } // namespace Rapture

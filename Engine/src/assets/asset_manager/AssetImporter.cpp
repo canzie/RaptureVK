@@ -132,7 +132,7 @@ std::unique_ptr<Asset> Asset_importShader(AssetMetadata &metadata, AssetHandle h
 
 std::unique_ptr<Asset> Asset_importScript(AssetMetadata &metadata, AssetHandle handle)
 {
-    auto asset = std::make_unique<AScript>(std::string{}, false);
+    auto asset = std::make_unique<AScript>(std::string{});
     if (!asset->reimport(metadata)) {
         return nullptr;
     }

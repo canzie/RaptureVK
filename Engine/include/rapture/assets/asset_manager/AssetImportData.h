@@ -52,14 +52,9 @@ struct SkeletonImportData {
     std::unique_ptr<Skeleton> skeleton;
 };
 
-struct ScriptImportData {
-    std::string source;
-    bool sourceIsInline = true;
-};
-
 using AssetImportDataVariant =
     std::variant<std::monostate, StaticMeshImportData, SkeletalMeshImportData, ModuleImportData, BaseMaterialImportData,
-                 MaterialInstanceImportData, WorldImportData, SkeletonImportData, ScriptImportData>;
+                 MaterialInstanceImportData, WorldImportData, SkeletonImportData>;
 
 struct AssetImportDataRequest {
     AssetImportDataVariant data;

@@ -12,7 +12,6 @@
 #include <rapture/assets/meshes/ASkeletalMesh.h>
 #include <rapture/assets/meshes/AStaticMesh.h>
 #include <rapture/assets/modules/AModule.h>
-#include <rapture/assets/scripts/AScript.h>
 #include <rapture/assets/skeletons/ASkeleton.h>
 #include <rapture/assets/textures/ATexture.h>
 #include <rapture/assets/worlds/AWorld.h>
@@ -131,16 +130,47 @@ static std::unique_ptr<Asset> s_buildImportData(AssetImportDataVariant &data, st
         type = ASSET_SKELETON;
         return skeleton;
     }
-    if (auto *scriptData = std::get_if<ScriptImportData>(&data)) {
-        type = ASSET_SCRIPT;
-        if (scriptData->sourceIsInline) {
-            payload.assign(scriptData->source.begin(), scriptData->source.end());
-        }
-        return std::make_unique<AScript>(std::move(scriptData->source), scriptData->sourceIsInline);
-    }
 
     type = ASSET_NONE;
     return nullptr;
+}
+
+/**
+ * @brief Where a script's Lua lives once imported, which is beside its asset file, since the Lua file is the script
+ * @param source The Lua file being imported
+ * @param outputFolder The folder the asset file goes into
+ * @return The Lua file beside the asset file
+ */
+static std::filesystem::path s_scriptSourceBesideAsset(const std::filesystem::path &source, const std::filesystem::path &outputFolder)
+{
+    std::filesystem::path destination = outputFolder / source.filename();
+
+    std::error_code ec;
+    return (std::filesystem::equivalent(source, destination, ec) ? source : destination).lexically_normal();
+}
+
+/**
+ * @brief Copies a Lua file to where its script lives
+ * @param source The Lua file being imported
+ * @param destination Where the script's Lua lives
+ * @return True if the Lua is now at the destination
+ */
+static bool s_copyScriptSource(const std::filesystem::path &source, const std::filesystem::path &destination)
+{
+    if (std::filesystem::exists(destination)) {
+        RP_CORE_ERROR("'{}' already exists, so '{}' cannot be imported beside it", destination.string(), source.string());
+        return false;
+    }
+
+    std::error_code ec;
+    std::filesystem::create_directories(destination.parent_path(), ec);
+    std::filesystem::copy_file(source, destination, ec);
+    if (ec) {
+        RP_CORE_ERROR("Could not copy '{}' to '{}': {}", source.string(), destination.string(), ec.message());
+        return false;
+    }
+
+    return true;
 }
 
 struct AssetManagerEditor::UnloadCheckQueue {
@@ -235,24 +265,33 @@ Asset *AssetManagerEditor::importAsset(const AssetImportFileRequest &request)
 
     AssetType assetType = determineAssetType(request.source.string());
 
+    std::filesystem::path source = request.source;
+    if (assetType == ASSET_SCRIPT && !request.output.empty()) {
+        source = s_scriptSourceBesideAsset(request.source, request.output);
+    }
+
     // A reimport of the same source with the same config lands on the same type, so only that bucket can hold it
     for (const AssetSlot &slot : m_assets.ofType(assetType)) {
-        if (slot.metadata->getSourcePath() == request.source && slot.metadata->importConfig == request.config) {
+        if (slot.metadata->getSourcePath() == source && slot.metadata->importConfig == request.config) {
             return getAsset(slot.handle);
         }
     }
 
+    if (source != request.source && !s_copyScriptSource(request.source, source)) {
+        return nullptr;
+    }
+
     auto metadata = std::make_unique<AssetMetadata>();
     metadata->storageType = AssetStorageType::DISK;
-    metadata->provenance = AssetProvenance{.sourcePath = request.source};
-    metadata->name = request.name.empty() ? request.source.stem().string() : request.name;
+    metadata->provenance = AssetProvenance{.sourcePath = source};
+    metadata->name = request.name.empty() ? source.stem().string() : request.name;
     metadata->assetType = assetType;
     metadata->importConfig = request.config;
 
     AssetHandle handle = UUIDGenerator::Generate();
     std::unique_ptr<Asset> asset = s_importFromSource(*metadata, handle);
     if (asset == nullptr) {
-        RP_CORE_ERROR("Failed to import asset: {}", request.source.string());
+        RP_CORE_ERROR("Failed to import asset: {}", source.string());
         return nullptr;
     }
 

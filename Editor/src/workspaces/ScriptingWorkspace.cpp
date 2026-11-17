@@ -4,17 +4,27 @@
 #include "ui/AssetVisuals.h"
 
 #include <rapture/app/Application.h>
-#include <rapture/assets/asset_manager/AssetImportData.h>
+#include <rapture/assets/asset_manager/AssetImportConfig.h>
 #include <rapture/assets/asset_manager/AssetManager.h>
 #include <rapture/assets/asset_manager/AssetRegistry.h>
 #include <rapture/core/utils/Log.h>
 #include <rapture/scene/Project.h>
 
+#include <fstream>
+
+static constexpr std::string_view LUA_EXTENSION = ".lua";
+
+static bool s_scriptNameIsTaken(const std::filesystem::path &folder, const std::string &name)
+{
+    std::string assetExtension(Rapture::AssetRegistry::fileExtension(Rapture::ASSET_SCRIPT));
+    return std::filesystem::exists(folder / (name + assetExtension)) ||
+           std::filesystem::exists(folder / (name + std::string(LUA_EXTENSION)));
+}
+
 static std::string s_uniqueScriptName(const std::filesystem::path &folder)
 {
-    std::string extension(Rapture::AssetRegistry::fileExtension(Rapture::ASSET_SCRIPT));
     std::string name = "Script";
-    for (uint32_t suffix = 2; std::filesystem::exists(folder / (name + extension)); suffix++) {
+    for (uint32_t suffix = 2; s_scriptNameIsTaken(folder, name); suffix++) {
         name = "Script " + std::to_string(suffix);
     }
     return name;
@@ -45,8 +55,19 @@ void ScriptingWorkspace::buildHotbar()
 
 Rapture::AssetHandle ScriptingWorkspace::createScript(const std::filesystem::path &folder, std::string_view name)
 {
-    Rapture::AssetRef script = Rapture::AssetManager::importAsset(Rapture::AssetImportDataRequest{
-        .data = Rapture::ScriptImportData{},
+    const std::filesystem::path source = folder / (std::string(name) + std::string(LUA_EXTENSION));
+    if (std::filesystem::exists(source)) {
+        RP_ERROR("'{}' already exists", source.string());
+        return Rapture::INVALID_ASSET_HANDLE;
+    }
+
+    if (!std::ofstream(source, std::ios::binary)) {
+        RP_ERROR("Could not create '{}'", source.string());
+        return Rapture::INVALID_ASSET_HANDLE;
+    }
+
+    Rapture::AssetRef script = Rapture::AssetManager::importAsset(Rapture::AssetImportFileRequest{
+        .source = source,
         .output = folder,
         .name = std::string(name),
     });

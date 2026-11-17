@@ -124,7 +124,8 @@ static constexpr std::array<AssetClass, ASSET_TYPE_COUNT> ASSET_CLASSES = {{
      .fileExtension = ".rscript",
      .displayName = "Script",
      .deserialize = [](const AssetMetadata &metadata, std::span<const uint8_t> payload) -> std::unique_ptr<Asset> {
-         return AScript::deserialize(metadata, payload);
+         (void)payload;
+         return AScript::deserialize(metadata);
      },
      .import = Asset_importScript},
 }};

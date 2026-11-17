@@ -124,7 +124,7 @@ bool TextEditorPanel::openScript(Rapture::AssetHandle handle)
     }
 
     m_script = handle;
-    m_path = script->isSourceInline() ? std::filesystem::path{} : Rapture::AssetManager::getAssetMetadata(handle).getSourcePath();
+    m_path = Rapture::AssetManager::getAssetMetadata(handle).getSourcePath();
 
     std::string contents{script->source()};
     m_scriptAsset = std::move(script);
@@ -156,16 +156,12 @@ bool TextEditorPanel::save()
 bool TextEditorPanel::saveScript()
 {
     std::string text = m_buffer.text();
-    m_scriptAsset->setSource(text);
-
-    if (m_scriptAsset->isSourceInline()) {
-        if (!Rapture::AssetManager::saveAsset(m_script, {})) {
-            return false;
-        }
-    } else if (!s_writeFile(m_path, text)) {
+    if (!s_writeFile(m_path, text)) {
         RP_ERROR("Could not write {}", m_path.string());
         return false;
     }
+
+    m_scriptAsset->setSource(std::move(text));
 
     m_savedRevision = m_buffer.revision();
     refreshStatus();

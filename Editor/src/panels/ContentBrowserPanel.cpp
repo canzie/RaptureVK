@@ -4,6 +4,7 @@
 #include "context/WorkspaceManager.h"
 #include "ui/AssetVisuals.h"
 #include "ui/menus/ContextMenuItems.h"
+#include "workspaces/ScriptingWorkspace.h"
 #include <rapture/app/Application.h>
 #include <rapture/assets/asset_manager/AssetManager.h>
 #include <rapture/assets/asset_manager/AssetRegistry.h>
@@ -790,18 +791,12 @@ void ContentBrowserPanel::createModule(const Rapture::TypeInfo &type, std::strin
 
 void ContentBrowserPanel::createScript(std::string_view name)
 {
-    Rapture::AssetRef script = Rapture::AssetManager::importAsset(Rapture::AssetImportDataRequest{
-        .data = Rapture::ScriptImportData{},
-        .output = m_currentDirectory,
-        .name = std::string(name),
-    });
-
-    if (!script) {
-        RP_ERROR("Could not create a script named '{}' in '{}'", name, m_currentDirectory.string());
+    Rapture::AssetHandle script = ScriptingWorkspace::createScript(m_currentDirectory, name);
+    if (script == Rapture::INVALID_ASSET_HANDLE) {
         return;
     }
 
-    m_context.editor->workspaces->openAsset(script->handle());
+    m_context.editor->workspaces->openAsset(script);
 }
 
 void ContentBrowserPanel::createFolder(std::string_view name)
