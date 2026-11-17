@@ -1,0 +1,281 @@
+<!doctype html>
+<!--
+    Proposal: the Material Editor in the sweep's style, with the graph from the current editor rebuilt.
+    ?select=<node id> outlines a node and shows it in Details, ?hover=<node id> shows a node as hovered.
+    ?menu=add shows the add node popup that right clicking empty canvas opens.
+    ?canvas=grid or ?canvas=plus swaps the dotted background for a line grid or small crosses.
+    Render: tools/ui_mock/render.sh material_editor.html sweep
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<script src="icons.js"></script>
+<link rel="stylesheet" href="sweep.css">
+<style>
+:root {
+    --type-material: rgb(173, 115, 242);
+    --pin-float: #9A9A9A;
+    --pin-vec2: #5BB8D0;
+    --pin-vec3: #8178E0;
+    --pin-vec4: #D8B13A;
+    --pin-texture: #C85BA8;
+    --category-input: 192, 121, 74;
+    --category-texture: 78, 125, 191;
+    --category-math: 122, 122, 122;
+    --category-vector: 96, 140, 170;
+    --category-output: 94, 158, 90;
+}
+
+.canvas { position: absolute; inset: 6px; border-radius: 3px; background-color: #1A1A1A; overflow: hidden;
+    background-image: radial-gradient(circle, #2C2C2C 1px, transparent 1.4px); background-size: 24px 24px; background-position: 12px 12px; }
+.canvas.grid { background-image: linear-gradient(#242424 1px, transparent 1px), linear-gradient(90deg, #242424 1px, transparent 1px),
+    linear-gradient(#202020 1px, transparent 1px), linear-gradient(90deg, #202020 1px, transparent 1px);
+    background-size: 120px 120px, 120px 120px, 24px 24px, 24px 24px; background-position: 0 0; }
+.canvas.plus { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpath d='M12 9v7M8.5 12.5h7' stroke='%232E2E2E' stroke-width='1'/%3E%3C/svg%3E");
+    background-size: 24px 24px; }
+.wires { position: absolute; inset: 0; pointer-events: none; }
+.wires path { fill: none; stroke-width: 2; stroke-linecap: round; }
+
+.node { position: absolute; width: 190px; background: #262626; border: 1px solid #3A3A3A; border-radius: 6px; }
+.node:hover, .node.hovered { border-color: #555555; }
+.node.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.node .head { height: 28px; display: flex; align-items: center; gap: 8px; padding: 0 10px; border-radius: 5px 5px 0 0;
+    font-size: var(--small-text-size); font-weight: 700; border-bottom: 1px solid #1C1C1C; }
+.node .head .icon { width: 13px; height: 13px; color: var(--text-2); }
+.node .head .subtitle { margin-left: auto; font-weight: 400; color: var(--text-3); font-size: var(--caption-size); }
+.node .rows { padding: 4px 0 6px; }
+.node .row { position: relative; height: 22px; display: flex; align-items: center; padding: 0 12px; font-size: var(--small-text-size);
+    color: var(--text-2); gap: 8px; }
+.node .row.output { justify-content: flex-end; }
+.node .pin { position: absolute; top: 6px; width: 10px; height: 10px; border-radius: 50%; border: 2px solid #262626; box-sizing: content-box; }
+.node .row.input .pin { left: -7px; }
+.node .row.output .pin { right: -7px; }
+.node .pin.unconnected { background: #262626 !important; box-shadow: inset 0 0 0 2px var(--pin-color); }
+.node .inline-field { margin-left: auto; width: 90px; height: 18px; background: var(--bg-input); border: 1px solid var(--input-border);
+    border-radius: 3px; color: var(--text-1); font-size: var(--caption-size); display: flex; align-items: center; justify-content: center;
+    position: relative; overflow: hidden; }
+.node .inline-field .axis { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
+.node .mode { margin: 2px 10px 4px; height: 22px; background: var(--bg-input); border: 1px solid var(--input-border); border-radius: 3px;
+    display: flex; align-items: center; padding: 0 8px; font-size: var(--caption-size); color: var(--text-1); }
+.node .mode .icon { margin-left: auto; width: 9px; height: 9px; color: var(--text-3); }
+.node .preview { margin: 4px 10px 10px; aspect-ratio: 1; border-radius: 4px; border: 1px solid #1C1C1C; }
+
+.graph-toolbar { position: absolute; left: 12px; top: 12px; display: flex; align-items: center; gap: 2px; padding: 2px;
+    background: var(--overlay-background); border-radius: 6px; height: 30px; }
+.graph-toolbar .crumb { padding: 0 8px; color: var(--text-2); font-size: var(--small-text-size); display: flex; align-items: center; gap: 6px; }
+.graph-toolbar .crumb.current { color: var(--text-1); }
+.graph-toolbar .separator { width: 9px; height: 9px; color: var(--text-4); }
+.graph-view { position: absolute; right: 12px; top: 12px; display: flex; align-items: center; gap: 2px; padding: 2px;
+    background: var(--overlay-background); border-radius: 6px; height: 30px; }
+.graph-view .zoom { padding: 0 8px; font-family: "Plex Mono", monospace; font-size: var(--caption-size); color: var(--text-2); }
+.graph-view .tool-button { height: 26px; padding: 0 8px; font-size: var(--small-text-size); color: var(--text-1); }
+.graph-view .tool-button .icon { width: 14px; height: 14px; }
+
+#preview-image { position: absolute; inset: 6px; background: url("reference/material_preview.png") center / cover no-repeat; border-radius: 3px; }
+.preview-toolbar { position: absolute; left: 14px; top: 14px; height: 30px; display: flex; gap: 2px; padding: 2px;
+    background: var(--overlay-background); border-radius: 6px; }
+.preview-toolbar .tool-button { height: 26px; padding: 0 9px; font-size: var(--small-text-size); color: var(--text-1); }
+.preview-toolbar .caret { width: 9px; height: 9px; color: var(--text-3); }
+
+.asset-field { flex: 1; height: 44px; display: flex; align-items: center; gap: 10px; }
+.asset-field .thumb { width: 40px; height: 40px; border-radius: 4px; border: 1px solid var(--input-border); flex: none;
+    background: linear-gradient(135deg, #6E7B4F, #3E4A2C 60%, #6B5F55); }
+.asset-field .name { color: var(--text-1); font-size: var(--small-text-size); }
+.asset-field .kind { color: var(--text-3); font-size: var(--caption-size); }
+.asset-field .actions { margin-left: auto; display: flex; gap: 2px; }
+.asset-field .actions .nav-button { width: 26px; height: 26px; }
+.asset-field .actions .icon { width: 14px; height: 14px; }
+.add-menu { position: absolute; width: 330px; padding: 6px; background: var(--bg-header); border: 1px solid var(--border-4);
+    border-radius: 6px; z-index: 15; }
+.add-menu .search { position: relative; margin-bottom: 4px; }
+.add-menu .search.focused { border-color: var(--accent); color: var(--text-1); }
+.add-menu .typed { color: var(--text-1); }
+.add-section { height: 24px; display: flex; align-items: center; gap: 8px; padding: 0 6px; color: var(--text-3);
+    font-size: var(--caption-size); letter-spacing: 0.05em; text-transform: uppercase; }
+.add-section::after { content: ""; flex: 1; height: 1px; background: var(--border-4); }
+.add-entry { height: 28px; display: flex; align-items: center; gap: 8px; padding: 0 8px; border-radius: var(--control-radius); }
+.add-entry:hover { background: var(--hover); }
+.add-entry.highlighted { background: var(--selection); }
+.add-entry .swatch-dot { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+.add-entry .add-name { color: var(--text-1); width: 96px; flex: none; }
+.add-entry .add-description { color: var(--text-3); font-size: var(--caption-size); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.add-entry.highlighted .add-description { color: var(--text-2); }
+.status-note { gap: 8px; color: var(--text-3); font-size: var(--small-text-size); }
+.status-note .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--status-success); }
+</style>
+</head>
+<body>
+<script>
+const params = new URLSearchParams(location.search);
+const selectedNode = params.get("select") || "sampleAlbedo";
+const hoveredNode = params.get("hover") || "";
+const icon = (name, cls = "", style = "") => `<span class="icon ${cls}" style="${style}">${ICONS[name] || ""}</span>`;
+
+const PIN_HEIGHT = 22;
+const HEAD_HEIGHT = 29;
+const ROWS_TOP = HEAD_HEIGHT + 4;
+
+// pins: [name, type, side, extra] where extra may be {value} for an inline field
+const NODES = {
+    texCoord: {x: 40, y: 140, title: "Texture Coordinate", category: "input", icon: "GRID", pins: [["UV", "vec2", "out"]]},
+    sampleAlbedo: {x: 300, y: 30, title: "Texture Sample", category: "texture", icon: "MATERIAL",
+        pins: [["out", "vec4", "out"], ["tex", "texture", "in"], ["uv", "vec2", "in"]], preview: "linear-gradient(135deg, #6E7B4F, #3E4A2C 60%, #6B5F55)"},
+    sampleNormal: {x: 300, y: 335, title: "Texture Sample", category: "texture", icon: "MATERIAL",
+        pins: [["out", "vec4", "out"], ["tex", "texture", "in"], ["uv", "vec2", "in"]], preview: "linear-gradient(135deg, #B9B4F5, #8F88E8 50%, #C3C0F7)"},
+    sampleMask: {x: 300, y: 640, title: "Texture Sample", category: "texture", icon: "MATERIAL",
+        pins: [["out", "vec4", "out"], ["tex", "texture", "in"], ["uv", "vec2", "in"]], preview: "linear-gradient(135deg, #5A5A5A, #A0A0A0 40%, #3C3C3C)"},
+    tint: {x: 40, y: 420, title: "Vector 4", category: "vector", icon: "GRID", pins: [["out", "vec4", "out"]],
+        fields: [["X", "1.000", "--axis-x"], ["Y", "1.000", "--axis-y"], ["Z", "1.000", "--axis-z"], ["W", "1.000", "--text-3"]]},
+    multiplyColor: {x: 560, y: 80, title: "Multiply", category: "math", icon: "X", mode: "Vector",
+        pins: [["out", "vec3", "out"], ["a", "vec3", "in"], ["b", "vec3", "in"]]},
+    normalMap: {x: 820, y: 350, title: "Normal Map", subtitle: "RG", category: "vector", icon: "PERSPECTIVE",
+        pins: [["out", "vec3", "out"], ["sample", "vec4", "in"]]},
+    split: {x: 560, y: 680, title: "Split 4", category: "vector", icon: "GRID",
+        pins: [["x", "float", "out"], ["y", "float", "out"], ["z", "float", "out"], ["w", "float", "out"], ["in", "vec4", "in"]]},
+    multiplyRoughness: {x: 820, y: 640, title: "Multiply", category: "math", icon: "X", mode: "Float",
+        pins: [["out", "float", "out"], ["a", "float", "in"], ["b", "float", "in", {value: "0.800"}]]},
+    surface: {x: 1090, y: 70, width: 230, title: "PBR Surface", category: "output", icon: "MATERIAL",
+        pins: [["albedo", "vec3", "in"], ["normal", "vec3", "in"], ["roughness", "float", "in"], ["metallic", "float", "in"],
+               ["ao", "float", "in"], ["emission", "vec3", "in", {value: "0, 0, 0"}], ["emissive strength", "float", "in", {value: "0.000"}],
+               ["specular", "float", "in", {value: "0.500"}]]},
+};
+
+const LINKS = [
+    ["texCoord", "UV", "sampleAlbedo", "uv"], ["texCoord", "UV", "sampleNormal", "uv"], ["texCoord", "UV", "sampleMask", "uv"],
+    ["sampleAlbedo", "out", "multiplyColor", "a"], ["tint", "out", "multiplyColor", "b"], ["multiplyColor", "out", "surface", "albedo"],
+    ["sampleNormal", "out", "normalMap", "sample"], ["normalMap", "out", "surface", "normal"],
+    ["sampleMask", "out", "split", "in"], ["split", "x", "multiplyRoughness", "a"], ["multiplyRoughness", "out", "surface", "roughness"],
+    ["split", "y", "surface", "metallic"], ["split", "z", "surface", "ao"],
+];
+
+function isConnected(nodeId, pin) {
+    return LINKS.some(([a, ap, b, bp]) => (a === nodeId && ap === pin) || (b === nodeId && bp === pin));
+}
+
+// where a pin's row sits inside its node, counting the mode selector and fields above the pins
+function pinPosition(nodeId, pinName) {
+    const node = NODES[nodeId];
+    let y = node.y + ROWS_TOP + (node.mode ? 28 : 0);
+    for (const [name, , side] of node.pins) {
+        if (name === pinName) {
+            return [side === "out" ? node.x + (node.width || 190) + 1 : node.x - 1, y + PIN_HEIGHT / 2];
+        }
+        y += PIN_HEIGHT;
+    }
+    return [node.x, node.y];
+}
+
+function pinType(nodeId, pinName) {
+    return NODES[nodeId].pins.find(([name]) => name === pinName)[1];
+}
+
+function nodeHtml(id, node) {
+    const tint = `rgba(var(--category-${node.category}), 0.55)`;
+    const head = `<div class="head" style="background:linear-gradient(90deg, ${tint}, rgba(var(--category-${node.category}), 0.22)), #2C2C2C">
+        ${icon(node.icon)}${node.title}${node.subtitle ? `<span class="subtitle">${node.subtitle}</span>` : ""}</div>`;
+    const mode = node.mode ? `<div class="mode">${node.mode}${icon("CHEVRON_DOWN")}</div>` : "";
+    const rows = node.pins.map(([name, type, side, extra]) => {
+        const connected = isConnected(id, name);
+        const pin = `<span class="pin ${connected ? "" : "unconnected"}" style="background:var(--pin-${type});--pin-color:var(--pin-${type})"></span>`;
+        const field = extra && extra.value && !connected ? `<span class="inline-field">${extra.value}</span>` : "";
+        return `<div class="row ${side === "out" ? "output" : "input"}">${pin}${name}${field}</div>`;
+    }).join("");
+    const fields = (node.fields || []).map(([label, value, color]) =>
+        `<div class="row input" style="padding-left:12px"><span style="width:12px;color:var(--text-3)">${label}</span>
+            <span class="inline-field" style="width:130px"><span class="axis" style="background:var(${color})"></span>${value}</span></div>`).join("");
+    const preview = node.preview ? `<div class="preview" style="background:${node.preview}"></div>` : "";
+    const state = `${id === selectedNode ? "selected" : ""} ${id === hoveredNode ? "hovered" : ""}`;
+    return `<div class="node ${state}" style="left:${node.x}px;top:${node.y}px;width:${node.width || 190}px">${head}<div class="rows">${mode}${rows}${fields}</div>${preview}</div>`;
+}
+
+function wiresHtml() {
+    const paths = LINKS.map(([from, fromPin, to, toPin]) => {
+        const [x1, y1] = pinPosition(from, fromPin);
+        const [x2, y2] = pinPosition(to, toPin);
+        const bend = Math.max(60, Math.abs(x2 - x1) * 0.5);
+        return `<path d="M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}" stroke="var(--pin-${pinType(from, fromPin)})"/>`;
+    }).join("");
+    return `<svg class="wires" width="1382" height="878">${paths}</svg>`;
+}
+
+function addNodeMenu() {
+    const entry = (category, name, description, highlighted) => `<div class="add-entry ${highlighted ? "highlighted" : ""}">
+        <span class="swatch-dot" style="background:rgb(var(--category-${category}))"></span><span class="add-name">${name}</span>
+        <span class="add-description">${description}</span></div>`;
+    const click = [600, 290];
+    return `${mouseCursor(click)}<div class="add-menu" style="left:${click[0] + 6}px;top:${click[1] + 6}px">
+        <div class="search focused">${icon("SEARCH")}<span class="typed">norm</span><span class="caret-bar"></span></div>
+        <div class="add-section">Input</div>${entry("input", "Normal", "The surface normal at the shaded point", true)}
+        <div class="add-section">Vector</div>${entry("vector", "Normal Map", "Turns a sampled normal map into a normal")}
+        <div class="add-section">Math</div>${entry("math", "Normalize", "Scales a vector to length one")}</div>`;
+}
+
+function mouseCursor([x, y]) {
+    return `<svg class="abs" style="left:${x}px;top:${y}px;z-index:20" width="14" height="20" viewBox="0 0 14 20">
+        <path d="M1 1 L1 16 L5 12 L8 19 L10 18 L7 11 L12 11 Z" fill="#FFFFFF" stroke="#000000" stroke-width="1"/></svg>`;
+}
+
+function graphBody() {
+    return `<div class="canvas ${params.get("canvas") || ""}">${wiresHtml()}${Object.entries(NODES).map(([id, node]) => nodeHtml(id, node)).join("")}
+        <div class="graph-toolbar"><span class="crumb">${icon("MATERIAL", "", "width:14px;height:14px;color:var(--type-material)")}Material_0</span>
+            ${icon("CARET_RIGHT", "separator")}<span class="crumb current">Surface</span></div>
+        <div class="graph-view"><span class="zoom">100%</span><div class="tool-button" title="Frame all nodes">${icon("PERSPECTIVE")}</div></div>
+        ${params.get("menu") === "add" ? addNodeMenu() : ""}</div>`;
+}
+
+function previewBody() {
+    return `<div id="preview-image"></div><div class="preview-toolbar">
+        <div class="tool-button">${icon("CUBE")}Sphere${icon("CHEVRON_DOWN", "caret")}</div>
+        <div class="tool-button">${icon("PERSPECTIVE")}Lit${icon("CHEVRON_DOWN", "caret")}</div></div>`;
+}
+
+function detailsBody() {
+    let top = 10;
+    const header = title => {
+        const h = `<div class="component-header" style="top:${top}px">${icon("CHEVRON_DOWN", "chevron")}${icon("MATERIAL")}${title}</div>`;
+        top += 28;
+        return h;
+    };
+    const row = (label, fields, height = 30) => {
+        const r = `<div class="property-row" style="top:${top}px;height:${height}px"><div class="label">${label}</div><div class="divider"></div>
+            <div class="fields">${fields}</div></div>`;
+        top += height;
+        return r;
+    };
+    let html = header("Texture Sample");
+    html += row("Texture", `<div class="asset-field"><div class="thumb"></div><div><div class="name">T_Leaves_Albedo</div><div class="kind">Texture, 2048 x 2048</div></div>
+        <div class="actions"><span class="nav-button">${icon("SEARCH")}</span><span class="nav-button">${icon("X")}</span></div></div>`, 52);
+    html += row("Color space", `<div class="field text single">sRGB${icon("CHEVRON_DOWN", "caret")}</div>`);
+    html += row("Preview", `<div class="checkbox">${icon("CHECK")}</div>`);
+    return html;
+}
+
+function panel(id, box, tabs, body) {
+    const tabHtml = tabs.map((t, i) => `<div class="tab ${i === 0 ? "active" : ""}" style="left:${i * 162}px">
+        ${t.icon ? icon(t.icon) : ""}<span class="ellipsis">${t.label}</span>${i === 0 ? icon("X", "close") : ""}</div>`).join("");
+    return `<div id="${id}" class="panel" style="left:${box[0]}px;top:${box[1]}px;width:${box[2]}px;height:${box[3]}px">
+        <div class="tabs">${tabHtml}</div><div class="body">${body}</div></div>`;
+}
+
+const chrome = `<div id="menubar" class="abs">${["File", "Edit", "Window", "Help"].map(t => `<div class="item">${t}</div>`).join("")}
+        <div id="project" class="abs">${icon("FOLDER")}dwaqjdoiawd</div></div>
+    <div id="workspace-tabs" class="abs">
+        <div class="workspace-tab">${icon("SCENE", "kind", "color:var(--type-world)")}<span class="ellipsis">DefaultWorld</span>${icon("X", "close")}</div>
+        <div class="workspace-tab active">${icon("MATERIAL", "kind", "color:var(--type-material)")}<span class="ellipsis">Material_0</span>${icon("X", "close")}</div></div>
+    <div id="hotbar" class="abs">
+        <div class="hotbar-group"><div class="primary-button">${icon("BUILD")}Compile</div></div><div class="island-separator"></div>
+        <div class="hotbar-group"><div class="tool-button">${icon("SAVE")}Save</div></div><div class="island-separator"></div>
+        <div class="hotbar-group status-note"><span class="dot"></span>Compiled, 10 nodes</div></div>`;
+
+const bottom = `<div id="bottom-bar" class="abs"><div class="section browser">Content Browser</div><div class="island-separator"></div>
+    <div class="section command-section"><div class="command">Command</div></div><div class="island-separator"></div>
+    <div class="section stats-gap"></div><div class="island-separator"></div>
+    <div class="section stats"><span><b>8.3</b> ms</span><span><b>120</b> fps</span><span><b>412</b> MB VRAM</span></div></div>`;
+
+document.body.innerHTML = chrome +
+    panel("preview", [0, 108, 520, 540], [{icon: "VIEWPORT", label: "Preview"}], previewBody()) +
+    panel("details", [0, 654, 520, 362], [{icon: "PROPERTIES", label: "Details"}], detailsBody()) +
+    panel("graph", [526, 108, 1382, 908], [{icon: "MATERIAL", label: "Surface Graph"}], graphBody()) + bottom;
+</script>
+</body>
+</html>

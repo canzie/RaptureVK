@@ -1,0 +1,234 @@
+<!doctype html>
+<!--
+    Proposal: the World Editor after a full visual sweep, same palette as assets/themes/theme.ams.
+    ?open=menu shows the viewport's Render menu, ?open=popup the command line's completion popup, ?open=menu,popup both.
+    ?browser=floating shows the content browser above the bottom bar, ?browser=docked docks it under the viewport.
+    ?tooltip=button shows a control's tooltip, ?tooltip=asset an asset card's (with a browser open).
+    ?state=playing,unsaved,hover:properties shows the play state, unsaved changes and the panel under the cursor.
+    Hover effects are live when the file is opened in a browser, written the way the editor's :hover styles would be.
+    Render: tools/ui_mock/render.sh world_editor_sweep.html "sweep&open=menu,popup"
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<script src="icons.js"></script>
+<link rel="stylesheet" href="sweep.css">
+</head>
+<body>
+<script>
+const icon = (name, cls = "", style = "") => `<span class="icon ${cls}" style="${style}">${ICONS[name] || ""}</span>`;
+const open = (new URLSearchParams(location.search).get("open") || "").split(",");
+const browserMode = new URLSearchParams(location.search).get("browser") || "";
+const tooltip = new URLSearchParams(location.search).get("tooltip") || "";
+// states shown at once: playing, unsaved, hover:<panel id>
+const states = (new URLSearchParams(location.search).get("state") || "").split(",");
+const playing = states.includes("playing");
+const hoveredPanel = (states.find(s => s.startsWith("hover:")) || "").slice(6);
+
+function menubar() {
+    return `<div id="menubar" class="abs">${["File", "Edit", "Window", "Help"].map(t => `<div class="item">${t}</div>`).join("")}
+        <div id="project" class="abs">${icon("FOLDER")}dwaqjdoiawd</div></div>`;
+}
+
+function workspaceTabs() {
+    const tabs = [["SCENE", "--type-world", "DefaultWorld", true], ["SCRIPT", "--type-script", "Scripting", false],
+                  ["MESH", "--type-mesh", "Sponza_Mesh0", false]];
+    return `<div id="workspace-tabs" class="abs">${tabs.map(([i, color, label, active]) =>
+        `<div class="workspace-tab ${active ? "active" : ""} ${active && states.includes("unsaved") ? "unsaved" : ""}">${icon(i, "kind", `color:var(${color})`)}<span class="ellipsis">${label}</span>
+            ${icon("X", "close")}<span class="unsaved-dot"></span></div>`).join("")}</div>`;
+}
+
+function hotbar() {
+    return `<div id="hotbar" class="abs">
+        <div class="hotbar-group"><div class="select-button">${icon("CUBE")}Object Mode${icon("CHEVRON_DOWN", "caret")}</div></div>
+        <div class="island-separator"></div>
+        <div class="hotbar-group"><div class="primary-button">${icon("PLUS")}Add</div></div>
+        <div class="island-separator"></div>
+        <div class="hotbar-group"><div class="tool-button ${tooltip === "button" ? "hovered" : ""}">${icon("SAVE")}Save World</div></div>
+        <div class="island-separator"></div>
+        <div class="hotbar-group"><div class="play-group">${playing ? `<div class="tool-button stop">${icon("STOP")}</div>` : `<div class="tool-button play">${icon("PLAY")}</div>`}
+            <div class="tool-button">${icon("PAUSE")}</div><div class="tool-button">${icon("FRAME_ADVANCE")}</div></div></div>
+        <div class="island-separator"></div>
+        ${playing ? `<div class="hotbar-group playing-note"><span class="pulse"></span>Playing, changes made now are undone when you stop</div>` : ""}</div>`;
+}
+
+function panel(id, box, tabs, body) {
+    const hovered = hoveredPanel === id ? "hovered" : "";
+    const tabHtml = tabs.map((t, i) => `<div class="tab ${i === 0 ? "active" : ""}" style="left:${i * 162}px">
+        ${t.icon ? icon(t.icon) : ""}<span class="ellipsis">${t.label}</span>${i === 0 ? icon("X", "close") : ""}</div>`).join("");
+    return `<div id="${id}" class="panel ${hovered}" style="left:${box[0]}px;top:${box[1]}px;width:${box[2]}px;height:${box[3]}px">
+        <div class="tabs">${tabHtml}</div><div class="body">${body}</div></div>`;
+}
+
+function renderMenu() {
+    const radio = (label, chosen) => `<div class="item ${chosen ? "chosen" : ""}"><span class="marker"><span class="radio"></span></span>${label}</div>`;
+    const check = (label, checked) => `<div class="item"><span class="marker"><span class="check">${checked ? icon("CHECK") : ""}</span></span>${label}</div>`;
+    return `<div class="menu" style="left:114px;top:48px">
+        <div class="section">View mode</div>
+        ${radio("Lit", true)}${radio("Direct Lighting")}${radio("Indirect Lighting")}${radio("Raw Irradiance")}
+        ${radio("Normals")}${radio("Motion Vectors")}${radio("Ambient Occlusion")}
+        <div class="section">Features</div>
+        ${check("Ambient Occlusion", true)}${check("Show Probes", false)}
+        <div class="section">Probe debug</div>
+        ${radio("Classification")}${radio("Irradiance")}${radio("Distance")}${radio("Relocation")}</div>`;
+}
+
+function orientationGizmo() {
+    const center = [60, 60];
+    const axes = [["X", [36, -14], "--axis-x"], ["Y", [0, -40], "--axis-y"], ["Z", [26, 24], "--axis-z"]];
+    let negatives = "", positives = "";
+    for (const [label, [dx, dy], color] of axes) {
+        negatives += `<circle cx="${center[0] - dx}" cy="${center[1] - dy}" r="7" fill="#1E1E1E" stroke="var(${color})" stroke-width="2"/>`;
+        positives += `<line x1="${center[0]}" y1="${center[1]}" x2="${center[0] + dx}" y2="${center[1] + dy}" stroke="var(${color})" stroke-width="2"/>
+            <circle cx="${center[0] + dx}" cy="${center[1] + dy}" r="9" fill="var(${color})"/>
+            <text x="${center[0] + dx}" y="${center[1] + dy + 4}" text-anchor="middle" font-size="11" font-weight="700" fill="#141414">${label}</text>`;
+    }
+    return `<svg class="gizmo" width="120" height="120" viewBox="0 0 120 120">${negatives}${positives}</svg>`;
+}
+
+function viewportBody() {
+    return `<div id="viewport-image"></div>${orientationGizmo()}
+        <div class="viewport-toolbar">
+            <div class="tool-button">${icon("TRANSFORM")}Transform${icon("CHEVRON_DOWN", "caret")}</div>
+            <div class="tool-button ${open.includes("menu") ? "open" : ""}">${icon("PERSPECTIVE")}Lit${icon("CHEVRON_DOWN", "caret")}</div>
+        </div>${open.includes("menu") ? renderMenu() : ""}`;
+}
+
+function outlinerBody() {
+    // [depth, expanded (null for a leaf), icon, name, type]
+    const rows = [[0, null, "WORLD", "Environment", "Environment"], [0, true, "GROUP", "Lights", "Folder"],
+                  [1, null, "LIGHT", "Sun", "DirectionalLight3D"], [0, null, "CUBE", "Floor", "StaticMesh3D"],
+                  [0, false, "TRANSFORM", "Sponza", "Sponza"], [0, true, "CUBE", "Cube", "StaticMesh3D"],
+                  [1, true, "TRANSFORM", "Arm", "SpringArm3D"], [2, null, "CAMERA", "Camera", "Camera3D"]];
+    const header = `<div class="tree-header" style="top:40px"><span class="column" style="left:48px">Name</span>
+        <span class="divider" style="left:400px"></span><span class="column" style="left:408px">Type</span></div>`;
+    const body = rows.map(([depth, expanded, i, name, type], r) => {
+        const guides = Array.from({length: depth}, (_, d) => `<span class="guide" style="left:${17 + d * 16}px"></span>`).join("");
+        const expander = icon(expanded === null ? "CARET_RIGHT" : expanded ? "CHEVRON_DOWN" : "CARET_RIGHT", `expander ${expanded === null ? "leaf" : ""}`);
+        return `<div class="tree-row ${name === "Sun" ? "selected" : ""}" style="top:${64 + r * 24}px">${guides}
+            <span style="width:${10 + depth * 16}px;flex:none"></span>${expander}${icon(i).replace('class="icon ', 'class="icon tree-icon ')}<span>${name}</span><span class="type">${type}</span></div>`;
+    }).join("");
+    const fill = `<div class="tree-fill" style="top:${64 + rows.length * 24}px"></div>`;
+    return `<div class="search" style="left:8px;right:8px;top:8px">${icon("SEARCH")}Search</div>` + header + body + fill;
+}
+
+function propertiesBody() {
+    let top = 42;
+    const header = (title, iconName) => {
+        const h = `<div class="component-header" style="top:${top}px">${icon("CHEVRON_DOWN", "chevron")}${icon(iconName)}${title}
+            <span class="icon-button">${icon("MORE")}</span></div>`;
+        top += 28;
+        return h;
+    };
+    const row = (label, fields, changed = false) => {
+        const reset = changed ? `<span class="reset" title="Reset to default">${icon("RESET")}</span>` : "";
+        const r = `<div class="property-row ${changed ? "changed" : ""}" style="top:${top}px"><div class="label">${label}</div><div class="divider"></div><div class="fields">${fields}</div>${reset}</div>`;
+        top += 30;
+        return r;
+    };
+    const axis = ["--axis-x", "--axis-y", "--axis-z"];
+    const vector = values => values.map((v, i) => `<div class="field number"><span class="axis" style="background:var(${axis[i]})"></span>${v}</div>`).join("");
+
+    let html = `<div class="search" style="left:8px;width:380px;top:8px">${icon("SEARCH")}Search properties</div>
+        <span class="icon-button" style="right:36px;top:9px">${icon("FILTER")}</span>
+        <span class="icon-button" style="right:8px;top:9px">${icon("MORE")}</span>`;
+    html += header("Transform", "TRANSFORM");
+    html += row("Translation", vector(["0.000", "0.000", "0.000"]));
+    html += row("Rotation", vector(["-1.854", "0.000", "0.000"]), true);
+    html += row("Scale", vector(["1.000", "1.000", "1.000"]));
+    html += header("Light", "LIGHT");
+    html += row("Color", `<div class="swatch"></div><span class="swatch-hex">#FFFFFF</span>`);
+    html += row("Intensity", `<div class="field text single"><div class="fill" style="width:19%"></div><span class="value">19.753</span></div>`, true);
+    html += row("Mobility", `<div class="field text single">Static${icon("CHEVRON_DOWN", "caret")}</div>`);
+    html += row("Active", `<div class="checkbox">${icon("CHECK")}</div>`);
+    html += row("Casts Shadow", `<div class="checkbox">${icon("CHECK")}</div>`);
+    html += row("Use Temperature", `<div class="checkbox"></div>`);
+    html += row("Temperature", `<div class="field text single"><div class="fill" style="width:12%"></div><span class="value">6500.0 K</span></div>`);
+    html += `<div class="scroll-thumb" style="top:44px;height:240px"></div>`;
+    return html;
+}
+
+function contentBrowser(floating) {
+    const folder = (label, depth, expanded, opts = {}) => `<div class="folder-row ${opts.selected ? "selected" : ""} ${opts.internal ? "internal" : ""}"
+        style="padding-left:${8 + depth * 14}px">${icon(expanded === null ? "CHEVRON_DOWN" : expanded ? "CHEVRON_DOWN" : "CARET_RIGHT", `expander ${expanded === null ? "empty" : ""}`)}
+        ${icon("FOLDER", "folder")}<span class="ellipsis">${label}</span></div>`;
+    const card = (iconName, name, kind, color, selected) => `<div class="card ${selected ? "selected" : ""} ${tooltip === "asset" && name === "DefaultWorld" ? "hovered" : ""}">
+        <div class="thumb">${icon(iconName, "", iconName === "FOLDER" ? "color:var(--type-folder)" : "")}</div>
+        <div class="footer"><span class="name ellipsis">${name}</span>${color ? `<span class="kind">${kind}</span><span class="strip" style="background:var(${color})"></span>` : ""}</div></div>`;
+
+    const toolbar = `<div class="browser-toolbar">
+        <div class="hotbar-group"><div class="primary-button">${icon("PLUS")}Add</div></div><div class="island-separator"></div>
+        <div class="hotbar-group"><div class="tool-button">${icon("FOLDER_PLUS")}Import</div></div><div class="island-separator"></div>
+        <div class="hotbar-group"><span class="nav-button">${icon("NAV_BACK")}</span><span class="nav-button disabled">${icon("NAV_FORWARD")}</span>
+            <span class="nav-button">${icon("NAV_UP")}</span></div><div class="island-separator"></div>
+        <div class="hotbar-group breadcrumb"><span class="crumb">${icon("FOLDER")}dwaqjdoiawd</span>${icon("CARET_RIGHT", "separator")}
+            <span class="crumb current">content</span></div>
+        <div class="right"><div class="island-separator"></div><div class="hotbar-group"><div class="search">${icon("SEARCH")}Search content</div></div>
+            ${floating ? `<div class="island-separator"></div><div class="hotbar-group"><div class="tool-button">${icon("PIN")}Dock</div></div>` : ""}
+            <div class="island-separator"></div><div class="hotbar-group"><span class="nav-button settings">${icon("SETTINGS")}</span></div></div></div>`;
+
+    const sidebar = `<div class="browser-sidebar"><div class="sidebar-section">${icon("CHEVRON_DOWN", "chevron")}Project</div>
+        ${folder("dwaqjdoiawd", 0, true)}${folder("blobs", 1, null, {internal: true})}${folder(".cache", 1, false, {internal: true})}
+        ${folder("content", 1, true, {selected: true})}${folder("Sponza", 2, null)}
+        <div class="sidebar-after-tree"><div class="sidebar-section">${icon("CARET_RIGHT", "chevron")}Recent</div></div></div>`;
+
+    const grid = `<div class="browser-grid">${card("FOLDER", "Sponza", "Folder", null, false)}${card("SCENE", "DefaultWorld", "World", "--type-world", false)}
+        ${card("SCRIPT", "Script", "Script", "--type-script", false)}${card("SCRIPT", "Script 2", "Script", "--type-script", true)}</div>
+        <div class="browser-status">4 items, 1 selected</div>`;
+
+    return toolbar + sidebar + grid;
+}
+
+function mouseCursor([x, y]) {
+    return `<svg class="abs" style="left:${x}px;top:${y}px;z-index:20" width="14" height="20" viewBox="0 0 14 20">
+        <path d="M1 1 L1 16 L5 12 L8 19 L10 18 L7 11 L12 11 Z" fill="#FFFFFF" stroke="#000000" stroke-width="1"/></svg>`;
+}
+
+function tooltips() {
+    if (tooltip === "button") {
+        const cursor = [336, 88];
+        return `${mouseCursor(cursor)}<div class="tooltip described" style="left:${cursor[0] + 14}px;top:${cursor[1] + 22}px">
+            <span>Writes this world and its objects to its asset file</span><span class="shortcut">Ctrl+S</span></div>`;
+    }
+    if (tooltip === "asset") {
+        const fact = (key, value, mono) => `<span class="key">${key}</span><span class="value ${mono ? "mono" : ""}">${value}</span>`;
+        return `<div class="tooltip asset" style="left:${browserMode === "docked" ? 520 : 528}px;top:${browserMode === "docked" ? 852 : 700}px">
+            <div class="head"><div class="preview">${icon("SCENE")}</div><div><div class="title">DefaultWorld</div>
+                <div class="chip"><span class="dot" style="background:var(--type-world)"></span>World</div></div></div>
+            <div class="facts">${fact("Location", "content/DefaultWorld.rworld", true)}${fact("Size on disk", "18.2 KB")}
+                ${fact("Instances", "8")}${fact("Startup world", "Yes")}${fact("Id", "7f3a91c2e0d84b15", true)}</div></div>`;
+    }
+    return "";
+}
+
+function commandPopup() {
+    const entries = [["list", "Lists the open workspaces with their ids and types"], ["select", "Brings an open workspace to the front"]];
+    return `<div class="popup" style="left:160px;bottom:30px">
+        ${entries.map(([w, d], i) => `<div class="entry ${i === 0 ? "highlighted" : ""}"><span class="word">${w}</span><span class="description">${d}</span></div>`).join("")}
+        <div class="hints"><span><b>Tab</b> accept</span><span><b>↑ ↓</b> move</span><span><b>Enter</b> run</span><span><b>Esc</b> close</span></div></div>`;
+}
+
+function bottomBar() {
+    const typing = open.includes("popup");
+    const floatingBrowser = browserMode === "floating";
+    return `<div id="bottom-bar" class="abs">
+        <div class="section browser ${floatingBrowser ? "active" : ""}">Content Browser</div><div class="island-separator"></div>
+        <div class="section command-section"><div class="command ${typing ? "focused" : ""}">${typing ? "workspace <span class=\"caret-bar\"></span>" : "Command"}</div></div>
+        <div class="island-separator"></div>
+        <div class="section stats-gap"></div><div class="island-separator"></div><div class="section stats"><span><b>8.3</b> ms</span><span><b>120</b> fps</span><span><b>412</b> MB VRAM</span></div>
+    </div>${typing ? commandPopup() : ""}${floatingBrowser ? `<div class="browser-floating">${contentBrowser(true)}</div>` : ""}`;
+}
+
+const docked = browserMode === "docked";
+if (playing) {
+    document.body.classList.add("playing");
+}
+document.body.innerHTML = menubar() + workspaceTabs() + hotbar() +
+    (docked ? panel("browser", [0, 662, 1300, 354], [{icon: "FOLDER", label: "Content Browser"}], `<div class="browser-fill">${contentBrowser(false)}</div>`) : "") +
+    panel("viewport", [0, 108, 1300, docked ? 548 : 908], [{icon: "VIEWPORT", label: "Viewport"}, {icon: "", label: "Texture Viewer"}], viewportBody()) +
+    panel("outliner", [1306, 108, 602, 451], [{icon: "LAYERS", label: "Outliner"}], outlinerBody()) +
+    panel("properties", [1306, 565, 602, 451], [{icon: "PROPERTIES", label: "Properties"}, {icon: "WORLD", label: "World Settings"}], propertiesBody()) +
+    bottomBar() + tooltips();
+</script>
+</body>
+</html>

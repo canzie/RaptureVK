@@ -1,0 +1,284 @@
+<!doctype html>
+<!--
+    The World Editor at 1908x1048, rebuilt from assets/themes/theme.ams and the layout constants in Editor/src.
+    "current" reproduces the editor as it is; other variants are proposals, chosen with ?variant=<name>.
+    Render: tools/ui_mock/render.sh world_editor.html <variant>
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<script src="icons.js"></script>
+<style>
+@font-face { font-family: "Roboto"; src: url("../../assets/fonts/Roboto-Regular.ttf"); font-weight: 400; }
+@font-face { font-family: "Roboto"; src: url("../../assets/fonts/Roboto-Bold.ttf"); font-weight: 700; }
+
+/* theme.ams, unchanged */
+:root {
+    --bg-window: #181818;
+    --bg-canvas: #1A1A1A;
+    --bg-input: #111111;
+    --bg-panel: #252525;
+    --bg-header: #2F2F2F;
+    --bg-frame: #1F1F1F;
+    --bg-buttons: #383838;
+    --bg-contrast: #4D4D4D;
+    --text-1: #EEEEEE;
+    --text-2: #BEBEBE;
+    --text-3: #868686;
+    --text-4: #555555;
+    --border-1: #1C1C1C;
+    --border-2: #272727;
+    --border-3: #343434;
+    --border-4: #414141;
+    --accent: #4772B3;
+    --status-success: #A3BE8C;
+
+    /* metrics measured off the editor at 1080p */
+    --font: "Roboto";
+    --font-weight: 400;
+    --text-size: 13px;
+    --small-text-size: 12px;
+    --menu-height: 28px;
+    --workspace-tab-height: 32px;
+    --workspace-tab-width: 196px;
+    --hotbar-height: 40px;
+    --dock-spacing: 4px;
+    --panel-tab-height: 30px;
+    --panel-tab-width: 99px;
+    --tree-row-height: 24px;
+    --property-row-height: 33px;
+    --component-header-height: 27px;
+    --input-inset: 5px;
+    --input-radius: 2px;
+    --input-border: var(--border-3);
+    --input-fill-gap: 0px;
+    --label-column: 238px;
+    --bottom-bar-height: 28px;
+    --selection: #3D5F99;
+    --slider-fill: var(--bg-contrast);
+    --project-background: var(--bg-input);
+    --tab-close-gap: 0px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1908px; height: 1048px; overflow: hidden; }
+body {
+    position: relative;
+    background: var(--bg-window);
+    color: var(--text-1);
+    font-family: var(--font), sans-serif;
+    font-weight: var(--font-weight);
+    font-size: var(--text-size);
+    -webkit-font-smoothing: antialiased;
+}
+.abs { position: absolute; }
+.icon { display: inline-block; width: 16px; height: 16px; flex: none; }
+.icon svg { width: 100%; height: 100%; display: block; }
+.row { display: flex; align-items: center; }
+
+#menubar { left: 0; top: 0; width: 100%; height: var(--menu-height); }
+#menubar .item { position: absolute; top: 0; height: 100%; display: flex; align-items: center; color: var(--text-1); }
+#project { right: 140px; top: 4px; width: 180px; height: 20px; background: var(--project-background); border-radius: 2px;
+    color: var(--text-3); font-size: var(--small-text-size); display: flex; align-items: center; justify-content: center; }
+
+#workspace-tabs { left: 0; top: var(--menu-height); width: 100%; height: var(--workspace-tab-height); }
+.workspace-tab { position: absolute; left: 12px; top: 0; width: var(--workspace-tab-width); height: 100%;
+    background: var(--bg-panel); border-radius: 2px 2px 0 0; display: flex; align-items: center; padding-left: 8px; gap: 6px; }
+.workspace-tab .close { position: absolute; right: 10px; color: var(--text-3); width: 10px; height: 10px; }
+
+#hotbar { left: 0; top: calc(var(--menu-height) + var(--workspace-tab-height)); width: 100%; height: var(--hotbar-height);
+    background: var(--bg-panel); display: flex; align-items: center; padding-left: 8px; gap: 8px; }
+.hotbar-button { height: 24px; padding: 0 12px; background: var(--bg-buttons); color: var(--text-2); font-size: var(--small-text-size);
+    border-radius: 2px; display: flex; align-items: center; }
+.hotbar-separator { width: 2px; height: 24px; background: var(--bg-window); }
+.hotbar-icon { width: 18px; height: 18px; padding: 2px; color: var(--text-2); background: var(--bg-buttons); border-radius: 2px; }
+.hotbar-icon.play { color: var(--status-success); }
+
+.panel { position: absolute; }
+.panel .tabs { position: absolute; left: 0; top: 0; right: 0; height: var(--panel-tab-height); background: var(--bg-window); }
+.panel .tab { position: absolute; top: 0; height: 100%; display: flex; align-items: center; gap: 6px; padding-left: 8px;
+    color: var(--text-2); width: var(--panel-tab-width); white-space: nowrap; overflow: hidden; }
+.panel .tab.active { background: var(--bg-panel); color: var(--text-1); border-radius: 2px 2px 0 0; }
+.panel .tab .icon { width: 14px; height: 14px; color: var(--text-2); }
+.panel .tab .close { position: absolute; right: 4px; width: 9px; height: 9px; color: var(--text-3); }
+.panel .tab.active { padding-right: var(--tab-close-gap); }
+.panel .body { position: absolute; left: 0; right: 0; top: var(--panel-tab-height); bottom: 0; background: var(--bg-panel); overflow: hidden; }
+
+#viewport-image { position: absolute; left: 6px; top: 6px; right: 6px; bottom: 6px;
+    background: url("reference/viewport.png") no-repeat; background-size: cover; }
+.overlay-button { position: absolute; top: 14px; width: 80px; height: 24px; background: #5C5C5C; color: var(--text-2);
+    font-size: var(--small-text-size); border-radius: 4px; display: flex; align-items: center; justify-content: center; }
+
+.tree-header, .tree-row { position: absolute; left: 0; right: 0; height: var(--tree-row-height); display: flex; align-items: center; }
+.tree-header { color: var(--text-1); }
+.tree-row:nth-child(odd of .tree-row) { background: var(--bg-frame); }
+.tree-row.selected { background: var(--selection); }
+.tree-row .icon { width: 12px; height: 12px; color: var(--text-3); margin-left: 34px; margin-right: 6px; }
+.tree-row .type, .tree-header .type { position: absolute; left: 401px; }
+.tree-row .type { color: var(--text-2); }
+
+.search { position: absolute; left: 12px; height: 28px; background: var(--bg-input); border: 1px solid var(--border-3);
+    border-radius: 2px; display: flex; align-items: center; gap: 6px; padding-left: 8px; color: var(--text-3); }
+.search .icon { width: 12px; height: 12px; }
+
+.component-header { position: absolute; left: 0; right: 8px; height: var(--component-header-height); background: var(--bg-header);
+    display: flex; align-items: center; padding-left: 8px; gap: 8px; font-size: 14px; }
+.component-header .icon { width: 14px; height: 14px; color: var(--text-2); }
+.component-header .more { position: absolute; right: 8px; width: 14px; height: 14px; color: var(--text-3); }
+.property-row { position: absolute; left: 0; right: 8px; height: var(--property-row-height); border-bottom: 1px solid var(--bg-window); }
+.property-row .label { position: absolute; left: 12px; top: 0; bottom: 0; display: flex; align-items: center;
+    color: var(--text-2); font-size: var(--small-text-size); }
+.property-row .divider { position: absolute; left: var(--label-column); top: 0; bottom: 0; width: 1px; background: var(--bg-window); }
+.property-row .fields { position: absolute; left: calc(var(--label-column) + 10px); right: 10px; top: var(--input-inset);
+    bottom: var(--input-inset); display: flex; gap: 6px; }
+.field { flex: 1; background: var(--bg-input); border: 1px solid var(--input-border); border-radius: var(--input-radius);
+    color: var(--text-1); font-size: var(--small-text-size); display: flex; align-items: center; position: relative;
+    padding: var(--input-fill-gap); }
+.field.number { justify-content: center; }
+.field.text { padding-left: 4px; }
+.field .fill { position: absolute; left: var(--input-fill-gap); top: var(--input-fill-gap); bottom: var(--input-fill-gap);
+    background: var(--slider-fill); border-radius: max(0px, calc(var(--input-radius) - 1px)); }
+.field .value { position: relative; padding-left: 4px; }
+.swatch { width: 16px; height: 16px; background: #FFF; border-radius: 2px; margin: 0 6px 0 0; }
+.checkbox { width: 18px; height: 18px; background: var(--bg-input); border: 1px solid var(--input-border); border-radius: 2px;
+    color: var(--accent); display: flex; align-items: center; justify-content: center; }
+.checkbox .icon { width: 14px; height: 14px; }
+.scrollbar { position: absolute; right: 0; width: 8px; background: var(--bg-header); }
+.scrollbar .thumb { position: absolute; left: 1px; right: 1px; background: var(--bg-contrast); border-radius: 3px; }
+
+#bottom-bar { left: 0; bottom: 0; width: 100%; height: var(--bottom-bar-height); background: var(--bg-panel); }
+#bottom-bar .browser { position: absolute; left: 0; width: 150px; height: 100%; display: flex; align-items: center;
+    justify-content: center; color: var(--text-2); font-size: var(--small-text-size); }
+#bottom-bar .separator { position: absolute; top: 0; width: 2px; height: 100%; background: var(--bg-window); }
+#bottom-bar .command { position: absolute; left: 164px; top: 3px; width: 380px; height: 22px; background: var(--bg-input);
+    border: 1px solid #949494; color: var(--text-3); display: flex; align-items: center; padding-left: 2px; }
+</style>
+</head>
+<body>
+<script>
+const icon = (name, cls = "") => `<span class="icon ${cls}">${ICONS[name] || ""}</span>`;
+
+function menubar() {
+    const items = [["File", 15], ["Edit", 63], ["Window", 108], ["Help", 177]];
+    return `<div id="menubar" class="abs">${items.map(([t, x]) => `<div class="item" style="left:${x}px">${t}</div>`).join("")}
+        <div id="project" class="abs">dwaqjdoiawd</div></div>`;
+}
+
+function workspaceTabs() {
+    return `<div id="workspace-tabs" class="abs"><div class="workspace-tab">${icon("SCENE")}DefaultWorld${icon("X", "close")}</div></div>`;
+}
+
+function hotbar() {
+    return `<div id="hotbar" class="abs">
+        <div class="hotbar-button">Add</div><div class="hotbar-separator"></div>
+        <div class="hotbar-button">Save World</div><div class="hotbar-separator"></div>
+        ${icon("PLAY", "hotbar-icon play")}${icon("PAUSE", "hotbar-icon")}${icon("FRAME_ADVANCE", "hotbar-icon")}</div>`;
+}
+
+function panel(id, box, tabs, body) {
+    const tabHtml = tabs.map((t, i) => `<div class="tab ${i === 0 ? "active" : ""}" style="left:${i * 108}px">
+        ${t.icon ? icon(t.icon) : ""}<span>${t.label}</span>${i === 0 && t.closable ? icon("X", "close") : ""}</div>`).join("");
+    return `<div id="${id}" class="panel" style="left:${box[0]}px;top:${box[1]}px;width:${box[2]}px;height:${box[3]}px">
+        <div class="tabs">${tabHtml}</div><div class="body">${body}</div></div>`;
+}
+
+function viewportBody() {
+    return `<div id="viewport-image"></div>
+        <div class="overlay-button" style="left:14px">Transform</div><div class="overlay-button" style="left:98px">Render</div>`;
+}
+
+function outlinerBody() {
+    const rows = [["WORLD", "Environment", "Environment"], ["LIGHT", "Sun", "DirectionalLight3D"], ["CUBE", "Floor", "StaticMesh3D"],
+                  ["TRANSFORM", "Sponza", "Sponza"], ["CUBE", "Cube", "StaticMesh3D"]];
+    const rowHeight = metric("--tree-row-height");
+    const header = `<div class="tree-header" style="top:2px">Name<span class="type">Type</span></div>`;
+    const body = rows.map(([i, n, t], r) => `<div class="tree-row ${r === 1 ? "selected" : ""}" style="top:${4 + (r + 1) * rowHeight}px">
+        ${icon(i)}${n}<span class="type">${t}</span></div>`).join("");
+    return header + body;
+}
+
+function propertyRow(top, label, fields) {
+    return `<div class="property-row" style="top:${top}px"><div class="label">${label}</div><div class="divider"></div>
+        <div class="fields">${fields}</div></div>`;
+}
+
+const metric = name => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name));
+
+function propertiesBody() {
+    const rowHeight = metric("--property-row-height");
+    let html = `<div class="search" style="top:8px;width:471px">${icon("SEARCH")}Search Properties...</div>
+        ${icon("FILTER", "abs").replace('class="icon abs"', 'class="icon abs" style="left:491px;top:14px;color:var(--text-2)"')}
+        ${icon("MORE", "abs").replace('class="icon abs"', 'class="icon abs" style="left:542px;top:14px;color:var(--text-3)"')}`;
+
+    let top = 48;
+    const header = (title, iconName) => {
+        const h = `<div class="component-header" style="top:${top}px">${icon("CHEVRON_DOWN")}${icon(iconName)}${title}${icon("MORE", "more")}</div>`;
+        top += metric("--component-header-height");
+        return h;
+    };
+    const row = (label, fields) => { const r = propertyRow(top, label, fields); top += rowHeight; return r; };
+    const numbers = (a, b, c) => [a, b, c].map(v => `<div class="field number">${v}</div>`).join("");
+
+    html += header("Transform", "TRANSFORM");
+    html += row("Translation", numbers("0.000", "0.000", "0.000"));
+    html += row("Rotation", numbers("-1.854", "0.000", "0.000"));
+    html += row("Scale", numbers("1.000", "1.000", "1.000"));
+    top += 7;
+    html += header("Light", "LIGHT");
+    html += row("Color", `<div class="field text"><div class="swatch"></div>#FFFFFF</div>`);
+    html += row("Intensity", `<div class="field text"><div class="fill" style="width:19%"></div><span class="value">19.753</span></div>`);
+    html += row("Mobility", `<div class="field text">Static</div>`);
+    html += row("Active", `<div class="checkbox">${icon("CHECK")}</div>`);
+    html += row("Casts Shadow", `<div class="checkbox">${icon("CHECK")}</div>`);
+    html += row("Use Temperature", `<div class="checkbox"></div>`);
+    html += row("Temperature", `<div class="field text"><div class="fill" style="width:12%"></div><span class="value">6500.0 K</span></div>`);
+    html += `<div class="scrollbar" style="top:48px;bottom:0"><div class="thumb" style="top:2px;height:300px"></div></div>`;
+    return html;
+}
+
+function bottomBar() {
+    return `<div id="bottom-bar" class="abs"><div class="browser">Content Browser</div>
+        <div class="separator" style="left:150px"></div><div class="command">COMMAND</div>
+        <div class="separator" style="left:552px"></div></div>`;
+}
+
+// variants override the metrics and colours above, the layout stays the same
+const INPUTS = {
+    "--input-radius": "4px",
+    "--input-fill-gap": "1px",
+    "--input-border": "#2C2C2C",
+    "--slider-fill": "var(--bg-buttons)",
+};
+
+const VARIANTS = {
+    current: {},
+    // fields only: rounder, an inset fill with a gap to the border, a darker slider fill under bright text
+    inputs: INPUTS,
+    // fields, plus text sized to its rows, a tab wide enough for its close button and a plain project name
+    proportions: {
+        ...INPUTS,
+        "--text-size": "14px",
+        "--small-text-size": "13px",
+        "--property-row-height": "30px",
+        "--input-inset": "4px",
+        "--component-header-height": "28px",
+        "--tree-row-height": "24px",
+        "--panel-tab-width": "116px",
+        "--tab-close-gap": "22px",
+        "--project-background": "transparent",
+    },
+};
+
+const variant = new URLSearchParams(location.search).get("variant") || "current";
+for (const [key, value] of Object.entries(VARIANTS[variant] || {})) {
+    document.documentElement.style.setProperty(key, value);
+}
+
+document.body.innerHTML = menubar() + workspaceTabs() + hotbar() +
+    panel("viewport", [0, 104, 1300, 912], [{icon: "VIEWPORT", label: "Viewport", closable: true}, {icon: "", label: "Texture Viewer"}], viewportBody()) +
+    panel("outliner", [1306, 104, 602, 453], [{icon: "LAYERS", label: "Outliner", closable: true}], outlinerBody()) +
+    panel("properties", [1306, 563, 602, 453], [{icon: "PROPERTIES", label: "Properties", closable: true}, {icon: "WORLD", label: "World Settings"}], propertiesBody()) +
+    bottomBar();
+</script>
+</body>
+</html>
