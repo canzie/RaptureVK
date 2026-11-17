@@ -828,15 +828,6 @@ void CascadedShadowEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
             }
             m_entity.write<Rapture::CascadedShadowComponent>()->isActive = b;
         });
-        m_mobilityDropdown = rowMobility(t, Rapture::MOBILITY_DYNAMIC, [this](Rapture::Mobility m) {
-            if (!m_entity.isValid() || !m_entity.has<Rapture::CascadedShadowComponent>()) {
-                return;
-            }
-            m_entity.write<Rapture::CascadedShadowComponent>()->mobility = m;
-            if (m_mobilityDropdown != nullptr) {
-                m_mobilityDropdown->setText(Rapture::mobilityToString(m));
-            }
-        });
         rowSlider(t, "Lambda", &m_lambda, 0.0f, 1.0f, [this](float v) {
             if (!m_entity.isValid() || !m_entity.has<Rapture::CascadedShadowComponent>()) {
                 return;
@@ -849,17 +840,12 @@ void CascadedShadowEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 
 void CascadedShadowEditor::sync(const Rapture::ecs::EntityAccessor &entity)
 {
-    bool entityChanged = subjectChanged();
     if (!entity.has<Rapture::CascadedShadowComponent>()) {
         return;
     }
     const auto &csc = entity.read<Rapture::CascadedShadowComponent>();
     m_isActive = csc.isActive;
     m_lambda = csc.lambda;
-
-    if (entityChanged && m_mobilityDropdown != nullptr) {
-        m_mobilityDropdown->setText(Rapture::mobilityToString(csc.mobility));
-    }
 }
 
 void EnvironmentEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)

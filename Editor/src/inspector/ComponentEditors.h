@@ -282,7 +282,6 @@ class CascadedShadowEditor : public ComponentEditorBase {
   private:
     bool m_isActive = true;
     float m_lambda = 0.5f;
-    Amethyst::Dropdown *m_mobilityDropdown = nullptr;
 };
 
 class EnvironmentEditor : public ComponentEditorBase {

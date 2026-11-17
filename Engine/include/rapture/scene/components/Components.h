@@ -347,7 +347,6 @@ struct CascadedShadowComponent {
     float lambda = 0.8f;
     float shadowDistance = 80.0f;
     bool isActive = true;
-    Mobility mobility = MOBILITY_DYNAMIC;
 
     CascadedShadowComponent() = default;
     CascadedShadowComponent(uint32_t resolution, uint8_t numCascades, float lambda)
