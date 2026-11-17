@@ -20,6 +20,7 @@
 #include <rapture/app/Layer.h>
 #include <rapture/core/utils/rp_assert.h>
 #include <rapture/scene/Scene.h>
+#include <rapture/scene/instances/Camera3D.h>
 #include <rapture/scene/instances/Instance.h>
 
 static constexpr float PLAY_CONTROL_SCALE = 0.7f;
