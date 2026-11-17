@@ -25,9 +25,10 @@ static CommandReply s_recordInto(RecordedAnswer &answer)
     });
 }
 
-static bool s_contains(const std::vector<std::string> &values, std::string_view value)
+static bool s_contains(const std::vector<Rapture::CommandCompletion> &candidates, std::string_view text)
 {
-    return std::find(values.begin(), values.end(), value) != values.end();
+    return std::any_of(candidates.begin(), candidates.end(),
+                       [text](const Rapture::CommandCompletion &candidate) { return candidate.text == text; });
 }
 
 /**
@@ -167,7 +168,7 @@ TEST_F(CommandRegistryTest, CompletesGroupsCommandsOptionsAndValues)
 
 TEST_F(CommandRegistryTest, CompletersSeeWhatTheCallAlreadyHolds)
 {
-    std::vector<std::string> candidates = registry.complete("screenshot panel --workspace Scripting ");
+    std::vector<Rapture::CommandCompletion> candidates = registry.complete("screenshot panel --workspace Scripting ");
     EXPECT_TRUE(s_contains(candidates, "Text Editor"));
     EXPECT_FALSE(s_contains(candidates, "Outliner"));
 }

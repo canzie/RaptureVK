@@ -321,32 +321,36 @@ static bool s_finishBinding(const CommandDescription &command, CommandBinding &b
     return true;
 }
 
-static std::vector<std::string> s_candidatesForParameter(const CommandParameter &parameter, const CommandArguments &given)
+static std::vector<CommandCompletion> s_candidatesForParameter(const CommandParameter &parameter, const CommandArguments &given)
 {
+    std::vector<std::string> values;
     if (parameter.type == COMMAND_ARGUMENT_TYPE_CHOICE) {
-        return parameter.choices;
+        values = parameter.choices;
+    } else if (parameter.type == COMMAND_ARGUMENT_TYPE_BOOL) {
+        values = {"true", "false"};
+    } else if (parameter.complete != nullptr) {
+        values = parameter.complete(given);
     }
-    if (parameter.type == COMMAND_ARGUMENT_TYPE_BOOL) {
-        return {"true", "false"};
+
+    std::vector<CommandCompletion> candidates;
+    for (std::string &value : values) {
+        candidates.push_back({.text = std::move(value), .description = parameter.name});
     }
-    if (parameter.complete != nullptr) {
-        return parameter.complete(given);
-    }
-    return {};
+    return candidates;
 }
 
-static std::vector<std::string> s_candidatesForCommand(const CommandDescription &command, const CommandBinding &binding,
-                                                       std::string_view partial)
+static std::vector<CommandCompletion> s_candidatesForCommand(const CommandDescription &command, const CommandBinding &binding,
+                                                             std::string_view partial)
 {
     if (binding.optionAwaitingValue != nullptr) {
         return s_candidatesForParameter(*binding.optionAwaitingValue, binding.arguments);
     }
 
     if (partial.starts_with(OPTION_PREFIX)) {
-        std::vector<std::string> options;
+        std::vector<CommandCompletion> options;
         for (const CommandParameter &parameter : command.parameters) {
             if (parameter.kind == COMMAND_PARAMETER_KIND_OPTION && !binding.arguments.has(parameter.name)) {
-                options.push_back(std::string(OPTION_PREFIX) + parameter.name);
+                options.push_back({.text = std::string(OPTION_PREFIX) + parameter.name, .description = parameter.description});
             }
         }
         return options;
@@ -543,8 +547,8 @@ CommandRegistry::CommandRegistry()
                          .description = "The line as typed so far, quoted so a trailing space is kept"}},
          .run = [this](const CommandArguments &arguments, CommandReply reply) {
              std::string listing;
-             for (const std::string &candidate : complete(arguments.string("line"))) {
-                 listing += candidate + "\n";
+             for (const CommandCompletion &candidate : complete(arguments.string("line"))) {
+                 listing += candidate.text + "\n";
              }
              reply.succeed(listing);
          }});
@@ -583,7 +587,7 @@ void CommandRegistry::execute(std::string_view line, CommandReply reply) const
     location.command->run(binding.arguments, std::move(reply));
 }
 
-std::vector<std::string> CommandRegistry::complete(std::string_view line) const
+std::vector<CommandCompletion> CommandRegistry::complete(std::string_view line) const
 {
     CommandWords split = s_splitIntoWords(line);
 
@@ -600,13 +604,13 @@ std::vector<std::string> CommandRegistry::complete(std::string_view line) const
         return {};
     }
 
-    std::vector<std::string> candidates;
+    std::vector<CommandCompletion> candidates;
     if (location.command == nullptr) {
         for (const auto &[name, child] : location.group->groups()) {
-            candidates.push_back(name);
+            candidates.push_back({.text = name, .description = child.description()});
         }
         for (const auto &[name, command] : location.group->commands()) {
-            candidates.push_back(name);
+            candidates.push_back({.text = name, .description = command.description});
         }
     } else {
         CommandBinding binding;
@@ -616,7 +620,7 @@ std::vector<std::string> CommandRegistry::complete(std::string_view line) const
         candidates = s_candidatesForCommand(*location.command, binding, partial);
     }
 
-    std::erase_if(candidates, [&partial](const std::string &candidate) { return !candidate.starts_with(partial); });
+    std::erase_if(candidates, [&partial](const CommandCompletion &candidate) { return !candidate.text.starts_with(partial); });
     return candidates;
 }
 

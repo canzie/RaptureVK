@@ -81,6 +81,14 @@ class CommandArguments {
 };
 
 /**
+ * @brief One word a partly typed line can continue with, and what it stands for
+ */
+struct CommandCompletion {
+    std::string text;
+    std::string description;
+};
+
+/**
  * @brief Lists the values a parameter can currently take, given what the call already holds
  */
 using CommandCompleter = std::function<std::vector<std::string>(const CommandArguments &given)>;
@@ -247,9 +255,9 @@ class CommandRegistry {
     /**
      * @brief Lists what the last word of a partly typed line can become
      * @param line The line as typed so far, ending in the word being completed or in a space to start a new one
-     * @return The candidates for that word
+     * @return The candidates for that word, each with what it stands for
      */
-    std::vector<std::string> complete(std::string_view line) const;
+    std::vector<CommandCompletion> complete(std::string_view line) const;
 
     /**
      * @brief Describes a group or command

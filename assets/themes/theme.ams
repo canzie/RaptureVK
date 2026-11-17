@@ -184,16 +184,43 @@ text-area {
     
 }
 
-.command-answer {
+.command-popup {
+    background-color: @bg-header;
+    border-pixel-size: 1px;
+    border-color: @border-4;
+    corner-radius: 3px;
+}
+
+.command-popup-row {
     background-transparency: 1.0;
-    text-color: @text-2;
+}
+
+.command-popup-row-highlighted {
+    background-color: @bg-contrast;
+}
+
+.command-popup-text {
+    background-transparency: 1.0;
+    text-color: @text-1;
     font-size: 12px;
     text-x-alignment: left;
     text-y-alignment: center;
 }
 
-.command-answer-failed {
+.command-popup-description {
+    background-transparency: 1.0;
+    text-color: @text-3;
+    font-size: 12px;
+    text-x-alignment: left;
+    text-y-alignment: center;
+}
+
+.command-popup-failed {
+    background-transparency: 1.0;
     text-color: @status-error;
+    font-size: 12px;
+    text-x-alignment: left;
+    text-y-alignment: center;
 }
 
 

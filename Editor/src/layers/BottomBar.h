@@ -5,11 +5,9 @@
 #include "workspaces/Workspace.h"
 #include <amethyst/Amethyst.h>
 
-#include <rapture/core/commands/CommandRegistry.h>
-
 #include <memory>
-#include <string>
 
+class CommandLine;
 class ContentBrowserPanel;
 
 class BottomBar {
@@ -24,25 +22,6 @@ class BottomBar {
     void setCurrentWorkspace(Workspace *workspace);
 
   private:
-    void setupCommandLine(Amethyst::UIScope &root);
-
-    /**
-     * @brief Runs what the command line holds and clears it
-     */
-    void runCommandLine();
-
-    /**
-     * @brief Completes the word the command line ends in, as far as every candidate agrees
-     */
-    void completeCommandLine();
-
-    /**
-     * @brief Shows the first line of a command's answer beside the command line and logs all of it
-     * @param result How the command ended
-     * @param text The answer
-     */
-    void showCommandAnswer(Rapture::CommandResult result, const std::string &text);
-
     void setupContentBrowserToggle(void);
     void toggleContentBrowser(void);
 
@@ -58,7 +37,7 @@ class BottomBar {
     Amethyst::Frame *m_root = nullptr;
     Amethyst::TextButton *m_contentBrowserBtn = nullptr;
     Amethyst::TextInput *m_commandInput = nullptr;
-    Amethyst::TextLabel *m_commandAnswer = nullptr;
+    std::unique_ptr<CommandLine> m_commandLine;
     Amethyst::Popup *m_contentBrowserPopup = nullptr;
     std::unique_ptr<ContentBrowserPanel> m_contentBrowserPanel;
 };
