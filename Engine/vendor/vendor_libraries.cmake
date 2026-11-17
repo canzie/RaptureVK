@@ -158,6 +158,8 @@ set(TARGET_SAMPLES OFF CACHE BOOL "" FORCE)
 set(TARGET_VIEWER OFF CACHE BOOL "" FORCE)
 # Keep LTO off to match the rest of the vendor libs.
 set(INTERPROCEDURAL_OPTIMIZATION OFF CACHE BOOL "" FORCE)
+# The engine derives from Jolt classes with out-of-line virtuals (JobSystemWithBarrier), which needs their typeinfo.
+set(CPP_RTTI_ENABLED ON CACHE BOOL "" FORCE)
 FetchContent_Declare(
     JoltPhysics
     GIT_REPOSITORY https://github.com/jrouwe/JoltPhysics.git
