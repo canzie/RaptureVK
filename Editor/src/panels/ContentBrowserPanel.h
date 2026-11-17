@@ -20,6 +20,7 @@
 
 class ContentBrowserPanel : public Panel {
   public:
+    std::string_view typeName() const override { return "ContentBrowserPanel"; }
     /**
      * @brief Creates the content browser
      * @param context The workspace the panel is built against

@@ -25,6 +25,7 @@ enum class ImagePreviewMode {
  */
 class ImagePreviewPanel : public Panel {
   public:
+    std::string_view typeName() const override { return "ImagePreviewPanel"; }
     explicit ImagePreviewPanel(const WorkspaceContext &context, std::string title = "Preview",
                                ImagePreviewMode mode = ImagePreviewMode::EXTERNAL);
     ~ImagePreviewPanel() override;

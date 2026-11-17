@@ -20,6 +20,7 @@ class PlayLayer;
  */
 class WorldEditorWorkspace : public AssetWorkspace {
   public:
+    std::string_view typeName() const override { return "WorldEditorWorkspace"; }
     WorldEditorWorkspace(const EditorContext &context, Rapture::Ref<Rapture::AWorld> world);
     ~WorldEditorWorkspace() override;
 

@@ -55,6 +55,8 @@ enum EditorConfigKey {
     EDITOR_CONFIG_TAB_LABEL_PADDING,
     EDITOR_CONFIG_TAB_ICON_GAP,
 
+    EDITOR_CONFIG_COMMAND_SOCKET,
+
     EDITOR_CONFIG_COUNT
 };
 
@@ -87,6 +89,8 @@ constexpr std::array<EditorConfigEntry, EDITOR_CONFIG_COUNT> EDITOR_CONFIG_TABLE
     {"tabIconSize", CONFIG_VALUE_FLOAT, 16.0, SCALING_SNAP},
     {"tabLabelPadding", CONFIG_VALUE_FLOAT, 8.0, SCALING_ROUND},
     {"tabIconGap", CONFIG_VALUE_FLOAT, 6.0, SCALING_ROUND},
+
+    {"commandSocket", CONFIG_VALUE_BOOL, true, SCALING_NONE},
 }};
 
 /**

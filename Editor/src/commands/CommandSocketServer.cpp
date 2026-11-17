@@ -1,4 +1,4 @@
-#include <rapture/platform/CommandSocketServer.h>
+#include "commands/CommandSocketServer.h"
 
 #include <rapture/core/utils/Log.h>
 
@@ -13,8 +13,6 @@
 #include <sys/un.h>
 #include <unistd.h>
 #endif // __unix__
-
-namespace Rapture {
 
 #if defined(__unix__)
 
@@ -38,21 +36,21 @@ static bool s_sendAll(int socket, const std::string &bytes)
     return true;
 }
 
-CommandSocketServer::CommandSocketServer(const CommandRegistry &registry, std::filesystem::path socketPath)
+CommandSocketServer::CommandSocketServer(const Rapture::CommandRegistry &registry, std::filesystem::path socketPath)
     : m_registry(&registry), m_socketPath(std::move(socketPath))
 {
     sockaddr_un address{};
     address.sun_family = AF_UNIX;
     const std::string path = m_socketPath.string();
     if (path.size() >= sizeof(address.sun_path)) {
-        RP_CORE_ERROR("'{}' is too long to be a socket path", path);
+        RP_ERROR("'{}' is too long to be a socket path", path);
         return;
     }
     std::memcpy(address.sun_path, path.c_str(), path.size() + 1);
 
     m_listenSocket = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
     if (m_listenSocket < 0) {
-        RP_CORE_ERROR("Could not create the command socket: {}", std::strerror(errno));
+        RP_ERROR("Could not create the command socket: {}", std::strerror(errno));
         return;
     }
 
@@ -65,13 +63,13 @@ CommandSocketServer::CommandSocketServer(const CommandRegistry &registry, std::f
     umask(previousMask);
 
     if (bound != 0 || listen(m_listenSocket, LISTEN_BACKLOG) != 0) {
-        RP_CORE_ERROR("Could not listen on '{}': {}", path, std::strerror(errno));
+        RP_ERROR("Could not listen on '{}': {}", path, std::strerror(errno));
         close(m_listenSocket);
         m_listenSocket = -1;
         return;
     }
 
-    RP_CORE_INFO("Taking commands on '{}'", path);
+    RP_INFO("Taking commands on '{}'", path);
 }
 
 CommandSocketServer::~CommandSocketServer()
@@ -93,7 +91,7 @@ std::filesystem::path CommandSocketServer::defaultSocketPath()
     return folder / ("rapture-" + std::to_string(getpid()) + ".sock");
 }
 
-void CommandSocketServer::poll()
+void CommandSocketServer::onUpdate()
 {
     if (m_listenSocket < 0) {
         return;
@@ -161,13 +159,13 @@ bool CommandSocketServer::serviceConnection(Connection &connection)
     connection.isAwaitingAnswer = true;
 
     const uint32_t connectionId = connection.id;
-    m_registry->execute(line, CommandReply([this, connectionId](CommandOutcome outcome, std::string text) {
-                            sendAnswer(connectionId, outcome, text);
+    m_registry->execute(line, Rapture::CommandReply([this, connectionId](Rapture::CommandResult result, std::string text) {
+                            sendAnswer(connectionId, result, text);
                         }));
     return true;
 }
 
-void CommandSocketServer::sendAnswer(uint32_t connectionId, CommandOutcome outcome, const std::string &text)
+void CommandSocketServer::sendAnswer(uint32_t connectionId, Rapture::CommandResult result, const std::string &text)
 {
     Connection *connection = findConnection(connectionId);
     if (connection == nullptr) {
@@ -176,7 +174,7 @@ void CommandSocketServer::sendAnswer(uint32_t connectionId, CommandOutcome outco
 
     connection->isAwaitingAnswer = false;
 
-    const std::string header = std::string(outcome == COMMAND_SUCCEEDED ? "ok " : "error ") + std::to_string(text.size()) + "\n";
+    const std::string header = std::string(result == Rapture::COMMAND_RESULT_SUCCEEDED ? "ok " : "error ") + std::to_string(text.size()) + "\n";
     if (!s_sendAll(connection->socket, header + text)) {
         close(connection->socket);
         connection->socket = -1;
@@ -193,10 +191,10 @@ CommandSocketServer::Connection *CommandSocketServer::findConnection(uint32_t co
 
 #else
 
-CommandSocketServer::CommandSocketServer(const CommandRegistry &registry, std::filesystem::path socketPath)
+CommandSocketServer::CommandSocketServer(const Rapture::CommandRegistry &registry, std::filesystem::path socketPath)
     : m_registry(&registry), m_socketPath(std::move(socketPath))
 {
-    RP_CORE_WARN("Commands over a local socket are not available on this platform");
+    RP_WARN("Commands over a local socket are not available on this platform");
 }
 
 CommandSocketServer::~CommandSocketServer() = default;
@@ -206,7 +204,7 @@ std::filesystem::path CommandSocketServer::defaultSocketPath()
     return {};
 }
 
-void CommandSocketServer::poll() {}
+void CommandSocketServer::onUpdate() {}
 
 void CommandSocketServer::acceptClients() {}
 
@@ -216,10 +214,10 @@ bool CommandSocketServer::serviceConnection(Connection &connection)
     return false;
 }
 
-void CommandSocketServer::sendAnswer(uint32_t connectionId, CommandOutcome outcome, const std::string &text)
+void CommandSocketServer::sendAnswer(uint32_t connectionId, Rapture::CommandResult result, const std::string &text)
 {
     (void)connectionId;
-    (void)outcome;
+    (void)result;
     (void)text;
 }
 
@@ -230,5 +228,3 @@ CommandSocketServer::Connection *CommandSocketServer::findConnection(uint32_t co
 }
 
 #endif // __unix__
-
-} // namespace Rapture

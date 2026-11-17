@@ -16,6 +16,7 @@
 
 class OutlinerPanel : public Panel {
   public:
+    std::string_view typeName() const override { return "OutlinerPanel"; }
     explicit OutlinerPanel(const WorkspaceContext &context);
 
     /**

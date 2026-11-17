@@ -42,6 +42,7 @@ enum ViewportLightingMode {
 
 class ViewportPanel : public Panel {
   public:
+    std::string_view typeName() const override { return "ViewportPanel"; }
     explicit ViewportPanel(const WorkspaceContext &context);
     ~ViewportPanel() override;
 

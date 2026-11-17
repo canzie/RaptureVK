@@ -16,6 +16,7 @@ class TextEditorPanel;
  */
 class ScriptingWorkspace : public Workspace {
   public:
+    std::string_view typeName() const override { return "ScriptingWorkspace"; }
     static constexpr std::string_view LABEL = "Scripting";
 
     explicit ScriptingWorkspace(const EditorContext &context);

@@ -6,6 +6,7 @@
 #include <amethyst/Amethyst.h>
 #include <components/ui_scope.h>
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -68,6 +69,22 @@ class Panel {
     Amethyst::Frame *root() const { return m_root; }
     std::string_view name() const { return m_name; }
 
+    /**
+     * @brief The class this panel is, which a command can find it by
+     */
+    virtual std::string_view typeName() const = 0;
+
+    /**
+     * @brief The number the workspace holding this panel knows it by, unique within that workspace
+     */
+    uint32_t id() const { return m_id; }
+
+    /**
+     * @brief Gives this panel the number its workspace knows it by
+     * @param id The number, unique within the workspace
+     */
+    void assignId(uint32_t id) { m_id = id; }
+
   protected:
     /**
      * @brief Fills this panel's frame, called once as it is attached
@@ -98,6 +115,7 @@ class Panel {
     WorkspaceContext m_context;
 
     Amethyst::Frame *m_root = nullptr;
+    uint32_t m_id = 0;
     Amethyst::EventConnection m_rootDestroyConn;
     EntitySelection *m_selection = nullptr;
 

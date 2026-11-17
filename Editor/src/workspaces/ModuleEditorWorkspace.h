@@ -24,6 +24,7 @@ class Scene;
  */
 class ModuleEditorWorkspace : public AssetWorkspace {
   public:
+    std::string_view typeName() const override { return "ModuleEditorWorkspace"; }
     ModuleEditorWorkspace(const EditorContext &context, Rapture::AssetHandle handle);
     ~ModuleEditorWorkspace() override;
 

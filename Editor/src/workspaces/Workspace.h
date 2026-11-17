@@ -54,6 +54,22 @@ class Workspace {
     virtual std::string_view tabIcon() const { return {}; }
 
     /**
+     * @brief The class this workspace is, which a command can find it by
+     */
+    virtual std::string_view typeName() const = 0;
+
+    /**
+     * @brief The number the editor knows this workspace by, unique among the workspaces opened this run
+     */
+    uint32_t id() const { return m_id; }
+
+    /**
+     * @brief Gives this workspace the number the editor knows it by
+     * @param id The number, unique among the workspaces opened this run
+     */
+    void assignId(uint32_t id) { m_id = id; }
+
+    /**
      * @brief Docks a panel into this workspace
      * @param panel The panel to take over
      * @param tabBar The bar the panel's tab is added to
@@ -212,6 +228,8 @@ class Workspace {
     Amethyst::UIListLayout *m_hotbarLayout = nullptr;
     Amethyst::DockingLayer *m_contentDock = nullptr;
     std::vector<std::unique_ptr<Panel>> m_panels;
+    uint32_t m_id = 0;
+    uint32_t m_nextPanelId = 1;
 
   private:
     /**

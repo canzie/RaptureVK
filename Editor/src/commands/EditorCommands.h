@@ -1,9 +1,13 @@
 #ifndef RAPTURE__EDITOR_COMMANDS_H
 #define RAPTURE__EDITOR_COMMANDS_H
 
-#include <rapture/core/commands/CommandRegistry.h>
-#include <rapture/platform/CommandSocketServer.h>
+#include "commands/CommandSocketServer.h"
 
+#include <rapture/core/commands/CommandRegistry.h>
+
+#include <memory>
+
+class EditorConfig;
 class WorkspaceManager;
 
 namespace Rapture {
@@ -16,11 +20,12 @@ class RenderWindow;
 class EditorCommands {
   public:
     /**
-     * @brief Registers the editor's commands and opens the socket
+     * @brief Registers the editor's commands, and opens the socket unless the config turns it off
+     * @param config The editor's settings
      * @param workspaces The open workspaces, which have to outlive this
      * @param mainWindow The editor's main window, which has to outlive this
      */
-    EditorCommands(WorkspaceManager &workspaces, Rapture::RenderWindow &mainWindow);
+    EditorCommands(const EditorConfig &config, WorkspaceManager &workspaces, Rapture::RenderWindow &mainWindow);
 
     EditorCommands(const EditorCommands &) = delete;
     EditorCommands &operator=(const EditorCommands &) = delete;
@@ -28,7 +33,7 @@ class EditorCommands {
     /**
      * @brief Runs every call that has arrived over the socket
      */
-    void poll();
+    void onUpdate();
 
     const Rapture::CommandRegistry &registry() const { return m_registry; }
 
@@ -41,7 +46,7 @@ class EditorCommands {
     WorkspaceManager *m_workspaces;
     Rapture::RenderWindow *m_mainWindow;
     Rapture::CommandRegistry m_registry;
-    Rapture::CommandSocketServer m_socketServer;
+    std::unique_ptr<CommandSocketServer> m_socketServer;
 };
 
 #endif // RAPTURE__EDITOR_COMMANDS_H

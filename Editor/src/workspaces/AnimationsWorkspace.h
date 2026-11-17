@@ -5,6 +5,7 @@
 
 class AnimationsWorkspace : public Workspace {
   public:
+    std::string_view typeName() const override { return "AnimationsWorkspace"; }
     static constexpr std::string_view LABEL = "Animations";
 
     explicit AnimationsWorkspace(const EditorContext &context) : Workspace(context) {}

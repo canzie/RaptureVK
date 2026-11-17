@@ -1,19 +1,31 @@
 # Editor Commands
 
-The editor can be driven with text command calls such as `workspace.select("World Editor")` or `screenshot.panel("Outliner", "/tmp/outliner.png")`. `help()` lists every command with its parameters.
+The editor can be driven with text commands. A command is words: the groups leading to it, its name, then its arguments, for example `screenshot panel Outliner --workspace "World Editor"`. `help` lists the top level, `help screenshot panel` describes one command with its parameters.
 
-`CommandRegistry` (`Engine/include/rapture/core/commands/CommandRegistry.h`) is the core: it reads a call out of a line of text, checks its arguments against what the command declares (string, number, bool), and runs it. A command answers through a `CommandReply`, which it may hold past its own return, for example until a frame has been captured. A reply that is never answered fails, so whoever issued the call is never left waiting. Nothing in the registry knows where the text came from, so an in-editor terminal feeds it the same way the socket does.
+## Registry
 
-`CommandSocketServer` (`Engine/include/rapture/platform/CommandSocketServer.h`) is one transport: a Unix socket at `$XDG_RUNTIME_DIR/rapture-<pid>.sock`, connectable only by the current user, polled by the main thread once per frame. A client writes one call per line and reads back `ok <bytes>` or `error <bytes>` followed by the text.
+`CommandRegistry` (`Engine/include/rapture/core/commands/CommandRegistry.h`) holds a tree of groups and commands and knows nothing about where a line came from, so the socket, a future in-editor terminal and a game's dev console all feed it the same way.
 
-`EditorCommands` (`Editor/src/commands/`) registers the editor's commands and owns the socket. Calls run before the main window's frame is drawn, so a screenshot captures what the calls before it changed.
+- A group holds further groups and commands under one sorted map of names, so a name is either a group or a command.
+- A command declares its parameters: positional words in order, `--name value` options (a bool option is a bare `--name`), and at most one parameter taking every remaining word. Types are string, number, bool and choice, a fixed set of words.
+- Every group, command and parameter carries a description, registration refuses one without.
+- Arguments reach the handler checked and converted, read by parameter name. The handler answers through a `CommandReply`, which it may hold past its own return. A reply never answered fails, so whoever issued the call is never left waiting.
+- `complete` lists what the last word of a partly typed line can become: a group's children, a command's unused options, a choice's words, or what a parameter's completer returns. A completer sees the arguments already typed, so the panel names it offers follow `--workspace`.
 
-`tools/editor/cli.py 'workspace.list()'` issues calls from a shell.
+## Socket
 
-## Commands
+`CommandSocketServer` (`Editor/src/commands/`) is a Unix socket at `$XDG_RUNTIME_DIR/rapture-<pid>.sock`, connectable only by the current user and run once per frame on the main thread. A client writes one command per line and reads back `ok <bytes>` or `error <bytes>` followed by the text. The `commandSocket` entry in the editor config turns it off entirely.
 
-- `workspace.list()`, `workspace.select(label)`
-- `panel.list()` for the workspace in front, with each panel's size and position
-- `screenshot.window(path)`, `screenshot.panel(name, path)`, which block until the PNG is written
+`tools/editor/cli.py workspace list` issues a command from a shell, `--complete "<line>"` asks for completions.
+
+## Editor commands
+
+`EditorCommands` (`Editor/src/commands/`) registers them. Calls run before the main window's frame is drawn, so a screenshot shows what the calls before it changed.
+
+- `workspace list`, `workspace select <label> | --id | --type`
+- `panel list [--workspace | --workspace-id]`
+- `screenshot window [--out]`, `screenshot panel <name> | --id | --type [--workspace | --workspace-id] [--out]`, which block until the PNG is written
+
+Workspaces and panels are named by label, by id or by class. Ids are handed out as workspaces open and panels are docked, unique for the run, and shown by the list commands. A name that matches several is an error listing them, never a guess.
 
 Related: [[Lua Scripting]], [[Engine Hardening]]

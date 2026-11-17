@@ -2,129 +2,182 @@
 
 #include <rapture/core/commands/CommandRegistry.h>
 
+#include <algorithm>
 #include <string>
+#include <vector>
 
 using Rapture::CommandArguments;
-using Rapture::CommandCall;
-using Rapture::CommandOutcome;
 using Rapture::CommandReply;
+using Rapture::CommandResult;
 
 struct RecordedAnswer {
-    bool answered = false;
-    CommandOutcome outcome = Rapture::COMMAND_FAILED;
+    int answers = 0;
+    CommandResult result = Rapture::COMMAND_RESULT_FAILED;
     std::string text;
 };
 
 static CommandReply s_recordInto(RecordedAnswer &answer)
 {
-    return CommandReply([&answer](CommandOutcome outcome, std::string text) {
-        answer.answered = true;
-        answer.outcome = outcome;
+    return CommandReply([&answer](CommandResult result, std::string text) {
+        answer.answers++;
+        answer.result = result;
         answer.text = std::move(text);
     });
 }
 
-TEST(CommandCallParse, ReadsNameAndEveryArgumentType)
+static bool s_contains(const std::vector<std::string> &values, std::string_view value)
 {
-    CommandCall call;
-    std::string error;
-    ASSERT_TRUE(Rapture::CommandCall_parse(R"( screenshot.panel( "Out \"liner\"" , -2.5, true ) )", call, error)) << error;
-
-    EXPECT_EQ(call.name, "screenshot.panel");
-    ASSERT_EQ(call.arguments.size(), 3u);
-    EXPECT_EQ(std::get<std::string>(call.arguments[0]), "Out \"liner\"");
-    EXPECT_DOUBLE_EQ(std::get<double>(call.arguments[1]), -2.5);
-    EXPECT_TRUE(std::get<bool>(call.arguments[2]));
+    return std::find(values.begin(), values.end(), value) != values.end();
 }
 
-TEST(CommandCallParse, ReadsACallWithoutArguments)
-{
-    CommandCall call;
-    std::string error;
-    ASSERT_TRUE(Rapture::CommandCall_parse("workspace.list()", call, error)) << error;
+/**
+ * @brief A registry holding one screenshot panel command that echoes what it was given
+ */
+class CommandRegistryTest : public ::testing::Test {
+  protected:
+    void SetUp() override
+    {
+        Rapture::CommandGroup &screenshot = registry.group("screenshot", "Captures");
+        screenshot.add({.name = "panel",
+                        .description = "Captures a panel",
+                        .parameters = {{.name = "name",
+                                        .kind = Rapture::COMMAND_PARAMETER_KIND_REMAINING,
+                                        .description = "The panel",
+                                        .complete =
+                                            [](const CommandArguments &given) {
+                                                if (given.has("workspace") && given.string("workspace") == "Scripting") {
+                                                    return std::vector<std::string>{"Text Editor"};
+                                                }
+                                                return std::vector<std::string>{"Outliner", "Viewport"};
+                                            }},
+                                       {.name = "id",
+                                        .type = Rapture::COMMAND_ARGUMENT_TYPE_NUMBER,
+                                        .kind = Rapture::COMMAND_PARAMETER_KIND_OPTION,
+                                        .description = "The panel's id"},
+                                       {.name = "workspace", .kind = Rapture::COMMAND_PARAMETER_KIND_OPTION, .description = "Where"},
+                                       {.name = "format",
+                                        .type = Rapture::COMMAND_ARGUMENT_TYPE_CHOICE,
+                                        .kind = Rapture::COMMAND_PARAMETER_KIND_OPTION,
+                                        .description = "How",
+                                        .choices = {"png", "bmp"}},
+                                       {.name = "hidden",
+                                        .type = Rapture::COMMAND_ARGUMENT_TYPE_BOOL,
+                                        .kind = Rapture::COMMAND_PARAMETER_KIND_OPTION,
+                                        .description = "Whether"}},
+                        .run = [](const CommandArguments &arguments, CommandReply reply) {
+                            std::string text = std::string(arguments.string("name"));
+                            if (arguments.has("id")) {
+                                text += " id=" + std::to_string(static_cast<int>(arguments.number("id")));
+                            }
+                            if (arguments.has("workspace")) {
+                                text += " workspace=" + std::string(arguments.string("workspace"));
+                            }
+                            if (arguments.has("format")) {
+                                text += " format=" + std::string(arguments.string("format"));
+                            }
+                            text += arguments.boolean("hidden") ? " hidden" : "";
+                            reply.succeed(text);
+                        }});
 
-    EXPECT_EQ(call.name, "workspace.list");
-    EXPECT_TRUE(call.arguments.empty());
-}
+        registry.group("math", "Arithmetic")
+            .add({.name = "add",
+                  .description = "Adds two numbers",
+                  .parameters = {{.name = "a", .type = Rapture::COMMAND_ARGUMENT_TYPE_NUMBER, .description = "First"},
+                                 {.name = "b", .type = Rapture::COMMAND_ARGUMENT_TYPE_NUMBER, .description = "Second"}},
+                  .run = [](const CommandArguments &arguments, CommandReply reply) {
+                      reply.succeed(std::to_string(static_cast<int>(arguments.number("a") + arguments.number("b"))));
+                  }});
+    }
 
-TEST(CommandCallParse, RejectsMalformedText)
-{
-    CommandCall call;
-    std::string error;
-    EXPECT_FALSE(Rapture::CommandCall_parse("workspace.list", call, error));
-    EXPECT_FALSE(Rapture::CommandCall_parse("workspace..list()", call, error));
-    EXPECT_FALSE(Rapture::CommandCall_parse("a(\"never closed)", call, error));
-    EXPECT_FALSE(Rapture::CommandCall_parse("a(1 2)", call, error));
-    EXPECT_FALSE(Rapture::CommandCall_parse("a(word)", call, error));
-    EXPECT_FALSE(Rapture::CommandCall_parse("a() trailing", call, error));
-}
+    RecordedAnswer run(std::string_view line)
+    {
+        RecordedAnswer answer;
+        registry.execute(line, s_recordInto(answer));
+        return answer;
+    }
 
-TEST(CommandRegistry, RunsACommandWithItsArguments)
-{
     Rapture::CommandRegistry registry;
-    registry.add("math.add", "Adds two numbers", {{"a", Rapture::COMMAND_ARGUMENT_NUMBER}, {"b", Rapture::COMMAND_ARGUMENT_NUMBER}},
-                 [](const CommandArguments &arguments, CommandReply reply) {
-                     reply.succeed(std::to_string(static_cast<int>(arguments.number(0) + arguments.number(1))));
-                 });
+};
 
-    RecordedAnswer answer;
-    registry.execute("math.add(2, 3)", s_recordInto(answer));
-
-    ASSERT_TRUE(answer.answered);
-    EXPECT_EQ(answer.outcome, Rapture::COMMAND_SUCCEEDED);
+TEST_F(CommandRegistryTest, RunsAPositionalCommandInAGroup)
+{
+    RecordedAnswer answer = run("math add 2 3");
+    EXPECT_EQ(answer.result, Rapture::COMMAND_RESULT_SUCCEEDED);
     EXPECT_EQ(answer.text, "5");
 }
 
-TEST(CommandRegistry, FailsUnknownCommandsWrongArityAndWrongTypes)
+TEST_F(CommandRegistryTest, ReadsRemainingWordsQuotesAndOptions)
 {
-    Rapture::CommandRegistry registry;
-    registry.add("echo", "Echoes text", {{"text", Rapture::COMMAND_ARGUMENT_STRING}},
-                 [](const CommandArguments &arguments, CommandReply reply) { reply.succeed(std::string(arguments.string(0))); });
-
-    RecordedAnswer unknown;
-    registry.execute("missing()", s_recordInto(unknown));
-    EXPECT_EQ(unknown.outcome, Rapture::COMMAND_FAILED);
-
-    RecordedAnswer arity;
-    registry.execute("echo()", s_recordInto(arity));
-    EXPECT_EQ(arity.outcome, Rapture::COMMAND_FAILED);
-
-    RecordedAnswer type;
-    registry.execute("echo(3)", s_recordInto(type));
-    EXPECT_EQ(type.outcome, Rapture::COMMAND_FAILED);
+    RecordedAnswer answer = run(R"(screenshot panel Asset Details --workspace "World Editor" --id 4 --format png --hidden)");
+    EXPECT_EQ(answer.result, Rapture::COMMAND_RESULT_SUCCEEDED) << answer.text;
+    EXPECT_EQ(answer.text, "Asset Details id=4 workspace=World Editor format=png hidden");
 }
 
-TEST(CommandRegistry, AReplyNeverAnsweredFailsOnce)
+TEST_F(CommandRegistryTest, AQuotedWordIsNeverAnOption)
 {
-    Rapture::CommandRegistry registry;
-    registry.add("silent", "Answers nothing", {}, [](const CommandArguments &arguments, CommandReply reply) {
-        (void)arguments;
-        (void)reply;
-    });
-
-    int answers = 0;
-    CommandOutcome outcome = Rapture::COMMAND_SUCCEEDED;
-    registry.execute("silent()", CommandReply([&](CommandOutcome given, std::string text) {
-                         (void)text;
-                         answers++;
-                         outcome = given;
-                     }));
-
-    EXPECT_EQ(answers, 1);
-    EXPECT_EQ(outcome, Rapture::COMMAND_FAILED);
+    RecordedAnswer answer = run(R"(screenshot panel "--id")");
+    EXPECT_EQ(answer.result, Rapture::COMMAND_RESULT_SUCCEEDED) << answer.text;
+    EXPECT_EQ(answer.text, "--id");
 }
 
-TEST(CommandRegistry, HelpListsRegisteredCommands)
+TEST_F(CommandRegistryTest, FailsWhatDoesNotFit)
 {
-    Rapture::CommandRegistry registry;
-    registry.add("workspace.list", "Lists workspaces", {}, [](const CommandArguments &arguments, CommandReply reply) {
-        (void)arguments;
-        reply.succeed();
-    });
+    EXPECT_EQ(run("").result, Rapture::COMMAND_RESULT_FAILED);
+    EXPECT_EQ(run("missing").result, Rapture::COMMAND_RESULT_FAILED);
+    EXPECT_EQ(run("math").result, Rapture::COMMAND_RESULT_FAILED);
+    EXPECT_EQ(run("math add 2").result, Rapture::COMMAND_RESULT_FAILED);
+    EXPECT_EQ(run("math add 2 3 4").result, Rapture::COMMAND_RESULT_FAILED);
+    EXPECT_EQ(run("math add two 3").result, Rapture::COMMAND_RESULT_FAILED);
+    EXPECT_EQ(run("screenshot panel --format gif").result, Rapture::COMMAND_RESULT_FAILED);
+    EXPECT_EQ(run("screenshot panel --id").result, Rapture::COMMAND_RESULT_FAILED);
+    EXPECT_EQ(run("screenshot panel --id 1 --id 2").result, Rapture::COMMAND_RESULT_FAILED);
+    EXPECT_EQ(run("screenshot panel --nope").result, Rapture::COMMAND_RESULT_FAILED);
+    EXPECT_EQ(run("screenshot panel \"never closed").result, Rapture::COMMAND_RESULT_FAILED);
+}
 
-    RecordedAnswer answer;
-    registry.execute("help()", s_recordInto(answer));
+TEST_F(CommandRegistryTest, NamesTheChoicesWhenAWordNamesNothing)
+{
+    RecordedAnswer answer = run("screenshot nope");
+    EXPECT_EQ(answer.result, Rapture::COMMAND_RESULT_FAILED);
+    EXPECT_NE(answer.text.find("panel"), std::string::npos);
+}
 
-    EXPECT_EQ(answer.outcome, Rapture::COMMAND_SUCCEEDED);
-    EXPECT_NE(answer.text.find("workspace.list()  Lists workspaces"), std::string::npos);
+TEST_F(CommandRegistryTest, AReplyNeverAnsweredFailsOnce)
+{
+    registry.add({.name = "silent", .description = "Answers nothing", .run = [](const CommandArguments &arguments, CommandReply reply) {
+                      (void)arguments;
+                      (void)reply;
+                  }});
+
+    RecordedAnswer answer = run("silent");
+    EXPECT_EQ(answer.answers, 1);
+    EXPECT_EQ(answer.result, Rapture::COMMAND_RESULT_FAILED);
+}
+
+TEST_F(CommandRegistryTest, CompletesGroupsCommandsOptionsAndValues)
+{
+    EXPECT_TRUE(s_contains(registry.complete("scr"), "screenshot"));
+    EXPECT_TRUE(s_contains(registry.complete("screenshot "), "panel"));
+    EXPECT_TRUE(s_contains(registry.complete("screenshot panel --f"), "--format"));
+    EXPECT_FALSE(s_contains(registry.complete("screenshot panel --id 3 --"), "--id"));
+    EXPECT_TRUE(s_contains(registry.complete("screenshot panel --format "), "bmp"));
+    EXPECT_TRUE(s_contains(registry.complete("screenshot panel Out"), "Outliner"));
+    EXPECT_FALSE(s_contains(registry.complete("screenshot panel Out"), "Viewport"));
+}
+
+TEST_F(CommandRegistryTest, CompletersSeeWhatTheCallAlreadyHolds)
+{
+    std::vector<std::string> candidates = registry.complete("screenshot panel --workspace Scripting ");
+    EXPECT_TRUE(s_contains(candidates, "Text Editor"));
+    EXPECT_FALSE(s_contains(candidates, "Outliner"));
+}
+
+TEST_F(CommandRegistryTest, HelpDescribesGroupsAndCommands)
+{
+    RecordedAnswer top = run("help");
+    EXPECT_NE(top.text.find("screenshot ..."), std::string::npos);
+
+    RecordedAnswer command = run("help screenshot panel");
+    EXPECT_NE(command.text.find("[--format <format>]"), std::string::npos);
+    EXPECT_NE(command.text.find("one of png, bmp"), std::string::npos);
 }

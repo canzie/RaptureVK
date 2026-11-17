@@ -20,6 +20,7 @@ class SkeletonPose;
  */
 class SkeletonWorkspace : public PreviewWorkspace {
   public:
+    std::string_view typeName() const override { return "SkeletonWorkspace"; }
     SkeletonWorkspace(const EditorContext &context, Rapture::AssetHandle handle);
 
     void onUpdate(float dt) override;

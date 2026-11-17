@@ -1,200 +1,456 @@
 #include <rapture/core/commands/CommandRegistry.h>
 
+#include <rapture/core/utils/rp_assert.h>
+
+#include <algorithm>
 #include <cctype>
 #include <charconv>
+#include <span>
 #include <utility>
 
 namespace Rapture {
 
-static_assert(std::variant_size_v<CommandArgument> == COMMAND_ARGUMENT_TYPE_COUNT,
-              "every argument type needs the CommandArgument alternative at its index");
-
-static constexpr std::string_view COMMAND_ARGUMENT_TYPE_NAMES[COMMAND_ARGUMENT_TYPE_COUNT] = {"string", "number", "bool"};
+static constexpr std::string_view COMMAND_ARGUMENT_TYPE_NAMES[COMMAND_ARGUMENT_TYPE_COUNT] = {"string", "number", "bool", "choice"};
+static constexpr std::string_view OPTION_PREFIX = "--";
 
 /**
- * @brief Walks a line of text one character at a time while a command call is read out of it
+ * @brief One word of a line, with whether it was written in quotes, which keeps it from being read as an option
  */
-struct CommandTextCursor {
-    std::string_view text;
-    size_t position = 0;
-
-    bool atEnd() const { return position >= text.size(); }
-    char peek() const { return atEnd() ? '\0' : text[position]; }
-
-    void skipWhitespace()
-    {
-        while (!atEnd() && std::isspace(static_cast<unsigned char>(text[position])) != 0) {
-            position++;
-        }
-    }
+struct CommandWord {
+    std::string text;
+    bool quoted = false;
 };
 
-static bool s_isNameStart(char c)
+/**
+ * @brief A line split into words
+ */
+struct CommandWords {
+    std::vector<CommandWord> words;
+    bool endsInsideWord = false;
+    bool hasUnclosedQuote = false;
+};
+
+/**
+ * @brief Where the words of a call lead in the tree
+ */
+struct CommandLocation {
+    const CommandGroup *group = nullptr;
+    const CommandDescription *command = nullptr;
+    std::string path;
+    size_t argumentStart = 0;
+};
+
+/**
+ * @brief The arguments read out of a call's words so far
+ */
+struct CommandBinding {
+    CommandArguments arguments;
+    size_t positionalsFilled = 0;
+    const CommandParameter *optionAwaitingValue = nullptr;
+    std::string remaining;
+};
+
+static CommandWords s_splitIntoWords(std::string_view line)
 {
-    return std::isalpha(static_cast<unsigned char>(c)) != 0 || c == '_';
-}
+    CommandWords split;
+    size_t position = 0;
 
-static bool s_isNameCharacter(char c)
-{
-    return std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '_';
-}
-
-static bool s_readCommandName(CommandTextCursor &cursor, std::string &name, std::string &error)
-{
-    const size_t start = cursor.position;
-
-    while (true) {
-        if (!s_isNameStart(cursor.peek())) {
-            error = "expected a command name at column " + std::to_string(cursor.position + 1);
-            return false;
-        }
-
-        while (s_isNameCharacter(cursor.peek())) {
-            cursor.position++;
-        }
-
-        if (cursor.peek() != '.') {
-            break;
-        }
-        cursor.position++;
-    }
-
-    name = std::string(cursor.text.substr(start, cursor.position - start));
-    return true;
-}
-
-static bool s_readStringArgument(CommandTextCursor &cursor, CommandArgument &argument, std::string &error)
-{
-    // past the opening quote
-    cursor.position++;
-
-    std::string value;
-    while (!cursor.atEnd() && cursor.peek() != '"') {
-        char c = cursor.text[cursor.position++];
-        if (c != '\\') {
-            value += c;
+    while (position < line.size()) {
+        if (std::isspace(static_cast<unsigned char>(line[position])) != 0) {
+            position++;
             continue;
         }
 
-        if (cursor.atEnd()) {
-            break;
+        CommandWord word;
+        if (line[position] == '"') {
+            word.quoted = true;
+            position++;
+            while (position < line.size() && line[position] != '"') {
+                if (line[position] == '\\' && position + 1 < line.size()) {
+                    position++;
+                }
+                word.text += line[position++];
+            }
+
+            if (position >= line.size()) {
+                split.hasUnclosedQuote = true;
+            } else {
+                position++;
+            }
+        } else {
+            while (position < line.size() && std::isspace(static_cast<unsigned char>(line[position])) == 0) {
+                word.text += line[position++];
+            }
         }
 
-        char escaped = cursor.text[cursor.position++];
-        switch (escaped) {
-        case 'n':
-            value += '\n';
-            break;
-        case 't':
-            value += '\t';
-            break;
-        default:
-            value += escaped;
-            break;
-        }
+        split.words.push_back(std::move(word));
     }
 
-    if (cursor.atEnd()) {
-        error = "a string is never closed";
-        return false;
-    }
-
-    cursor.position++;
-    argument = std::move(value);
-    return true;
+    split.endsInsideWord = !line.empty() && (split.hasUnclosedQuote || std::isspace(static_cast<unsigned char>(line.back())) == 0);
+    return split;
 }
 
-static bool s_readWordArgument(CommandTextCursor &cursor, CommandArgument &argument, std::string &error)
+static bool s_isOptionWord(const CommandWord &word)
 {
-    const size_t start = cursor.position;
-    while (!cursor.atEnd() && cursor.peek() != ',' && cursor.peek() != ')' &&
-           std::isspace(static_cast<unsigned char>(cursor.peek())) == 0) {
-        cursor.position++;
-    }
-
-    std::string_view word = cursor.text.substr(start, cursor.position - start);
-    if (word == "true" || word == "false") {
-        argument = word == "true";
-        return true;
-    }
-
-    double number = 0.0;
-    auto [end, result] = std::from_chars(word.data(), word.data() + word.size(), number);
-    if (result != std::errc() || end != word.data() + word.size() || word.empty()) {
-        error = "'" + std::string(word) + "' is not a string, number or bool";
-        return false;
-    }
-
-    argument = number;
-    return true;
+    return !word.quoted && word.text.starts_with(OPTION_PREFIX) && word.text.size() > OPTION_PREFIX.size();
 }
 
-static bool s_readArguments(CommandTextCursor &cursor, std::vector<CommandArgument> &arguments, std::string &error)
+static std::string s_listGroupContents(const CommandGroup &group)
 {
-    cursor.skipWhitespace();
-    if (cursor.peek() == ')') {
-        cursor.position++;
-        return true;
+    std::string names;
+    for (const auto &[name, child] : group.groups()) {
+        names += (names.empty() ? "" : ", ") + name;
     }
+    for (const auto &[name, command] : group.commands()) {
+        names += (names.empty() ? "" : ", ") + name;
+    }
+    return names;
+}
 
-    while (true) {
-        cursor.skipWhitespace();
+static std::string s_joinPath(const std::string &path, const std::string &word)
+{
+    return path.empty() ? word : path + " " + word;
+}
 
-        CommandArgument argument;
-        const bool read = cursor.peek() == '"' ? s_readStringArgument(cursor, argument, error)
-                                               : s_readWordArgument(cursor, argument, error);
-        if (!read) {
-            return false;
+/**
+ * @brief Follows words down the tree until one names a command
+ * @param root The top of the tree
+ * @param words The words to follow
+ * @param wordCount How many of the words may be followed
+ * @param location Receives where the words lead
+ * @param error Receives what is wrong when a word names nothing
+ * @return True if the words reached a command or ran out at a group, false if one named nothing
+ */
+static bool s_followWords(const CommandGroup &root, const std::vector<CommandWord> &words, size_t wordCount, CommandLocation &location,
+                          std::string &error)
+{
+    location.group = &root;
+
+    for (size_t i = 0; i < wordCount; i++) {
+        const std::string &word = words[i].text;
+
+        if (const CommandGroup *child = location.group->findGroup(word)) {
+            location.group = child;
+            location.path = s_joinPath(location.path, word);
+            continue;
         }
-        arguments.push_back(std::move(argument));
 
-        cursor.skipWhitespace();
-        if (cursor.peek() == ')') {
-            cursor.position++;
+        if (const CommandDescription *command = location.group->findCommand(word)) {
+            location.command = command;
+            location.path = s_joinPath(location.path, word);
+            location.argumentStart = i + 1;
             return true;
         }
 
-        if (cursor.peek() != ',') {
-            error = "expected ',' or ')' at column " + std::to_string(cursor.position + 1);
-            return false;
-        }
-        cursor.position++;
-    }
-}
-
-bool CommandCall_parse(std::string_view line, CommandCall &call, std::string &error)
-{
-    CommandTextCursor cursor{line};
-    call = CommandCall{};
-
-    cursor.skipWhitespace();
-    if (!s_readCommandName(cursor, call.name, error)) {
-        return false;
-    }
-
-    cursor.skipWhitespace();
-    if (cursor.peek() != '(') {
-        error = "expected '(' after " + call.name;
-        return false;
-    }
-    cursor.position++;
-
-    if (!s_readArguments(cursor, call.arguments, error)) {
-        return false;
-    }
-
-    cursor.skipWhitespace();
-    if (!cursor.atEnd()) {
-        error = "unexpected text after the call at column " + std::to_string(cursor.position + 1);
+        const std::string where = location.path.empty() ? "there is" : location.path + " has";
+        error = where + " no '" + word + "', the choices are: " + s_listGroupContents(*location.group);
         return false;
     }
 
     return true;
+}
+
+static const CommandParameter *s_findOption(const CommandDescription &command, std::string_view name)
+{
+    for (const CommandParameter &parameter : command.parameters) {
+        if (parameter.kind == COMMAND_PARAMETER_KIND_OPTION && parameter.name == name) {
+            return &parameter;
+        }
+    }
+    return nullptr;
+}
+
+static const CommandParameter *s_findPositional(const CommandDescription &command, size_t index)
+{
+    size_t seen = 0;
+    for (const CommandParameter &parameter : command.parameters) {
+        if (parameter.kind != COMMAND_PARAMETER_KIND_POSITIONAL) {
+            continue;
+        }
+        if (seen++ == index) {
+            return &parameter;
+        }
+    }
+    return nullptr;
+}
+
+static const CommandParameter *s_findRemaining(const CommandDescription &command)
+{
+    for (const CommandParameter &parameter : command.parameters) {
+        if (parameter.kind == COMMAND_PARAMETER_KIND_REMAINING) {
+            return &parameter;
+        }
+    }
+    return nullptr;
+}
+
+static bool s_convertWord(const CommandParameter &parameter, const std::string &word, CommandArgument &value, std::string &error)
+{
+    switch (parameter.type) {
+    case COMMAND_ARGUMENT_TYPE_STRING:
+        value = word;
+        return true;
+    case COMMAND_ARGUMENT_TYPE_NUMBER: {
+        double number = 0.0;
+        auto [end, result] = std::from_chars(word.data(), word.data() + word.size(), number);
+        if (result != std::errc() || end != word.data() + word.size() || word.empty()) {
+            error = parameter.name + " has to be a number, '" + word + "' is not";
+            return false;
+        }
+        value = number;
+        return true;
+    }
+    case COMMAND_ARGUMENT_TYPE_BOOL:
+        if (word != "true" && word != "false") {
+            error = parameter.name + " has to be true or false, '" + word + "' is neither";
+            return false;
+        }
+        value = word == "true";
+        return true;
+    case COMMAND_ARGUMENT_TYPE_CHOICE: {
+        if (std::find(parameter.choices.begin(), parameter.choices.end(), word) == parameter.choices.end()) {
+            std::string choices;
+            for (const std::string &choice : parameter.choices) {
+                choices += (choices.empty() ? "" : ", ") + choice;
+            }
+            error = parameter.name + " has to be one of " + choices + ", '" + word + "' is not";
+            return false;
+        }
+        value = word;
+        return true;
+    }
+    case COMMAND_ARGUMENT_TYPE_COUNT:
+        break;
+    }
+
+    error = parameter.name + " has no type";
+    return false;
+}
+
+static bool s_bindOption(const CommandDescription &command, const CommandWord &word, CommandBinding &binding, std::string &error)
+{
+    std::string_view name = std::string_view(word.text).substr(OPTION_PREFIX.size());
+    const CommandParameter *option = s_findOption(command, name);
+    if (option == nullptr) {
+        error = "there is no option --" + std::string(name);
+        return false;
+    }
+
+    if (binding.arguments.has(option->name)) {
+        error = "--" + option->name + " is given twice";
+        return false;
+    }
+
+    if (option->type == COMMAND_ARGUMENT_TYPE_BOOL) {
+        binding.arguments.set(option->name, true);
+        return true;
+    }
+
+    binding.optionAwaitingValue = option;
+    return true;
+}
+
+static bool s_bindPositional(const CommandDescription &command, const CommandWord &word, CommandBinding &binding, std::string &error)
+{
+    if (const CommandParameter *positional = s_findPositional(command, binding.positionalsFilled)) {
+        CommandArgument value;
+        if (!s_convertWord(*positional, word.text, value, error)) {
+            return false;
+        }
+        binding.arguments.set(positional->name, std::move(value));
+        binding.positionalsFilled++;
+        return true;
+    }
+
+    if (s_findRemaining(command) != nullptr) {
+        binding.remaining += (binding.remaining.empty() ? "" : " ") + word.text;
+        return true;
+    }
+
+    error = "'" + word.text + "' is one word too many";
+    return false;
+}
+
+/**
+ * @brief Reads a command's arguments out of the words after its name, stopping at the first that does not fit
+ * @param command The command
+ * @param words The words after its name
+ * @param binding Receives what was read
+ * @param error Receives what does not fit
+ * @return True if every word fit
+ */
+static bool s_bindWords(const CommandDescription &command, std::span<const CommandWord> words, CommandBinding &binding,
+                        std::string &error)
+{
+    for (const CommandWord &word : words) {
+        if (binding.optionAwaitingValue != nullptr) {
+            CommandArgument value;
+            if (!s_convertWord(*binding.optionAwaitingValue, word.text, value, error)) {
+                return false;
+            }
+            binding.arguments.set(binding.optionAwaitingValue->name, std::move(value));
+            binding.optionAwaitingValue = nullptr;
+            continue;
+        }
+
+        const bool bound = s_isOptionWord(word) ? s_bindOption(command, word, binding, error) : s_bindPositional(command, word, binding, error);
+        if (!bound) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static bool s_finishBinding(const CommandDescription &command, CommandBinding &binding, std::string &error)
+{
+    if (binding.optionAwaitingValue != nullptr) {
+        error = "--" + binding.optionAwaitingValue->name + " needs a value";
+        return false;
+    }
+
+    if (const CommandParameter *missing = s_findPositional(command, binding.positionalsFilled)) {
+        error = "missing " + missing->name;
+        return false;
+    }
+
+    if (const CommandParameter *remaining = s_findRemaining(command)) {
+        binding.arguments.set(remaining->name, binding.remaining);
+    }
+
+    return true;
+}
+
+static std::vector<std::string> s_candidatesForParameter(const CommandParameter &parameter, const CommandArguments &given)
+{
+    if (parameter.type == COMMAND_ARGUMENT_TYPE_CHOICE) {
+        return parameter.choices;
+    }
+    if (parameter.type == COMMAND_ARGUMENT_TYPE_BOOL) {
+        return {"true", "false"};
+    }
+    if (parameter.complete != nullptr) {
+        return parameter.complete(given);
+    }
+    return {};
+}
+
+static std::vector<std::string> s_candidatesForCommand(const CommandDescription &command, const CommandBinding &binding,
+                                                       std::string_view partial)
+{
+    if (binding.optionAwaitingValue != nullptr) {
+        return s_candidatesForParameter(*binding.optionAwaitingValue, binding.arguments);
+    }
+
+    if (partial.starts_with(OPTION_PREFIX)) {
+        std::vector<std::string> options;
+        for (const CommandParameter &parameter : command.parameters) {
+            if (parameter.kind == COMMAND_PARAMETER_KIND_OPTION && !binding.arguments.has(parameter.name)) {
+                options.push_back(std::string(OPTION_PREFIX) + parameter.name);
+            }
+        }
+        return options;
+    }
+
+    if (const CommandParameter *positional = s_findPositional(command, binding.positionalsFilled)) {
+        return s_candidatesForParameter(*positional, binding.arguments);
+    }
+
+    if (const CommandParameter *remaining = s_findRemaining(command)) {
+        return s_candidatesForParameter(*remaining, binding.arguments);
+    }
+
+    return {};
+}
+
+static std::string s_describeUsage(const std::string &path, const CommandDescription &command)
+{
+    std::string usage = path;
+    for (const CommandParameter &parameter : command.parameters) {
+        switch (parameter.kind) {
+        case COMMAND_PARAMETER_KIND_POSITIONAL:
+            usage += " <" + parameter.name + ">";
+            break;
+        case COMMAND_PARAMETER_KIND_OPTION:
+            usage += parameter.type == COMMAND_ARGUMENT_TYPE_BOOL ? " [--" + parameter.name + "]"
+                                                                  : " [--" + parameter.name + " <" + parameter.name + ">]";
+            break;
+        case COMMAND_PARAMETER_KIND_REMAINING:
+            usage += " [" + parameter.name + "...]";
+            break;
+        case COMMAND_PARAMETER_KIND_COUNT:
+            break;
+        }
+    }
+    return usage;
+}
+
+static std::string s_describeCommand(const std::string &path, const CommandDescription &command)
+{
+    std::string text = s_describeUsage(path, command) + "\n  " + command.description + "\n";
+    for (const CommandParameter &parameter : command.parameters) {
+        text += "  " + parameter.name + " (" + std::string(COMMAND_ARGUMENT_TYPE_NAMES[parameter.type]) + ")  " + parameter.description;
+        if (!parameter.choices.empty()) {
+            std::string choices;
+            for (const std::string &choice : parameter.choices) {
+                choices += (choices.empty() ? "" : ", ") + choice;
+            }
+            text += ", one of " + choices;
+        }
+        text += "\n";
+    }
+    return text;
+}
+
+static std::string s_describeGroup(const std::string &path, const CommandGroup &group)
+{
+    std::string text;
+    if (!path.empty()) {
+        text += path + "\n  " + group.description() + "\n";
+    }
+
+    for (const auto &[name, child] : group.groups()) {
+        text += "  " + s_joinPath(path, name) + " ...  " + child.description() + "\n";
+    }
+    for (const auto &[name, command] : group.commands()) {
+        text += "  " + s_describeUsage(s_joinPath(path, name), command) + "  " + command.description + "\n";
+    }
+    return text;
+}
+
+bool CommandArguments::has(std::string_view name) const
+{
+    return m_values.find(name) != m_values.end();
+}
+
+std::string_view CommandArguments::string(std::string_view name) const
+{
+    auto found = m_values.find(name);
+    RP_ASSERT(found != m_values.end(), "argument {} was not given", name);
+    return std::get<std::string>(found->second);
+}
+
+double CommandArguments::number(std::string_view name) const
+{
+    auto found = m_values.find(name);
+    RP_ASSERT(found != m_values.end(), "argument {} was not given", name);
+    return std::get<double>(found->second);
+}
+
+bool CommandArguments::boolean(std::string_view name) const
+{
+    auto found = m_values.find(name);
+    return found != m_values.end() && std::get<bool>(found->second);
+}
+
+void CommandArguments::set(std::string name, CommandArgument value)
+{
+    m_values.insert_or_assign(std::move(name), std::move(value));
 }
 
 CommandReply::~CommandReply()
 {
-    deliver(COMMAND_FAILED, "the command gave no answer");
+    deliver(COMMAND_RESULT_FAILED, "the command gave no answer");
 }
 
 CommandReply::CommandReply(CommandReply &&other) noexcept : m_deliver(std::exchange(other.m_deliver, nullptr)) {}
@@ -202,7 +458,7 @@ CommandReply::CommandReply(CommandReply &&other) noexcept : m_deliver(std::excha
 CommandReply &CommandReply::operator=(CommandReply &&other) noexcept
 {
     if (this != &other) {
-        deliver(COMMAND_FAILED, "the command gave no answer");
+        deliver(COMMAND_RESULT_FAILED, "the command gave no answer");
         m_deliver = std::exchange(other.m_deliver, nullptr);
     }
     return *this;
@@ -210,86 +466,168 @@ CommandReply &CommandReply::operator=(CommandReply &&other) noexcept
 
 void CommandReply::succeed(std::string text)
 {
-    deliver(COMMAND_SUCCEEDED, std::move(text));
+    deliver(COMMAND_RESULT_SUCCEEDED, std::move(text));
 }
 
 void CommandReply::fail(std::string text)
 {
-    deliver(COMMAND_FAILED, std::move(text));
+    deliver(COMMAND_RESULT_FAILED, std::move(text));
 }
 
-void CommandReply::deliver(CommandOutcome outcome, std::string text)
+void CommandReply::deliver(CommandResult result, std::string text)
 {
     if (m_deliver == nullptr) {
         return;
     }
 
     Deliver handOver = std::exchange(m_deliver, nullptr);
-    handOver(outcome, std::move(text));
+    handOver(result, std::move(text));
+}
+
+CommandGroup &CommandGroup::group(std::string_view name, std::string description)
+{
+    RP_ASSERT(findCommand(name) == nullptr, "'{}' is already a command, it cannot also be a group", name);
+
+    auto found = m_groups.find(name);
+    if (found != m_groups.end()) {
+        return found->second;
+    }
+
+    RP_ASSERT(!description.empty(), "group '{}' needs a description", name);
+    return m_groups.emplace(std::string(name), CommandGroup(std::move(description))).first->second;
+}
+
+void CommandGroup::add(CommandDescription command)
+{
+    RP_ASSERT(findGroup(command.name) == nullptr && findCommand(command.name) == nullptr, "'{}' is already taken in this group",
+              command.name);
+    RP_ASSERT(!command.description.empty(), "command '{}' needs a description", command.name);
+    RP_ASSERT(command.run != nullptr, "command '{}' runs nothing", command.name);
+
+    std::string name = command.name;
+    m_commands.emplace(std::move(name), std::move(command));
+}
+
+const CommandGroup *CommandGroup::findGroup(std::string_view name) const
+{
+    auto found = m_groups.find(name);
+    return found != m_groups.end() ? &found->second : nullptr;
+}
+
+const CommandDescription *CommandGroup::findCommand(std::string_view name) const
+{
+    auto found = m_commands.find(name);
+    return found != m_commands.end() ? &found->second : nullptr;
 }
 
 CommandRegistry::CommandRegistry()
 {
-    add("help", "Lists every command", {}, [this](const CommandArguments &arguments, CommandReply reply) {
-        (void)arguments;
-        reply.succeed(describeCommands());
-    });
-}
+    add({.name = "help",
+         .description = "Describes a group or command, or lists everything at the top level",
+         .parameters = {{.name = "path",
+                         .kind = COMMAND_PARAMETER_KIND_REMAINING,
+                         .description = "The words leading to the group or command"}},
+         .run = [this](const CommandArguments &arguments, CommandReply reply) { reply.succeed(describe(arguments.string("path"))); }});
 
-void CommandRegistry::add(std::string name, std::string description, std::vector<CommandParameter> parameters,
-                          CommandHandler handler)
-{
-    m_commands.insert_or_assign(std::move(name), Command{std::move(description), std::move(parameters), std::move(handler)});
+    add({.name = "complete",
+         .description = "Lists what the last word of a partly typed line can become, one candidate per line",
+         .parameters = {{.name = "line",
+                         .kind = COMMAND_PARAMETER_KIND_REMAINING,
+                         .description = "The line as typed so far, quoted so a trailing space is kept"}},
+         .run = [this](const CommandArguments &arguments, CommandReply reply) {
+             std::string listing;
+             for (const std::string &candidate : complete(arguments.string("line"))) {
+                 listing += candidate + "\n";
+             }
+             reply.succeed(listing);
+         }});
 }
 
 void CommandRegistry::execute(std::string_view line, CommandReply reply) const
 {
-    CommandCall call;
+    CommandWords split = s_splitIntoWords(line);
+    if (split.hasUnclosedQuote) {
+        reply.fail("a quote is never closed");
+        return;
+    }
+    if (split.words.empty()) {
+        reply.fail("nothing to run, help lists what there is");
+        return;
+    }
+
     std::string error;
-    if (!CommandCall_parse(line, call, error)) {
+    CommandLocation location;
+    if (!s_followWords(m_root, split.words, split.words.size(), location, error)) {
         reply.fail(error);
         return;
     }
-
-    auto found = m_commands.find(call.name);
-    if (found == m_commands.end()) {
-        reply.fail("no command named " + call.name + ", help() lists them");
+    if (location.command == nullptr) {
+        reply.fail(location.path + " is a group, the choices are: " + s_listGroupContents(*location.group));
         return;
     }
 
-    const Command &command = found->second;
-    if (call.arguments.size() != command.parameters.size()) {
-        reply.fail(call.name + " takes " + std::to_string(command.parameters.size()) + " arguments, " +
-                   std::to_string(call.arguments.size()) + " were given");
+    CommandBinding binding;
+    std::span<const CommandWord> argumentWords(split.words.data() + location.argumentStart, split.words.size() - location.argumentStart);
+    if (!s_bindWords(*location.command, argumentWords, binding, error) || !s_finishBinding(*location.command, binding, error)) {
+        reply.fail(error + "\n" + s_describeUsage(location.path, *location.command));
         return;
     }
 
-    for (size_t i = 0; i < call.arguments.size(); i++) {
-        const CommandParameter &parameter = command.parameters[i];
-        if (call.arguments[i].index() != static_cast<size_t>(parameter.type)) {
-            reply.fail(parameter.name + " has to be a " + std::string(COMMAND_ARGUMENT_TYPE_NAMES[parameter.type]));
-            return;
-        }
-    }
-
-    command.handler(CommandArguments(call.arguments), std::move(reply));
+    location.command->run(binding.arguments, std::move(reply));
 }
 
-std::string CommandRegistry::describeCommands() const
+std::vector<std::string> CommandRegistry::complete(std::string_view line) const
 {
-    std::string listing;
-    for (const auto &[name, command] : m_commands) {
-        listing += name + "(";
-        for (size_t i = 0; i < command.parameters.size(); i++) {
-            if (i > 0) {
-                listing += ", ";
-            }
-            listing += command.parameters[i].name + ": " + std::string(COMMAND_ARGUMENT_TYPE_NAMES[command.parameters[i].type]);
-        }
-        listing += ")  " + command.description + "\n";
+    CommandWords split = s_splitIntoWords(line);
+
+    std::string partial;
+    size_t finishedWords = split.words.size();
+    if (split.endsInsideWord) {
+        partial = split.words.back().text;
+        finishedWords--;
     }
 
-    return listing;
+    std::string error;
+    CommandLocation location;
+    if (!s_followWords(m_root, split.words, finishedWords, location, error)) {
+        return {};
+    }
+
+    std::vector<std::string> candidates;
+    if (location.command == nullptr) {
+        for (const auto &[name, child] : location.group->groups()) {
+            candidates.push_back(name);
+        }
+        for (const auto &[name, command] : location.group->commands()) {
+            candidates.push_back(name);
+        }
+    } else {
+        CommandBinding binding;
+        std::span<const CommandWord> argumentWords(split.words.data() + location.argumentStart, finishedWords - location.argumentStart);
+        // a word that does not fit leaves the binding at what was read before it, which is all completion needs
+        s_bindWords(*location.command, argumentWords, binding, error);
+        candidates = s_candidatesForCommand(*location.command, binding, partial);
+    }
+
+    std::erase_if(candidates, [&partial](const std::string &candidate) { return !candidate.starts_with(partial); });
+    return candidates;
+}
+
+std::string CommandRegistry::describe(std::string_view path) const
+{
+    CommandWords split = s_splitIntoWords(path);
+
+    std::string error;
+    CommandLocation location;
+    if (!s_followWords(m_root, split.words, split.words.size(), location, error)) {
+        return error;
+    }
+
+    if (location.command != nullptr) {
+        return s_describeCommand(location.path, *location.command);
+    }
+
+    return s_describeGroup(location.path, *location.group);
 }
 
 } // namespace Rapture

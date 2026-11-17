@@ -21,6 +21,7 @@
  */
 class AssetDetailsPanel : public Panel {
   public:
+    std::string_view typeName() const override { return "AssetDetailsPanel"; }
     AssetDetailsPanel(const WorkspaceContext &context, Rapture::AssetHandle handle);
 
     void onUpdate(float dt) override;

@@ -16,6 +16,7 @@
 
 class PropertiesPanel : public Panel {
   public:
+    std::string_view typeName() const override { return "PropertiesPanel"; }
     explicit PropertiesPanel(const WorkspaceContext &context);
 
     void setScene(Rapture::Scene *scene);

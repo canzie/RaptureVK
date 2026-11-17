@@ -193,6 +193,7 @@ std::unique_ptr<Workspace> WorkspaceManager::createAssetWorkspace(Rapture::Asset
 Workspace *WorkspaceManager::adopt(std::unique_ptr<Workspace> workspace)
 {
     Workspace *adopted = workspace.get();
+    adopted->assignId(m_nextWorkspaceId++);
     adopted->setContentArea(m_contentAreaPosition, m_contentAreaSize);
 
     // held before it is attached, so the selection handler can find the workspace the new tab belongs to

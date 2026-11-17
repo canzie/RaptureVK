@@ -8,6 +8,7 @@
  */
 class StaticMeshWorkspace : public PreviewWorkspace {
   public:
+    std::string_view typeName() const override { return "StaticMeshWorkspace"; }
     StaticMeshWorkspace(const EditorContext &context, Rapture::AssetHandle handle);
 
     std::string_view tabIcon() const override;

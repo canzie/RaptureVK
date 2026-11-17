@@ -8,6 +8,7 @@
  */
 class SkeletalMeshWorkspace : public PreviewWorkspace {
   public:
+    std::string_view typeName() const override { return "SkeletalMeshWorkspace"; }
     SkeletalMeshWorkspace(const EditorContext &context, Rapture::AssetHandle handle);
 
     std::string_view tabIcon() const override;

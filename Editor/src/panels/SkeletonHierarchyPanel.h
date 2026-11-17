@@ -25,6 +25,7 @@ class SkeletonPose;
  */
 class SkeletonHierarchyPanel : public Panel {
   public:
+    std::string_view typeName() const override { return "SkeletonHierarchyPanel"; }
     /**
      * @brief Builds the panel over a pose
      * @param context The workspace the panel is built against

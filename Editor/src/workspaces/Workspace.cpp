@@ -124,6 +124,7 @@ void Workspace::adoptPanel(std::unique_ptr<Panel> panel, Amethyst::TabBar *tabBa
     RP_ASSERT(tabBar != nullptr, "a panel needs a bar to be docked into");
 
     panel->setContext(m_context);
+    panel->assignId(m_nextPanelId++);
     if (panel->root() == nullptr) {
         panel->attach(tabBar);
     } else {

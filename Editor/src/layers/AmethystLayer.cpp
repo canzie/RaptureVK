@@ -199,7 +199,7 @@ void AmethystLayer::setupEditorContext()
     m_workspaceManager = std::make_unique<WorkspaceManager>(m_editorContext);
     m_editorContext.workspaces = m_workspaceManager.get();
 
-    m_commands = std::make_unique<EditorCommands>(*m_workspaceManager, Rapture::Application::getInstance().getMainWindow());
+    m_commands = std::make_unique<EditorCommands>(m_config, *m_workspaceManager, Rapture::Application::getInstance().getMainWindow());
 }
 
 void AmethystLayer::wireLauncher(ProjectLauncher &launcher)
@@ -280,7 +280,7 @@ void AmethystLayer::onUpdate(float dt)
 
     // before the frame is drawn, so what a call changes is in the frame a screenshot captures
     if (m_commands != nullptr) {
-        m_commands->poll();
+        m_commands->onUpdate();
     }
 
     auto frame = mainWindow.beginFrame();

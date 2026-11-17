@@ -35,6 +35,7 @@ class MaterialInstance;
  */
 class NodeEditorPanel : public Panel {
   public:
+    std::string_view typeName() const override { return "NodeEditorPanel"; }
     NodeEditorPanel(const WorkspaceContext &context, Rapture::AssetHandle material);
     ~NodeEditorPanel() override;
 

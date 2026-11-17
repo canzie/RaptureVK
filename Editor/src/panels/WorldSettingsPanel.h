@@ -38,6 +38,7 @@ class WorldPlaySection : public PropertySection {
  */
 class WorldSettingsPanel : public Panel {
   public:
+    std::string_view typeName() const override { return "WorldSettingsPanel"; }
     explicit WorldSettingsPanel(const WorkspaceContext &context);
 
     void onUpdate(float dt) override;

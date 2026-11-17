@@ -1,5 +1,5 @@
-#ifndef RAPTURE__COMMAND_SOCKET_SERVER_H
-#define RAPTURE__COMMAND_SOCKET_SERVER_H
+#ifndef RAPTURE__EDITOR_COMMAND_SOCKET_SERVER_H
+#define RAPTURE__EDITOR_COMMAND_SOCKET_SERVER_H
 
 #include <rapture/core/commands/CommandRegistry.h>
 
@@ -8,8 +8,6 @@
 #include <memory>
 #include <string>
 #include <vector>
-
-namespace Rapture {
 
 /**
  * @brief Takes command calls from other processes on this machine over a local socket.
@@ -24,7 +22,7 @@ class CommandSocketServer {
      * @param registry The commands calls are run against, which has to outlive the server
      * @param socketPath Where the socket is created
      */
-    CommandSocketServer(const CommandRegistry &registry, std::filesystem::path socketPath);
+    CommandSocketServer(const Rapture::CommandRegistry &registry, std::filesystem::path socketPath);
     ~CommandSocketServer();
 
     CommandSocketServer(const CommandSocketServer &) = delete;
@@ -39,7 +37,7 @@ class CommandSocketServer {
     /**
      * @brief Accepts new clients and runs every call that has arrived, without waiting for any
      */
-    void poll();
+    void onUpdate();
 
     const std::filesystem::path &socketPath() const { return m_socketPath; }
 
@@ -63,21 +61,19 @@ class CommandSocketServer {
     /**
      * @brief Sends an answer to a client, if it is still connected
      * @param connectionId The client the call came from
-     * @param outcome How the command ended
+     * @param result How the command ended
      * @param text The answer's text
      */
-    void sendAnswer(uint32_t connectionId, CommandOutcome outcome, const std::string &text);
+    void sendAnswer(uint32_t connectionId, Rapture::CommandResult result, const std::string &text);
 
     Connection *findConnection(uint32_t connectionId);
 
   private:
-    const CommandRegistry *m_registry;
+    const Rapture::CommandRegistry *m_registry;
     std::filesystem::path m_socketPath;
     int m_listenSocket = -1;
     std::vector<std::unique_ptr<Connection>> m_connections;
     uint32_t m_nextConnectionId = 1;
 };
 
-} // namespace Rapture
-
-#endif // RAPTURE__COMMAND_SOCKET_SERVER_H
+#endif // RAPTURE__EDITOR_COMMAND_SOCKET_SERVER_H

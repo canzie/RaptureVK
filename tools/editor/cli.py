@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Issue commands to a running Rapture editor over its local socket.
+"""Issue a command to a running Rapture editor over its local socket.
 
-    tools/editor/cli.py 'workspace.list()'
-    tools/editor/cli.py 'screenshot.panel("Outliner", "/tmp/outliner.png")'
-    tools/editor/cli.py 'help()'
+    tools/editor/cli.py help
+    tools/editor/cli.py workspace list
+    tools/editor/cli.py screenshot panel Outliner --workspace "World Editor"
+    tools/editor/cli.py --complete "screenshot panel --"
 
-Several commands run one after another, stopping at the first that fails.
+The words are the command as the editor reads it. A word holding spaces is passed on in quotes.
 """
 
-import argparse
 import glob
 import os
 import socket
@@ -46,6 +46,12 @@ def readHeader(connection):
     return outcome, int(size)
 
 
+def quoteWord(word):
+    if word and not any(c.isspace() or c == '"' for c in word):
+        return word
+    return '"' + word.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
 def run(connection, command):
     connection.sendall(command.encode() + b"\n")
     outcome, size = readHeader(connection)
@@ -54,21 +60,38 @@ def run(connection, command):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("commands", nargs="+", help="command calls, for example 'workspace.list()'")
-    parser.add_argument("--socket", help="the editor's socket, found automatically when one editor is running")
-    arguments = parser.parse_args()
+    # flags for this script come first, everything from the first other word on is the command
+    arguments = sys.argv[1:]
+    socketPath = None
+    completeLine = None
+    while arguments and arguments[0] in ("--socket", "--complete", "-h", "--help"):
+        flag = arguments.pop(0)
+        if flag in ("-h", "--help"):
+            print(__doc__)
+            return
+        if not arguments:
+            sys.exit(flag + " needs a value")
+        if flag == "--socket":
+            socketPath = arguments.pop(0)
+        else:
+            completeLine = arguments.pop(0)
+
+    if completeLine is not None:
+        command = "complete " + quoteWord(completeLine)
+    else:
+        command = " ".join(quoteWord(word) for word in arguments)
+    if not command:
+        sys.exit("give a command, help lists them")
 
     connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    connection.connect(arguments.socket or findSocket())
+    connection.connect(socketPath or findSocket())
 
-    for command in arguments.commands:
-        succeeded, text = run(connection, command)
-        stream = sys.stdout if succeeded else sys.stderr
-        if text:
-            print(text, end="" if text.endswith("\n") else "\n", file=stream)
-        if not succeeded:
-            sys.exit(1)
+    succeeded, text = run(connection, command)
+    stream = sys.stdout if succeeded else sys.stderr
+    if text:
+        print(text, end="" if text.endswith("\n") else "\n", file=stream)
+    if not succeeded:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

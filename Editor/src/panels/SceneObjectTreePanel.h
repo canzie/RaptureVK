@@ -26,6 +26,7 @@ class Scene;
  */
 class SceneObjectTreePanel : public Panel {
   public:
+    std::string_view typeName() const override { return "SceneObjectTreePanel"; }
     /**
      * @brief Builds the panel over a subtree
      * @param context The workspace the panel is built against

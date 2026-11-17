@@ -124,6 +124,7 @@ class WorkspaceManager {
     Amethyst::TabBar *m_tabBar = nullptr;
     std::vector<std::unique_ptr<Workspace>> m_workspaces;
     Workspace *m_active = nullptr;
+    uint32_t m_nextWorkspaceId = 1;
 
     Amethyst::vec2 m_contentAreaPosition = {0.0f, 0.0f};
     Amethyst::vec2 m_contentAreaSize = {0.0f, 0.0f};

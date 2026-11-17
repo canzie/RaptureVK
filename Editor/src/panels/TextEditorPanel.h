@@ -17,6 +17,7 @@
  */
 class TextEditorPanel : public Panel {
   public:
+    std::string_view typeName() const override { return "TextEditorPanel"; }
     explicit TextEditorPanel(const WorkspaceContext &context, std::string title = "Text Editor");
     ~TextEditorPanel() override;
 
