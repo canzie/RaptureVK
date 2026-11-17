@@ -1,9 +1,34 @@
 #include <rapture/core/ecs/registry.h>
 
 #include <bit>
+#include <mutex>
+#include <string>
+#include <unordered_map>
 
 namespace Rapture {
 namespace ecs {
+
+struct ComponentTypeTable {
+    std::mutex mutex;
+    std::unordered_map<std::string, ComponentTypeId> idsBySignature;
+};
+
+static ComponentTypeTable &s_getComponentTypeTable()
+{
+    static ComponentTypeTable s_table;
+    return s_table;
+}
+
+ComponentTypeId ComponentTypeIdForSignature(std::string_view signature)
+{
+    ComponentTypeTable &table = s_getComponentTypeTable();
+    std::lock_guard lock(table.mutex);
+
+    ComponentTypeId nextId = static_cast<ComponentTypeId>(table.idsBySignature.size());
+    ComponentTypeId id = table.idsBySignature.try_emplace(std::string(signature), nextId).first->second;
+    RP_ASSERT(id < COMPONENT_TYPE_MAX, "component type limit reached, ComponentMask needs a second word");
+    return id;
+}
 
 Entity Registry::create()
 {

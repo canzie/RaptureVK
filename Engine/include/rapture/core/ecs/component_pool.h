@@ -6,6 +6,7 @@
 
 #include <rapture/core/utils/rp_assert.h>
 
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -14,15 +15,24 @@ namespace Rapture {
 namespace ecs {
 
 /**
- * @brief Hands out the next unused component type id.
+ * @brief Type id of the component type a signature names, the same in every module of a run.
+ * @param signature Compiler generated signature that names exactly one component type.
  * @return A type id below COMPONENT_TYPE_MAX.
  */
-inline ComponentTypeId NextComponentTypeId()
+ComponentTypeId ComponentTypeIdForSignature(std::string_view signature);
+
+/**
+ * @brief Compiler generated signature naming a component type, identical wherever T is instantiated.
+ * @return The signature of this function for T.
+ */
+template <typename T>
+constexpr std::string_view ComponentTypeSignature()
 {
-    static ComponentTypeId s_next = 0;
-    ComponentTypeId id = s_next++;
-    RP_ASSERT(id < COMPONENT_TYPE_MAX, "component type limit reached, ComponentMask needs a second word");
-    return id;
+#if defined(_MSC_VER)
+    return __FUNCSIG__;
+#else
+    return __PRETTY_FUNCTION__;
+#endif
 }
 
 /**
@@ -32,7 +42,7 @@ inline ComponentTypeId NextComponentTypeId()
 template <typename T>
 ComponentTypeId ComponentType()
 {
-    static const ComponentTypeId s_id = NextComponentTypeId();
+    static const ComponentTypeId s_id = ComponentTypeIdForSignature(ComponentTypeSignature<T>());
     return s_id;
 }
 
