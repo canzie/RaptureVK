@@ -27,6 +27,7 @@ struct FiberContext {
 
 struct Fiber {
     void *stackBase;      // Allocated stack memory
+    size_t stackSize;
     void *stackPointer;   // Current stack position
     FiberContext context; // Platform-specific context (registers, etc.)
 
@@ -67,9 +68,24 @@ class FiberPool {
     FiberPool(FiberPool &&) = delete;
     FiberPool &operator=(FiberPool &&) = delete;
 
-    Fiber *acquire();             // Get a free fiber (blocks if none available)
-    bool tryAcquire(Fiber **out); // Non-blocking acquire
-    void release(Fiber *fiber);   // Return fiber to pool
+    static constexpr size_t FIBER_COUNT = MAX_FIBERS + MAX_LARGE_FIBERS;
+
+    /**
+     * @brief Takes a free fiber, waiting until one with the requested stack is free
+     * @param stackSize Which stack the fiber needs
+     * @return The fiber
+     */
+    Fiber *acquire(FiberStackSize stackSize);
+
+    /**
+     * @brief Takes a free fiber if one with the requested stack is free
+     * @param stackSize Which stack the fiber needs
+     * @param out Receives the fiber
+     * @return Whether a fiber was taken
+     */
+    bool tryAcquire(FiberStackSize stackSize, Fiber **out);
+
+    void release(Fiber *fiber); // Return fiber to pool
 
     size_t availableCount() const;
 
@@ -81,8 +97,9 @@ class FiberPool {
         std::atomic<bool> inUse{false};
     };
 
-    std::array<FiberSlot, MAX_FIBERS> m_fibers;
-    std::atomic<uint32_t> m_availableCount{MAX_FIBERS};
+    // the regular fibers first, the large ones after them
+    std::array<FiberSlot, FIBER_COUNT> m_fibers;
+    std::atomic<uint32_t> m_availableCount{FIBER_COUNT};
 };
 
 } // namespace Rapture

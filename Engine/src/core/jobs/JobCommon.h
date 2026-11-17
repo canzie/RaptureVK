@@ -17,6 +17,11 @@ enum class QueueAffinity {
     AFFINITY_COUNT
 };
 
+enum class FiberStackSize {
+    REGULAR,
+    LARGE
+};
+
 } // namespace Rapture
 
 #endif // RAPTURE__JOBCOMMON_H

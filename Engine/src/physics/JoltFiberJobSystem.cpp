@@ -38,13 +38,16 @@ void JoltFiberJobSystem::QueueJob(Job *inJob)
     // held until it has run, since the barrier may release its own reference first
     inJob->AddRef();
 
-    jobs().run(Rapture::JobDeclaration(
+    Rapture::JobDeclaration declaration(
         [inJob](JobContext &context) {
             (void)context;
             inJob->Execute();
             inJob->Release();
         },
-        JobPriority::HIGH, QueueAffinity::ANY, nullptr, "Jolt"));
+        JobPriority::HIGH, QueueAffinity::ANY, nullptr, "Jolt");
+    // collision detection keeps whole contact manifolds on the stack, well past a regular fiber
+    declaration.stackSize = FiberStackSize::LARGE;
+    jobs().run(declaration);
 }
 
 void JoltFiberJobSystem::QueueJobs(Job **inJobs, JPH::uint inNumJobs)

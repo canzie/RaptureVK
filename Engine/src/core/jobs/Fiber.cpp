@@ -105,7 +105,7 @@ void Fiber::switchToScheduler()
 
 void initializeFiber(Fiber *fiber)
 {
-    void *stackTop = static_cast<char *>(fiber->stackBase) + FiberPool::FIBER_STACK_SIZE;
+    void *stackTop = static_cast<char *>(fiber->stackBase) + fiber->stackSize;
 
     uintptr_t stackAddr = reinterpret_cast<uintptr_t>(stackTop);
     stackAddr &= ~0xFull;
@@ -132,11 +132,11 @@ Fiber *createSchedulerFiber()
 
 FiberPool::~FiberPool()
 {
-    for (size_t i = 0; i < MAX_FIBERS; ++i) {
+    for (size_t i = 0; i < FIBER_COUNT; ++i) {
         if (m_fibers[i].fiber.stackBase != nullptr) {
 #ifdef RAPTURE_FIBER_GUARD_PAGE
             size_t guardSize = s_fiberGuardSize();
-            munmap(static_cast<char *>(m_fibers[i].fiber.stackBase) - guardSize, FIBER_STACK_SIZE + guardSize);
+            munmap(static_cast<char *>(m_fibers[i].fiber.stackBase) - guardSize, m_fibers[i].fiber.stackSize + guardSize);
 #else
             std::free(m_fibers[i].fiber.stackBase);
 #endif // RAPTURE_FIBER_GUARD_PAGE
@@ -144,23 +144,20 @@ FiberPool::~FiberPool()
     }
 }
 
-Fiber *FiberPool::acquire()
+Fiber *FiberPool::acquire(FiberStackSize stackSize)
 {
-    while (true) {
-        for (size_t i = 0; i < MAX_FIBERS; ++i) {
-            bool expected = false;
-            if (m_fibers[i].inUse.compare_exchange_strong(expected, true, std::memory_order_acquire)) {
-                m_availableCount.fetch_sub(1, std::memory_order_relaxed);
-                return &m_fibers[i].fiber;
-            }
-        }
+    Fiber *fiber = nullptr;
+    while (!tryAcquire(stackSize, &fiber)) {
         std::this_thread::yield();
     }
+    return fiber;
 }
 
-bool FiberPool::tryAcquire(Fiber **out)
+bool FiberPool::tryAcquire(FiberStackSize stackSize, Fiber **out)
 {
-    for (size_t i = 0; i < MAX_FIBERS; ++i) {
+    size_t first = stackSize == FiberStackSize::LARGE ? MAX_FIBERS : 0;
+    size_t end = stackSize == FiberStackSize::LARGE ? FIBER_COUNT : MAX_FIBERS;
+    for (size_t i = first; i < end; ++i) {
         bool expected = false;
         if (m_fibers[i].inUse.compare_exchange_strong(expected, true, std::memory_order_acquire)) {
             m_availableCount.fetch_sub(1, std::memory_order_relaxed);
@@ -173,7 +170,7 @@ bool FiberPool::tryAcquire(Fiber **out)
 
 void FiberPool::release(Fiber *fiber)
 {
-    for (size_t i = 0; i < MAX_FIBERS; ++i) {
+    for (size_t i = 0; i < FIBER_COUNT; ++i) {
         if (&m_fibers[i].fiber == fiber) {
             m_fibers[i].inUse.store(false, std::memory_order_release);
             m_availableCount.fetch_add(1, std::memory_order_relaxed);
@@ -189,18 +186,19 @@ size_t FiberPool::availableCount() const
 
 void FiberPool::initializeFiberStacks()
 {
-    for (size_t i = 0; i < MAX_FIBERS; ++i) {
+    for (size_t i = 0; i < FIBER_COUNT; ++i) {
         Fiber &fiber = m_fibers[i].fiber;
+        fiber.stackSize = i < MAX_FIBERS ? FIBER_STACK_SIZE : FIBER_STACK_SIZE_LARGE;
 
 #ifdef RAPTURE_FIBER_GUARD_PAGE
         size_t guardSize = s_fiberGuardSize();
-        void *mapping = mmap(nullptr, FIBER_STACK_SIZE + guardSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        void *mapping = mmap(nullptr, fiber.stackSize + guardSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
         RP_ASSERT(mapping != MAP_FAILED, "Failed to mmap fiber stack");
         int guardResult = mprotect(mapping, guardSize, PROT_NONE);
         RP_ASSERT(guardResult == 0, "Failed to protect fiber guard page");
         fiber.stackBase = static_cast<char *>(mapping) + guardSize;
 #else
-        fiber.stackBase = std::aligned_alloc(16, FIBER_STACK_SIZE);
+        fiber.stackBase = std::aligned_alloc(16, fiber.stackSize);
         if (!fiber.stackBase) {
             std::abort();
         }

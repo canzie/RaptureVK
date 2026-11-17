@@ -26,6 +26,7 @@ struct JobDeclaration {
     QueueAffinity affinity = QueueAffinity::ANY;
     Counter *signalOnComplete = nullptr;
     const char *debugName = nullptr;
+    FiberStackSize stackSize = FiberStackSize::REGULAR;
 
     JobDeclaration(const JobFunction &_func, JobPriority _prio, QueueAffinity _affinity, Counter *onComplete = nullptr,
                    const char *name = nullptr)

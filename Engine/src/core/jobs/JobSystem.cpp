@@ -85,7 +85,7 @@ void workerThread(JobSystem *system, int32_t threadId)
         Fiber *fiber = job.fiber;
 
         if (fiber == nullptr) {
-            fiber = system->getFiberPool().acquire();
+            fiber = system->getFiberPool().acquire(job.decl.stackSize);
             job.fiber = fiber;
             initializeFiber(fiber);
         }
@@ -261,7 +261,7 @@ JobSystem::Stats JobSystem::getStats() const
 {
     return Stats{.jobsExecuted = 0,
                  .jobsPending = 0,
-                 .fibersInUse = FiberPool::MAX_FIBERS - m_fiberPool.availableCount(),
+                 .fibersInUse = FiberPool::FIBER_COUNT - m_fiberPool.availableCount(),
                  .waitListSize = m_waitList.size()};
 }
 
