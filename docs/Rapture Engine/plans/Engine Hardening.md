@@ -46,7 +46,7 @@ Ordered by how likely they are to be hit.
 
 What is owned at the wrong level. The per-asset / per-scene / per-view rule is already decided in [[ECS Tiers and Ownership]]; these are the places that do not follow it yet.
 
-- [ ] **Physics thread pool per scene.** Every `Scene` builds a `PhysicsSystem` (`Scene.cpp:56`) and each initialises a Jolt `JobSystemThreadPool` with `hardware_concurrency - 1` threads (`PhysicsSystem.cpp:127`), preview scenes included. One shared physics job system, or Jolt running on the engine's job system.
+- [x] **Physics thread pool per scene.** Every `Scene` builds a `PhysicsSystem` (`Scene.cpp:56`) and each initialises a Jolt `JobSystemThreadPool` with `hardware_concurrency - 1` threads (`PhysicsSystem.cpp:127`), preview scenes included. One shared physics job system, or Jolt running on the engine's job system. Fixed: `physics::JoltFiberJobSystem` runs Jolt's jobs as engine jobs, one for every `PhysicsSystem`, living as long as the Jolt globals. Jolt jobs never wait inside a job, only the thread calling `Update` waits on the barrier, so no worker blocks. Runs on the regular 64 KB fiber stacks until something shows they are too small. The engine job system currently runs two workers (`JobSystem.cpp`), so physics gets two workers plus the waiting thread.
 - [ ] **Shadow cascades and terrain follow one camera per scene.** `Scene::onUpdate` takes the camera from `m_activeController` and fits shadow views and terrain streaming to it (`Scene.cpp:188-211`). A second viewport on the same scene renders with cascades fitted to another camera. Cascades are per view; terrain streaming wants the union of views.
 - [ ] **DDGI and `RtInstanceData` per renderer.** Created in `DeferredRenderer`'s constructor (`DeferredRenderer.cpp:20-21`), so two views of one world trace two probe volumes. Per scene, like the TLAS already is.
 - [x] **Per-frame material sweep.** `Scene::onUpdate` walks every mesh's materials to poll pending textures (`Scene.cpp:171`), cost proportional to scene size every frame. Should be driven by texture load completion. Fixed: an instance that binds a texture still loading adds itself to `MaterialManager`'s waiting list, and `MaterialManager::bindLoadedPendingTextures` walks only that list once per frame from `Application::runFrame`. Materials outside static meshes now resolve too.
@@ -130,7 +130,6 @@ GoogleTest is already wired (`Engine/test/event_signal_test.cpp`, `logging_test.
 
 ## Still open
 
-- Whether Jolt runs on the engine's fiber job system or keeps one shared thread pool of its own.
 - How terrain streaming chooses what to load when several views look at one scene.
 - Whether frames in flight is fixed at two or configurable.
 
