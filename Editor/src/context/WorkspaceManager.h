@@ -69,6 +69,14 @@ class WorkspaceManager {
 
     Workspace *activeWorkspace() const { return m_active; }
 
+    const std::vector<std::unique_ptr<Workspace>> &workspaces() const { return m_workspaces; }
+
+    /**
+     * @brief Brings a workspace's tab to the front
+     * @param workspace The workspace to show
+     */
+    void select(Workspace &workspace);
+
   public:
     /**
      * @brief Fires with the workspace whose tab just came to the front
@@ -98,12 +106,6 @@ class WorkspaceManager {
      * @param entry The stored workspace to reopen
      */
     void openStoredWorkspace(const EditorWorkspaceState &entry);
-
-    /**
-     * @brief Brings a workspace's tab to the front
-     * @param workspace The workspace to show
-     */
-    void select(Workspace &workspace);
 
     /**
      * @brief Marks the workspace in a tab as the one in front

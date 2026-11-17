@@ -2,6 +2,7 @@
 
 #include "EditorState.h"
 #include "ProjectLauncher.h"
+#include "commands/EditorCommands.h"
 #include "context/WindowManager.h"
 #include "context/WorkspaceManager.h"
 #include <rapture/app/Application.h>
@@ -197,6 +198,8 @@ void AmethystLayer::setupEditorContext()
 
     m_workspaceManager = std::make_unique<WorkspaceManager>(m_editorContext);
     m_editorContext.workspaces = m_workspaceManager.get();
+
+    m_commands = std::make_unique<EditorCommands>(*m_workspaceManager, Rapture::Application::getInstance().getMainWindow());
 }
 
 void AmethystLayer::wireLauncher(ProjectLauncher &launcher)
@@ -274,6 +277,11 @@ void AmethystLayer::onUpdate(float dt)
 
     auto &app = Rapture::Application::getInstance();
     auto &mainWindow = app.getMainWindow();
+
+    // before the frame is drawn, so what a call changes is in the frame a screenshot captures
+    if (m_commands != nullptr) {
+        m_commands->poll();
+    }
 
     auto frame = mainWindow.beginFrame();
     if (!frame.acquired) {

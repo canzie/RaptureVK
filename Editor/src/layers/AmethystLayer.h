@@ -23,6 +23,7 @@ class SwapChain;
 class RenderWindow;
 } // namespace Rapture
 
+class EditorCommands;
 class ProjectLauncher;
 class WindowManager;
 class WorkspaceManager;
@@ -128,6 +129,7 @@ class AmethystLayer : public Rapture::Layer {
     std::unique_ptr<WorkspaceManager> m_workspaceManager;
     std::unique_ptr<ProjectLauncher> m_startupLauncher;
     std::unique_ptr<BottomBar> m_bottomBar;
+    std::unique_ptr<EditorCommands> m_commands;
     Rapture::EventConnection m_activeWorkspaceChangedConn;
 
     Rapture::EventConnection m_mainSwapchainRecreatedConn;
