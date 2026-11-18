@@ -61,29 +61,18 @@ BottomBar::BottomBar(Amethyst::Window *window, const EditorContext &context) : m
         {
             .base =
                 {
-                    .position = Amethyst::UDim2::fromOffset(CONTENT_BROWSER_BUTTON_WIDTH + 4.0f, 0.0f),
+                    .padding = Amethyst::UDim4::fromOffset(BOTTOM_BAR_PADDING),
+                    .position = Amethyst::UDim2::fromOffset(CONTENT_BROWSER_BUTTON_WIDTH + 2.0f, 0.0f),
                     .size = Amethyst::UDim2(0.0f, SEARCHBAR_CONTAINER_WIDTH, 1.0f, 0.0f),
                 },
         },
         [this](Amethyst::FrameScope &cont) {
             cont.component.addClass("bottom-bar");
-            cont.frame(
-                {
-                    .base =
-                        {
-                            .anchorPoint = {0.5f, 0.5f},
-                            .position = Amethyst::UDim2::fromScale(0.5f, 0.5f),
-                            .size = Amethyst::UDim2::fromScale(0.95f, 0.8f),
-                        },
-
-                },
-                [this](Amethyst::FrameScope &sb) {
-                    sb.textInput({.base = {.size = Amethyst::UDim2::fromScale(1.0f)}, .placeholder = "COMMAND"},
-                                 [this](Amethyst::TextInputScope &tis) {
-                                     tis.component.addClass("searchbar");
-                                     m_commandInput = &tis.component;
-                                 });
-                });
+            cont.textInput({.base = {.size = Amethyst::UDim2::fromScale(1.0f)}, .placeholder = "COMMAND"},
+                           [this](Amethyst::TextInputScope &tis) {
+                               tis.component.addClass("command-field");
+                               m_commandInput = &tis.component;
+                           });
         });
     rootScope.frame(
         {

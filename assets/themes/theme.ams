@@ -34,6 +34,14 @@
 
 @property type-folder #EBCB8B
 
+@property selection          #3D5F99
+@property hover              #333333
+@property row-hover          #2B2B2B
+@property input-border       #2C2C2C
+@property input-border-hover #4A4A4A
+@property button-hover       #424242
+@property tab-hover          #222222
+
 
 @property white #FFFFFF
 
@@ -51,6 +59,7 @@ text-button {
 .main-menu-bar {
     background-color: @bg-window;
     text-color: @text-1;
+    entry-font-size: 13px;
 }
 
 .main-menu-bar-project {
@@ -96,8 +105,12 @@ scrolling-frame {
 
 context-menu {
     text-color: @text-2;
-    background-color: @bg-buttons;
-    menu-item-hover-background: @accent;
+    background-color: @bg-header;
+    border-pixel-size: 1px;
+    border-color: @border-4;
+    corner-radius: 6px;
+    font-size: 13px;
+    menu-item-hover-background: @selection;
     menu-separator-color: @border-4;
 }
 
@@ -118,17 +131,24 @@ text-area {
 
 .panel {
     background-color: @bg-panel;
-    corner-radius: 2px;
+    corner-radius: 4px;
     tab-spacing: 2px;
     tab-offset: 6px;
-    tab-corner-radius: 2px 2px 0px 0px;
-    tab-close-color: @text-3;
+    tab-corner-radius: 4px 4px 0px 0px;
+    tab-close-color: @text-4;
 
 }
 
 .panel-tab#tab {
-    text-color: @text-2;
+    text-color: @text-3;
+    font-size: 13px;
     background-transparency: 1.0;
+}
+
+.panel-tab#tab:hover {
+    background-color: @bg-frame;
+    text-color: @text-2;
+    background-transparency: 0.0;
 }
 
 .panel-tab#tab:active {
@@ -140,20 +160,31 @@ text-area {
 
 .panel-tab {
     background-color: @bg-window;
+    tab-width: 160px;
+    bar-thickness: 30px;
+    tab-corner-radius: 4px 4px 0px 0px;
+    tab-close-color: @text-4;
 }
 
 .workspace {
     background-color: @bg-window;
     tab-spacing: 2px;
     tab-offset: 12px;
-    tab-corner-radius: 2px 2px 0px 0px;
-    tab-close-color: @text-3;
+    tab-corner-radius: 0px;
+    tab-close-color: @text-4;
 
 }
 
 .workspace-tab#tab {
+    background-color: @bg-frame;
+    text-color: @text-3;
+    font-size: 13px;
+    background-transparency: 0.0;
+}
+.workspace-tab#tab:hover {
+    background-color: @tab-hover;
     text-color: @text-2;
-    background-transparency: 1.0;
+    background-transparency: 0.0;
 }
 .workspace-tab#tab:active {
     background-color: @bg-panel;
@@ -176,6 +207,7 @@ text-area {
 }
 
 .bottom-bar-button {
+    background-color: @hover;
     background-transparency: 1.0;
     text-color: @text-2;
     font-size: 12px;
@@ -184,25 +216,49 @@ text-area {
     
 }
 
+.bottom-bar-button:hover {
+    background-transparency: 0.0;
+    text-color: @text-1;
+}
+
+.command-field {
+    font-family: "IBM Plex Mono";
+    font-size: 12px;
+    text-color: @text-1;
+    placeholder-color: @text-4;
+    background-color: @bg-input;
+    corner-radius: 3px;
+    border-pixel-size: 1px;
+    border-color: @input-border;
+    text-y-alignment: center;
+}
+
+.command-field:hover {
+    border-color: @input-border-hover;
+}
+
 .command-popup {
     background-color: @bg-header;
     border-pixel-size: 1px;
     border-color: @border-4;
-    corner-radius: 3px;
+    corner-radius: 6px;
 }
 
 .command-popup-row {
     background-transparency: 1.0;
+    corner-radius: 4px;
 }
 
 .command-popup-row-highlighted {
-    background-color: @bg-contrast;
+    background-color: @selection;
+    corner-radius: 4px;
 }
 
 .command-popup-text {
     background-transparency: 1.0;
     text-color: @text-1;
-    font-size: 12px;
+    font-family: "IBM Plex Mono";
+    font-size: 13px;
     text-x-alignment: left;
     text-y-alignment: center;
 }
@@ -234,12 +290,15 @@ text-area {
     font-size: 12px;
     text-color: @text-1;
     background-color: @bg-input;
-    corner-radius: 2px;
+    corner-radius: 4px;
     border-pixel-size: 1px;
-    border-color: @border-3;
+    border-color: @input-border;
     thumb-color: @bg-contrast;
     thumb-transparency: 1.0;
-    slider-fill-color: @bg-contrast;
+    slider-fill-color: @bg-buttons;
+    dropdown-item-font-size: 13px;
+    dropdown-popup-background: @bg-header;
+    menu-item-hover-background: @selection;
     scrollbar-color: @bg-header;
     check-color: @accent;
     text-x-alignment: left;
@@ -247,20 +306,28 @@ text-area {
 
 }
 
+.property-input-field:hover {
+    border-color: @input-border-hover;
+}
+
 .searchbar {
     font-size: 13px;
     text-color: @text-1;
-    placeholder-color: @text-3;
+    placeholder-color: @text-4;
     image-color: @text-3;
     background-color: @bg-input;
-    corner-radius: 2px;
+    corner-radius: 4px;
     border-pixel-size: 1px;
-    border-color: @border-3;
+    border-color: @input-border;
     text-y-alignment: center;
 }
 
+.searchbar:hover {
+    border-color: @input-border-hover;
+}
+
 .property-label {
-    font-size: 12px;
+    font-size: 13px;
     text-color: @text-2;
     background-color: @bg-panel;
     background-transparency: 1.0;
@@ -272,6 +339,8 @@ text-area {
 .component-header {
     background-transparency: 1.0;
     text-color: @text-1;
+    font-family: "Roboto Bold";
+    font-size: 13px;
     text-x-alignment: left;
     text-y-alignment: center;
 }
@@ -280,6 +349,8 @@ text-area {
     background-color: @bg-header;
     background-transparency: 0.0;
     text-color: @text-1;
+    font-family: "Roboto Bold";
+    font-size: 13px;
     text-x-alignment: left;
     text-y-alignment: center;
 }
@@ -289,7 +360,8 @@ text-area {
 }
 
 .treeview-secondary-column {
-    text-color: @text-2;
+    text-color: @text-3;
+    font-size: 12px;
 }
 
 .treeview-icon {
@@ -306,8 +378,12 @@ text-area {
 
 .viewport-context-menu {
     text-color: @text-2;
-    background-color: @bg-buttons;
-    
+    background-color: @bg-header;
+    border-pixel-size: 1px;
+    border-color: @border-4;
+    corner-radius: 6px;
+    font-size: 13px;
+    menu-item-hover-background: @selection;
 }
 
 .viewport-context-menu#separator {
@@ -317,7 +393,12 @@ text-area {
 
 .add-asset-menu {
     text-color: @text-2;
-    background-color: @bg-buttons;
+    background-color: @bg-header;
+    border-pixel-size: 1px;
+    border-color: @border-4;
+    corner-radius: 6px;
+    font-size: 13px;
+    menu-item-hover-background: @selection;
 }
 
 .add-asset-menu#separator {
@@ -337,7 +418,13 @@ radio-button.viewport-context-menu:active {
 .viewport-overlay-button {
     background-color: @bg-buttons;
     text-color: @text-2;
+    font-size: 12px;
     corner-radius: 4px;
+}
+
+.viewport-overlay-button:hover {
+    background-color: @button-hover;
+    text-color: @text-1;
 }
 
 .generic-text-button {
@@ -350,14 +437,14 @@ radio-button.viewport-context-menu:active {
     border-mode: outline;
     text-x-alignment: center;
     text-y-alignment: center;
-    font-size: 12px;
-    corner-radius: 2px;
+    font-size: 13px;
+    corner-radius: 4px;
 }
 
 .generic-text-button:hover {
-    background-color: @bg-buttons;
+    background-color: @button-hover;
     text-color: @text-1;
-    border-color: @border-2;
+    border-color: @border-4;
 }
 
 .accent-text-button {
@@ -370,8 +457,12 @@ radio-button.viewport-context-menu:active {
     border-mode: outline;
     text-x-alignment: center;
     text-y-alignment: center;
-    font-size: 12px;
-    corner-radius: 2px;
+    font-size: 13px;
+    corner-radius: 4px;
+}
+
+.accent-text-button:hover {
+    border-color: @border-4;
 }
 
 .play-button {
@@ -387,7 +478,7 @@ radio-button.viewport-context-menu:active {
     background-color: @bg-input;
     text-color: @text-2;
     border-pixel-size: 1px;
-    border-color: @border-1;
+    border-color: @input-border;
     border-mode: outline;
     text-x-alignment: center;
     text-y-alignment: center;
@@ -397,7 +488,7 @@ radio-button.viewport-context-menu:active {
 
 .segment-control:hover {
     text-color: @text-1;
-    border-color: @border-2;
+    border-color: @input-border-hover;
 }
 
 .segment-control:active {
@@ -617,6 +708,7 @@ radio-button.viewport-context-menu:active {
     text-color: @text-3;
     text-x-alignment: left;
     text-y-alignment: center;
+    font-family: "IBM Plex Mono";
     font-size: 11px;
 }
 

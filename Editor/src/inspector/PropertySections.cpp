@@ -5,7 +5,7 @@
 #include <components/checkbox.h>
 #include <components/common.h>
 
-static constexpr float ROW_HEIGHT = 32.0f;
+static constexpr float ROW_HEIGHT = 30.0f;
 static constexpr float PICKER_ROW_HEIGHT = 52.0f;
 static constexpr float PICKER_PREVIEW_SIZE = 28.0f;
 static constexpr float LABEL_FRAC = 0.4f;
@@ -13,6 +13,7 @@ static constexpr float LABEL_PAD = 12.0f;
 static constexpr float CONTROL_VPAD = 4.0f;
 static constexpr float CONTROL_HPAD = 10.0f;
 static constexpr float CONTROL_GAP = 6.0f;
+static constexpr float SINGLE_FIELD_WIDTH = 190.0f;
 
 static constexpr float HEADER_HEIGHT = PropertySection::HEADER_HEIGHT;
 static constexpr float SECTION_SPACING = PropertySection::SECTION_SPACING;
@@ -97,7 +98,7 @@ void PropertySection::rowSlider(Amethyst::TableScope &t, std::string_view label,
                     .classes = {"property-input-field"},
                     .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
                              .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
-                             .size = Amethyst::UDim2(1.0f, -2.0f * CONTROL_HPAD, 1.0f, -2.0f * CONTROL_VPAD)},
+                             .size = Amethyst::UDim2(0.0f, SINGLE_FIELD_WIDTH, 1.0f, -2.0f * CONTROL_VPAD)},
                     .format = format,
                     .min = min,
                     .max = max,
@@ -240,7 +241,7 @@ Amethyst::Dropdown *PropertySection::rowDropdown(Amethyst::TableScope &t, std::s
                     .classes = {"property-input-field"},
                     .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
                              .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
-                             .size = Amethyst::UDim2(1.0f, -2.0f * CONTROL_HPAD, 1.0f, -2.0f * CONTROL_VPAD)},
+                             .size = Amethyst::UDim2(0.0f, SINGLE_FIELD_WIDTH, 1.0f, -2.0f * CONTROL_VPAD)},
                     .text = {.textXAlignment = Amethyst::TextXAlignment::LEFT, .textYAlignment = Amethyst::TextYAlignment::CENTER},
                     .label = std::string(current),
                 },
@@ -270,7 +271,7 @@ void PropertySection::rowDragFloat(Amethyst::TableScope &t, std::string_view lab
                     .classes = {"property-input-field"},
                     .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
                              .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
-                             .size = Amethyst::UDim2(1.0f, -2.0f * CONTROL_HPAD, 1.0f, -2.0f * CONTROL_VPAD)},
+                             .size = Amethyst::UDim2(0.0f, SINGLE_FIELD_WIDTH, 1.0f, -2.0f * CONTROL_VPAD)},
                     .format = format,
                     .speed = speed,
                     .min = min,

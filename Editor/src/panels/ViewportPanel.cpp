@@ -141,7 +141,7 @@ void ViewportPanel::build(Amethyst::UIScope &scope)
                     .size = Amethyst::UDim2::fromScale(1.0f, 1.0f),
                     .zIndex = 100,
                 },
-            .style = {.cornerRadius = 2.0f},
+            .style = {.cornerRadius = 3.0f},
             .image = {.scaleType = Amethyst::ImageScaleType::STRETCH},
         },
         [this](Amethyst::ImageLabelScope &img) {

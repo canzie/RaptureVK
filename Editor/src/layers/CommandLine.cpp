@@ -6,9 +6,9 @@
 
 #include <algorithm>
 
-static constexpr float COMMAND_POPUP_WIDTH = 640.0f;
-static constexpr float COMMAND_POPUP_ROW_HEIGHT = 22.0f;
-static constexpr float COMMAND_POPUP_PADDING = 6.0f;
+static constexpr float COMMAND_POPUP_WIDTH = 520.0f;
+static constexpr float COMMAND_POPUP_ROW_HEIGHT = 26.0f;
+static constexpr float COMMAND_POPUP_PADDING = 4.0f;
 static constexpr float COMMAND_POPUP_TEXT_INSET = 10.0f;
 static constexpr float COMMAND_POPUP_TEXT_COLUMN = 0.35f;
 static constexpr size_t COMMAND_POPUP_MAX_ROWS = 14;

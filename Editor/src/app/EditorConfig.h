@@ -55,7 +55,7 @@ struct EditorConfigEntry {
 
 constexpr std::array<EditorConfigEntry, EDITOR_CONFIG_COUNT> EDITOR_CONFIG_TABLE = {{
     {"menuBarHeight", CONFIG_VALUE_FLOAT, 28.0},
-    {"workspaceTabHeight", CONFIG_VALUE_FLOAT, 32.0},
+    {"workspaceTabHeight", CONFIG_VALUE_FLOAT, 36.0},
     {"workspaceTabWidth", CONFIG_VALUE_FLOAT, 196.0},
     {"bottomBarHeight", CONFIG_VALUE_FLOAT, 28.0},
 

@@ -26,6 +26,16 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#include <array>
+#include <string_view>
+
+// the first font loaded is the default every unset font-family falls back to
+static constexpr std::array<std::string_view, 3> FONT_FILES = {
+    "Roboto-Regular.ttf",
+    "Roboto-Bold.ttf",
+    "IBMPlexMono-Regular.ttf",
+};
+
 static constexpr float PROJECT_NAME_WIDTH = 180.0f;
 static constexpr float PROJECT_NAME_RIGHT_INSET = 140.0f;
 static constexpr float PROJECT_NAME_VERTICAL_INSET = 8.0f;
@@ -146,9 +156,11 @@ void AmethystLayer::onAttach()
 
     m_backend.init(initInfo, glfwInfo);
 
-    auto fontPath = Rapture::EnginePaths::assetDirectory() / "fonts/Roboto-Regular.ttf";
-    if (!m_amCtx.loadFont(fontPath.string()).isValid()) {
-        RP_WARN("Failed to load font from: {}", fontPath.string());
+    for (std::string_view fontFile : FONT_FILES) {
+        auto fontPath = Rapture::EnginePaths::assetDirectory() / "fonts" / fontFile;
+        if (!m_amCtx.loadFont(fontPath.string()).isValid()) {
+            RP_WARN("Failed to load font from: {}", fontPath.string());
+        }
     }
 
     m_amCtx.init(m_backend);

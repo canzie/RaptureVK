@@ -11,7 +11,7 @@
 #include <components/ui_scope.h>
 #include <modules/color.h>
 
-static constexpr float SEARCH_BAR_HEIGHT = 28.0f;
+static constexpr float SEARCH_BAR_HEIGHT = 26.0f;
 static constexpr float SEARCH_BAR_TOP_PAD = 8.0f;
 static constexpr float CONTENT_OFFSET = SEARCH_BAR_TOP_PAD + SEARCH_BAR_HEIGHT + 8.0f;
 

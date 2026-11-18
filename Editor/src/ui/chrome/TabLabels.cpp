@@ -6,6 +6,8 @@
 
 static const Amethyst::Color4 COL_TAB_ICON{0.7f, 0.7f, 0.7f, 1.0f};
 
+static constexpr float TAB_CLOSE_BUTTON_CLEARANCE = 26.0f;
+
 /**
  * @brief The sizes a tab label is laid out by, taken once so the build callback holds no config
  */
@@ -48,13 +50,14 @@ static void s_buildTabLabel(const std::string &label, const std::string &iconSvg
         .base =
             {
                 .position = Amethyst::UDim2(0.0f, textOffset, 0.0f, 0.0f),
-                .size = Amethyst::UDim2(1.0f, -(textOffset + sizes.padding), 1.0f, 0.0f),
+                .size = Amethyst::UDim2(1.0f, -(textOffset + TAB_CLOSE_BUTTON_CLEARANCE), 1.0f, 0.0f),
             },
         .style = {.backgroundTransparency = 1.0f},
         .text =
             {
                 .textXAlignment = Amethyst::TextXAlignment::LEFT,
                 .textYAlignment = Amethyst::TextYAlignment::CENTER,
+                .textTruncate = Amethyst::TextTruncate::AT_END,
             },
         .label = label,
     });
