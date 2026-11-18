@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <climits>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <glm/gtc/matrix_transform.hpp>
@@ -462,6 +463,10 @@ void ViewportPanel::onUpdate(float dt)
 
     auto *viewport = m_viewport;
     Amethyst::vec2 size = m_viewportImage->absoluteContentSize;
+    if (auto *window = m_viewportImage->getWindow()) {
+        size = Amethyst::vec2(std::round(size.x * window->getLogicalToPhysicalScale()),
+                              std::round(size.y * window->getLogicalToPhysicalScale()));
+    }
     if (size.x > 0.0f && size.y > 0.0f) {
         if (size != m_pendingViewportSize) {
             m_pendingViewportSize = size;

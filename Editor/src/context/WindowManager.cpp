@@ -33,8 +33,8 @@ void WindowManager::openWindow(int32_t width, int32_t height, std::string_view t
 
     auto open = std::make_unique<OpenWindow>();
     open->renderWindow = &renderWindow;
-    open->window.absoluteSize = {static_cast<float>(swapChain->getExtent().width),
-                                 static_cast<float>(swapChain->getExtent().height)};
+    open->window.setFramebufferSize(
+        {static_cast<float>(swapChain->getExtent().width), static_cast<float>(swapChain->getExtent().height)});
     open->window.absoluteRotation = 0.0f;
 
     m_backend->registerWindow(renderWindow.getWindowContext()->getNativeWindowContext(), &open->window);
@@ -92,8 +92,7 @@ void WindowManager::resizeWindow(OpenWindow &open)
     Rapture::Application::getInstance().getVulkanContext().waitIdle();
 
     const VkExtent2D extent = open.renderWindow->getSwapChain()->getExtent();
-    open.window.absoluteSize = {static_cast<float>(extent.width), static_cast<float>(extent.height)};
-    open.window.markDirty();
+    open.window.setFramebufferSize({static_cast<float>(extent.width), static_cast<float>(extent.height)});
 }
 
 void WindowManager::closeWindow(OpenWindow *window)

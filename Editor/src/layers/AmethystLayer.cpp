@@ -153,8 +153,7 @@ void AmethystLayer::onAttach()
 
     m_amCtx.init(m_backend);
 
-    glm::vec2 screenSize = {static_cast<float>(swapChain->getExtent().width), static_cast<float>(swapChain->getExtent().height)};
-    m_window.absoluteSize = screenSize;
+    m_window.setFramebufferSize({static_cast<float>(swapChain->getExtent().width), static_cast<float>(swapChain->getExtent().height)});
     m_window.absoluteRotation = 0.0f;
 
     m_backgroundFrame = m_window.add<Amethyst::Frame>();
@@ -515,13 +514,10 @@ void AmethystLayer::onResize(const Rapture::SwapChain &swapChain)
 
     vulkanContext.waitIdle();
 
-    glm::vec2 screenSize = {static_cast<float>(swapChain.getExtent().width), static_cast<float>(swapChain.getExtent().height)};
-
-    m_window.absoluteSize = screenSize;
-    m_window.markDirty();
+    m_window.setFramebufferSize({static_cast<float>(swapChain.getExtent().width), static_cast<float>(swapChain.getExtent().height)});
 
     if (m_workspaceManager != nullptr) {
-        placeWorkspaceContent(screenSize);
+        placeWorkspaceContent(m_window.absoluteSize);
     }
 }
 
@@ -529,8 +525,9 @@ void AmethystLayer::updateShortcuts()
 {
     auto &windowContext = Rapture::Application::getInstance().getWindowContext();
 
-    // the cursor comes back in window pixels while the UI is placed in framebuffer ones
-    const glm::vec2 cursor = windowContext.getCursorPosition() * windowContext.getContentScale();
+    // the cursor comes back in window pixels while the UI is placed in logical ones
+    const glm::vec2 cursor =
+        windowContext.getCursorPosition() * windowContext.getContentScale() / m_window.getLogicalToPhysicalScale();
     m_shortcutRegistry.onUpdate(*m_input, cursor);
 }
 

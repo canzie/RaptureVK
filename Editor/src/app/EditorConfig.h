@@ -19,26 +19,9 @@ enum ConfigValueType {
     CONFIG_VALUE_COUNT
 };
 
-/**
- * @brief How a number changes when the UI scale changes
- */
-enum ScalingRule {
-    SCALING_NONE,  ///< used as authored, for ratios, counts and hairlines
-    SCALING_ROUND, ///< scaled, then rounded to a whole pixel
-    SCALING_SNAP,  ///< scaled, then snapped to the nearest step an SVG renders cleanly at
-    SCALING_COUNT
-};
-
-/**
- * @brief The steps SCALING_SNAP lands on
- */
-constexpr std::array<float, 7> SNAP_STEPS = {12.0f, 14.0f, 16.0f, 20.0f, 24.0f, 32.0f, 48.0f};
-
 using ConfigValue = std::variant<double, int64_t, bool>;
 
 enum EditorConfigKey {
-    EDITOR_CONFIG_UI_SCALE,
-
     EDITOR_CONFIG_MENU_BAR_HEIGHT,
     EDITOR_CONFIG_WORKSPACE_TAB_HEIGHT,
     EDITOR_CONFIG_WORKSPACE_TAB_WIDTH,
@@ -61,43 +44,37 @@ enum EditorConfigKey {
 };
 
 /**
- * @brief The declaration of one config entry: what it is called, what it holds, what it falls back
- * to and how it answers to the UI scale.
+ * @brief The declaration of one config entry: what it is called, what it holds, and what it falls
+ * back to.
  */
 struct EditorConfigEntry {
     std::string_view key;
     ConfigValueType type;
     ConfigValue fallback;
-    ScalingRule scaling;
 };
 
 constexpr std::array<EditorConfigEntry, EDITOR_CONFIG_COUNT> EDITOR_CONFIG_TABLE = {{
-    {"uiScale", CONFIG_VALUE_FLOAT, 1.0, SCALING_NONE},
+    {"menuBarHeight", CONFIG_VALUE_FLOAT, 28.0},
+    {"workspaceTabHeight", CONFIG_VALUE_FLOAT, 32.0},
+    {"workspaceTabWidth", CONFIG_VALUE_FLOAT, 196.0},
+    {"bottomBarHeight", CONFIG_VALUE_FLOAT, 28.0},
 
-    {"menuBarHeight", CONFIG_VALUE_FLOAT, 28.0, SCALING_ROUND},
-    {"workspaceTabHeight", CONFIG_VALUE_FLOAT, 32.0, SCALING_ROUND},
-    {"workspaceTabWidth", CONFIG_VALUE_FLOAT, 196.0, SCALING_ROUND},
-    {"bottomBarHeight", CONFIG_VALUE_FLOAT, 28.0, SCALING_ROUND},
+    {"hotbarHeight", CONFIG_VALUE_FLOAT, 40.0},
+    {"hotbarPadding", CONFIG_VALUE_FLOAT, 8.0},
+    {"hotbarSeparatorWidth", CONFIG_VALUE_FLOAT, 1.0},
 
-    {"hotbarHeight", CONFIG_VALUE_FLOAT, 40.0, SCALING_ROUND},
-    {"hotbarPadding", CONFIG_VALUE_FLOAT, 8.0, SCALING_ROUND},
-    {"hotbarSeparatorWidth", CONFIG_VALUE_FLOAT, 1.0, SCALING_NONE},
+    {"dockOuterSpacing", CONFIG_VALUE_FLOAT, 4.0},
+    {"dockInnerSpacing", CONFIG_VALUE_FLOAT, 3.0},
 
-    {"dockOuterSpacing", CONFIG_VALUE_FLOAT, 4.0, SCALING_ROUND},
-    {"dockInnerSpacing", CONFIG_VALUE_FLOAT, 3.0, SCALING_ROUND},
+    {"tabIconSize", CONFIG_VALUE_FLOAT, 16.0},
+    {"tabLabelPadding", CONFIG_VALUE_FLOAT, 8.0},
+    {"tabIconGap", CONFIG_VALUE_FLOAT, 6.0},
 
-    {"tabIconSize", CONFIG_VALUE_FLOAT, 16.0, SCALING_SNAP},
-    {"tabLabelPadding", CONFIG_VALUE_FLOAT, 8.0, SCALING_ROUND},
-    {"tabIconGap", CONFIG_VALUE_FLOAT, 6.0, SCALING_ROUND},
-
-    {"commandSocket", CONFIG_VALUE_BOOL, true, SCALING_NONE},
+    {"commandSocket", CONFIG_VALUE_BOOL, true},
 }};
 
 /**
  * @brief The editor's own settings, which live beside the executable because they outlive any project.
- *
- * Readers ask for a key and get the value the current UI scale calls for, so no call site multiplies
- * anything or knows which rule its number answers to.
  */
 class EditorConfig {
   public:
@@ -116,26 +93,11 @@ class EditorConfig {
     bool save() const;
 
     /**
-     * @brief The value of a float entry, with its scaling rule applied
+     * @brief The value of a float entry
      * @param key The entry to read
-     * @return The scaled value
+     * @return The value
      */
     float getFloat(EditorConfigKey key) const;
-
-    /**
-     * @brief The value of a float entry as it was authored, before any scaling
-     * @param key The entry to read
-     * @return The unscaled value
-     */
-    float getUnscaledFloat(EditorConfigKey key) const;
-
-    /**
-     * @brief A size the config does not hold, answered at the current UI scale
-     * @param pixels The size as it was authored
-     * @param rule How that size answers to the scale
-     * @return The scaled size
-     */
-    float scale(float pixels, ScalingRule rule = SCALING_ROUND) const;
 
     /**
      * @brief The value of an int entry
@@ -158,14 +120,6 @@ class EditorConfig {
      */
     void set(EditorConfigKey key, ConfigValue value);
 
-    float uiScale() const { return m_scale; }
-
-    /**
-     * @brief Puts the editor on a new UI scale
-     * @param scale The scale every SCALING_ROUND and SCALING_SNAP entry is answered at
-     */
-    void setUiScale(float scale);
-
     std::span<const std::filesystem::path> recentProjects() const { return m_recentProjects; }
 
     /**
@@ -183,7 +137,6 @@ class EditorConfig {
 
   private:
     std::array<ConfigValue, EDITOR_CONFIG_COUNT> m_values;
-    float m_scale = 1.0f;
 
     std::vector<std::filesystem::path> m_recentProjects;
     std::filesystem::path m_autoLaunchProject;

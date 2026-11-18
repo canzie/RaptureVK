@@ -135,10 +135,18 @@ bool GlfwWindowContext::isMouseButtonPressed(MouseButton button) const
 
 glm::vec2 GlfwWindowContext::getContentScale() const
 {
-    float x = 1.0f;
-    float y = 1.0f;
-    glfwGetWindowContentScale(m_glfwWindow, &x, &y);
-    return glm::vec2(x, y);
+    int windowWidth = 0;
+    int windowHeight = 0;
+    int framebufferWidth = 0;
+    int framebufferHeight = 0;
+    glfwGetWindowSize(m_glfwWindow, &windowWidth, &windowHeight);
+    glfwGetFramebufferSize(m_glfwWindow, &framebufferWidth, &framebufferHeight);
+
+    if (windowWidth <= 0 || windowHeight <= 0) {
+        return glm::vec2(1.0f);
+    }
+    return glm::vec2(static_cast<float>(framebufferWidth) / static_cast<float>(windowWidth),
+                     static_cast<float>(framebufferHeight) / static_cast<float>(windowHeight));
 }
 
 glm::vec2 GlfwWindowContext::getCursorPosition() const

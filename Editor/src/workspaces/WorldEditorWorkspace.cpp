@@ -123,7 +123,7 @@ void WorldEditorWorkspace::buildHotbar()
     addHotbarButton("Save World", [this]() { saveWorld(); });
     addHotbarSeparator();
 
-    const float buttonSize = config().getUnscaledFloat(EDITOR_CONFIG_HOTBAR_HEIGHT) * PLAY_CONTROL_SCALE;
+    const float buttonSize = config().getFloat(EDITOR_CONFIG_HOTBAR_HEIGHT) * PLAY_CONTROL_SCALE;
     const float groupWidth = 3.0f * buttonSize + 2.0f * PLAY_CONTROL_GAP;
     addHotbarItem(groupWidth, [this](Amethyst::UIScope &slot) { setupPlayControls(*slot.get().as<Amethyst::Frame>()); });
 }

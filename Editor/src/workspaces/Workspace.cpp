@@ -189,10 +189,10 @@ void Workspace::resolveHotbarItem(const HotbarItem &item) const
     float width = 0.0f;
     switch (item.kind) {
     case HotbarItemKind::FIXED:
-        width = config().scale(item.width);
+        width = item.width;
         break;
     case HotbarItemKind::LABELLED:
-        width = labelWidth(*item.object->as<Amethyst::TextButton>()) + 2.0f * config().scale(HOTBAR_LABEL_MARGIN);
+        width = labelWidth(*item.object->as<Amethyst::TextButton>()) + 2.0f * HOTBAR_LABEL_MARGIN;
         break;
     case HotbarItemKind::SEPARATOR:
         width = config().getFloat(EDITOR_CONFIG_HOTBAR_SEPARATOR_WIDTH);
