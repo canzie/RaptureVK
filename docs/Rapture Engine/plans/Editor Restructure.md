@@ -44,42 +44,11 @@ Fonts are the same story. The glyph atlas is keyed by `(FontId, pixelSize)` and 
 
 `@property` variables in `.ams` expand at **parse time** (`src/parsers/am_theme/am_theme_parser.cpp:715`, header doc at `am_theme_parser.h:26-29`). There is no C++ API to set one. So "user picks an accent colour" means writing a generated `.ams` and calling `Style::load` on it, not poking a variable. That is acceptable and is the design.
 
-### Scale is artisanal, so a single multiplier is the wrong model
+### Scale lives in Amethyst
 
-This is why putting a scale float inside Amethyst would not have helped even if it were easy. Categories of number scale by different rules:
+Amethyst lays the tree out in logical pixels and scales it onto the framebuffer. `Window::setLogicalToPhysicalScale` holds physical pixels per logical pixel, the GLFW backend sets it from the monitor's content scale on `registerWindow` and again when the window changes monitor, the vertex shader applies it, and text and SVGs rasterise at their physical size. The editor sizes each window with `Window::setFramebufferSize(swapchain extent)` and every number it authors (config entries, literals in constructors, theme sizes) is in logical pixels and needs no scaling of its own.
 
-- **Font sizes** scale, then round to whole pixels, because the glyph atlas is keyed by an integer `pixelSize` (`glyph_atlas.h:217`).
-- **Paddings, gaps, row and bar heights** scale, then round, so edges land on pixel boundaries and rows do not seam.
-- **Hairlines and borders** mostly do not scale. `EDITOR_HOTBAR_SEPARATOR_WIDTH` is 1.0f (`EditorLayout.h:10`) and should stay 1px until the scale is large enough to justify 2.
-- **Icon sizes** snap to a set (16 / 20 / 24 / 32) rather than taking 16 x 1.33 = 21.28, because SVGs at fractional sizes look wrong.
-- **Dock split ratios** do not scale at all. They are fractions.
-
-Every metric declares its own rule. That is per-number editorial work, not arithmetic, and it cannot live in a layout engine that does not know what any given number means.
-
-### The giga-dirty pass
-
-Scale does not tear the tree down. Geometry is authored in one overridable place per widget, and a scale change re-runs that place.
-
-Split "create the children" from "place the children":
-
-```cpp
-class EditorWidget {
-    virtual void build(Amethyst::UIScope &) = 0;  // once, creates children
-    virtual void applyMetrics() {}                // at build, and on every metrics change
-};
-```
-
-The `90.0f` and `28.0f` literals live only in `applyMetrics()`. A scale change walks the tree and calls it. Nothing is destroyed, so scroll positions, expanded sections, selection and open documents all survive, and none of it depends on the tree being reconstructible from persisted state.
-
-This is the same shape Amethyst already uses one level down. `resolveStyle()` is a public virtual re-resolve from a global that every component overrides (`ui_object.h:142`), called on construction and again whenever the thing it reads changes. `applyMetrics()` is that pattern for the editor's own numbers.
-
-Giga-dirty is therefore one tree walk: `applyMetrics()`, then `markDirty()`.
-
-Font sizes set by theme classes are the one number `applyMetrics()` cannot reach, since they come from the `.ams`. Reaching them means regenerating the theme with scaled sizes and calling `Style::load` + `resolveStyle()`, which the API already supports. **Deferred** — scale for different screens is the goal, user-chosen colours and fonts are not wanted yet. The hook is noted so the pass is built with room for it.
-
-**The cost:** every widget and panel that positions anything has to put those numbers in `applyMetrics()` instead of inline in its constructor. That is a real constraint on the widget layer, and it is the reason the widget layer has to land before scale does.
-
-**Conclusion: both halves are downstream of Phase 2.** Neither can be done first, and neither needs Phase 1's reconstructibility.
+That removed the editor-side scale: no per-number scaling rule, no `applyMetrics()` pass, no `EDITOR_CONFIG_UI_SCALE`. Anything outside the Amethyst tree that compares against UI positions converts to logical pixels itself, e.g. the shortcut registry's cursor.
 
 ### EditorConfig: one table, not a settings class per consumer
 
@@ -89,7 +58,6 @@ The key set is closed and known at compile time, so it is a `constexpr` array in
 
 ```cpp
 enum EditorConfigKey {
-    EDITOR_CONFIG_UI_SCALE,
     EDITOR_CONFIG_HOTBAR_HEIGHT,
     EDITOR_CONFIG_HOTBAR_PADDING,
     EDITOR_CONFIG_SEPARATOR_WIDTH,
@@ -102,13 +70,10 @@ struct EditorConfigEntry {
     std::string_view key;          // serialisation name
     EditorConfigType type;         // FLOAT / INT / BOOL / STRING
     EditorConfigValue fallback;    // used when nothing is stored
-    EditorConfigScaling scaling;   // NONE / ROUND / SNAP_ICON
 };
 
 constexpr EditorConfigEntry EDITOR_CONFIG_TABLE[EDITOR_CONFIG_COUNT] = { ... };
 ```
-
-`scaling` is where the artisanal rule lives, as data rather than scattered across call sites. `EDITOR_CONFIG_SEPARATOR_WIDTH` is `NONE` and stays 1px; `EDITOR_CONFIG_HOTBAR_HEIGHT` is `ROUND`; `EDITOR_CONFIG_ICON_SIZE` is `SNAP_ICON` and lands on 16 / 20 / 24 / 32. A reader calls `config.getFloat(EDITOR_CONFIG_HOTBAR_HEIGHT)` and gets the scaled, rule-applied number without knowing which rule applied.
 
 This is also what fixes the existing inconsistency where four workspaces use a literal `6.0f` for hotbar padding and two use `EDITOR_HOTBAR_PADDING` (8.0f). There stops being a second place to get the number from.
 
@@ -132,7 +97,6 @@ Editor/src/
     views/      ListView<T>, SceneTreeView, DirectoryTreeView, AssetTile
     chrome/     Breadcrumb, EmptyState, tab labels, section headers
     Theme.h     class-name constants, no colour literals
-    Metrics.h   scaled layout numbers, replaces EditorLayout.h
   document/     Document, UndoStack, dirty tracking
   inspector/    Inspector, Section, SectionRegistry, concrete sections
   workspaces/   Workspace, SingleDocumentWorkspace, MultiDocumentWorkspace, ScenePreviewHost
@@ -151,7 +115,7 @@ Ordered so each one unblocks the next. No phase depends on a later one.
 
 ### Phase 1 — lifetime and hosting
 
-The foundation. No visual change, and it is what makes both scale rebuilds and the inspector rewrite possible.
+The foundation. No visual change, and it is what makes the inspector rewrite possible.
 
 - `Panel` base that owns its own lifecycle: root creation, `addClass`, clipping, destroy connection, attach, and tab removal in the destructor. Kills 8 identical destructors and 12 identical constructor preambles. Fixes the `AssetDetailsPanel` bug where `m_root` and `m_rootDestroyConn` are redeclared (`AssetDetailsPanel.h:200-201`), shadowing `Panel::m_root` so `Panel::root()` returns nullptr and the re-dock overload silently no-ops.
 - `onShown()` / `onHidden()` on `Panel`, so a `ViewportPanel` on a hidden tab stops rendering its viewport.
@@ -216,14 +180,11 @@ Depends on Phase 2 for `FieldTable`.
 - Collapse `ComponentEditorBase` and `AssetEditorBase` into one `Section` over a subject variant. They duplicate `sync()`, `setSubject()` and `m_subjectChanged` today, and `PropertiesPanel::ensure` / `AssetDetailsPanel::ensure` are the same template written twice.
 - Move the nine `rowX` helpers off the section base (`property_sections.h:59-165`) into `FieldTable`, so anything can lay out a labelled field.
 
-### Phase 4 — scale
+### Phase 4 — settings
 
-Depends on Phase 2 (`applyMetrics()` on widgets) and Phase 1 (`EditorConfig` on `EditorContext`, `applyMetrics()` on `Panel`).
+Depends on Phase 1 (`EditorConfig` on `EditorContext`).
 
-- Every `EditorLayout.h` constant becomes an `EDITOR_CONFIG_` entry with its scaling rule. Launcher and file-explorer window sizes move out; they are not layout.
-- Every geometry literal moves out of constructors into `applyMetrics()`.
-- One giga-dirty entry point: walk the tree, `applyMetrics()`, `markDirty()`. Nothing is rebuilt.
-- A scale control that writes `EDITOR_CONFIG_UI_SCALE` and fires it.
+- Every `EditorLayout.h` constant becomes an `EDITOR_CONFIG_` entry. Launcher and file-explorer window sizes move out; they are not layout.
 - Settings UI as a workspace, not a modal. It is a document like anything else.
 
 ### Phase 5 — shell split
@@ -270,12 +231,10 @@ Undo/redo (Phase 7). Multi-selection — `EntitySelection` holds one entity and 
 
 - Where the undo stack lives now that there is no document object: per workspace, or per asset shared across the workspaces showing it.
 - Closing an `AssetWorkspace` when its asset is deleted has no hook. There is no asset-removed signal anywhere — `AssetManager`, `AssetRegistry` and `AssetManagerEditor` expose no `EventSignal`, and `ProjectEvents` only covers serialise and register. Asset deletion itself does not exist yet either (the content browser's Delete entry is an empty lambda), so this lands together with delete.
-- Whether UI scale belongs in Amethyst after all. Tweening and animated layout make a library-level scale hard to avoid, which would shrink `applyMetrics()` to whatever the library cannot know.
 - Whether `Viewport::EditorBinding::displayed` stays as the one-panel-per-viewport guard or goes with the other UI facts on the viewport.
 - The scripting workspace needs a file tree panel, since opening a second script into an existing workspace is now its job rather than the router's.
-- Which metrics snap to a set and which round, per category. Icons and hairlines are the ones that need deciding by eye rather than by rule.
-- Whether `applyMetrics()` is a plain tree walk or driven off a dirty epoch, so a widget built after a scale change does not need a second pass.
 - Whether the generated theme `.ams` is written to the project or beside the executable.
+- A user-chosen zoom on top of the monitor scale. The backend overwrites the window's scale on every content scale change, so a multiplier would need a home in Amethyst rather than a second `setLogicalToPhysicalScale` call from the editor.
 - The rig family: skeleton, skeletal mesh and animation workspaces sharing a rig preview. Postponed until the editor side of skeletons and animation is rethought.
 
 ## Related
