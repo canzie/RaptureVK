@@ -58,6 +58,51 @@ Hover states are live when a mock is opened in a browser, written the way they w
 
 Scripting, Static Mesh, Skeletal Mesh, Skeleton and Module Editor.
 
+## Order of work
+
+World Editor first, then the Content Browser. Within that, the steps that only change sizes, colours and states come before anything that changes what a panel is made of.
+
+### 1. Sizing and styling
+
+- [ ] Text: 13px labels and values, 12px secondary, 11px captions, bold section titles, secondary text in `text-3`, IBM Plex Mono for the command line, paths, ids and stats.
+- [ ] Controls: 4px radius, darker border that lightens on hover, slider fill `#383838`.
+- [ ] Single value fields (sliders, dropdowns) at a fixed width instead of filling the row.
+- [ ] Tabs: no accent, the front tab in the body colour, the others darker with dimmed text.
+- [ ] Panel tabs a constant 160px, close button clear of the label, ellipsis instead of clipping.
+- [ ] Menus and popups: border and 6px radius.
+- [ ] Radios without a border (input fill off, solid white on), checkboxes 16 to 18px with an accent check.
+- [ ] Workspace bar 36px tall, 16px icons.
+- [ ] Viewport image inside a 6px margin with a 3px radius.
+- [ ] Bottom bar: command field styled like other fields with even spacing around it.
+- [ ] Properties: slimmer search field.
+- [ ] Hover states on every interactive control.
+
+### 2. Structure
+
+- [ ] Island bars: workspace bar, hotbar, bottom bar (frame time, fps and VRAM in their own island), table headers.
+- [ ] Hotbar: Object Mode dropdown, Add as the primary button, Save World, play controls in their own group.
+- [ ] Play state: stop button, red viewport outline and note.
+- [ ] Workspace tabs: icons in the asset type colour, unsaved dot in place of the close button until hovered.
+- [ ] Viewport: transform and view mode in one floating toolbar, orientation gizmo, overlays chosen at creation.
+- [ ] Render menu grouped into View mode, Features and Probe debug.
+- [ ] Menu section labels with a line to the edge.
+- [ ] Outliner: search field, header row with full height separators, tree guides at 16px per level, zebra to the bottom.
+- [ ] Properties: labels indented under bold component headers, colour swatch with the hex beside it, reset to default slot on every row, XYZ fields with red, green and blue bars.
+
+### 3. Tooltips
+
+- [ ] Placed next to the cursor with a gap.
+- [ ] Text says what the control does and shows its shortcut, on every hotbar, toolbar and menu control.
+
+### 4. Content Browser
+
+- [ ] Toolbar as an island bar: Add, Import, back, forward, up, breadcrumb, search, Dock (floating only), settings.
+- [ ] Sidebar: Project and Recent as section labels, Recent directly below the tree.
+- [ ] Rooted at `content`, `blobs` and `.cache` hidden.
+- [ ] Cards 124 by 150 with the footer part of the card.
+- [ ] Floating placement 6px above the bottom bar, aligned with its button, the button showing it open.
+- [ ] Asset tooltip: preview, name, type chip, location, size on disk, id.
+
 ## Needed in Amethyst
 
 - A pattern primitive for canvas backgrounds: one quad, the dot, grid or cross pattern computed in `ui.fs.glsl` from position, spacing and offset, never one element per dot.
