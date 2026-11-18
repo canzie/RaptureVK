@@ -27,14 +27,6 @@ static constexpr float CAMERA_FIELD_OF_VIEW = 60.0f;
 static constexpr float CAMERA_NEAR_PLANE = 0.1f;
 static constexpr float CAMERA_FAR_PLANE = 100.0f;
 
-// TODO: make this a reserved asset, so opening a material never reaches the disk
-static Rapture::AssetRef s_defaultSkybox()
-{
-    static Rapture::AssetRef skybox =
-        Rapture::AssetManager::importAsset(Rapture::EnginePaths::assetDirectory() / "textures/cubemaps/default.cubemap");
-    return skybox;
-}
-
 MaterialEditorWorkspace::MaterialEditorWorkspace(const EditorContext &context, Rapture::AssetHandle handle)
     : PreviewWorkspace(context, handle, PREVIEW_SCENE_NAME)
 {
@@ -56,9 +48,10 @@ MaterialEditorWorkspace::MaterialEditorWorkspace(const EditorContext &context, R
     light->setIntensity(SUN_INTENSITY);
 
     Rapture::Environment *environment = scene->environment();
-    Rapture::AssetRef skybox = s_defaultSkybox();
-    if (environment != nullptr && skybox) {
-        environment->setSkybox(skybox->handle());
+    // TODO: make this a reserved asset, so opening a material never reaches the disk
+    m_skybox = Rapture::AssetManager::importAsset(Rapture::EnginePaths::assetDirectory() / "textures/cubemaps/default.cubemap");
+    if (environment != nullptr && m_skybox) {
+        environment->setSkybox(m_skybox->handle());
         environment->setSkyIntensity(SKY_INTENSITY);
     }
 

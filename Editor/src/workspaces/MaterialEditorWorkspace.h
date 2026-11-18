@@ -3,6 +3,7 @@
 
 #include "PreviewWorkspace.h"
 
+#include <rapture/assets/asset_manager/Asset.h>
 #include <rapture/core/events/EventSignal.h>
 
 class NodeEditorPanel;
@@ -36,6 +37,7 @@ class MaterialEditorWorkspace : public PreviewWorkspace {
     NodeEditorPanel *m_nodeEditor = nullptr;
     Rapture::StaticMesh3D *m_previewSphere = nullptr;
     Rapture::EventConnection m_materialSelectedConn;
+    Rapture::AssetRef m_skybox;
 };
 
 #endif // RAPTURE__MATERIAL_EDITOR_WORKSPACE_H
