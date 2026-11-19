@@ -31,12 +31,6 @@ class CompositePass : public RenderPass {
     SecondaryBufferInheritance getInheritance(const RenderPassContext &context) override;
     void beginRendering(const RenderPassContext &context, CommandBuffer *primaryCb) override;
 
-    /**
-     * @brief Set the exposure applied before tone mapping
-     * @param stops Exposure in f-stops
-     */
-    void setExposureStops(float stops) { m_exposureStops = stops; }
-
   protected:
     void updateAttachments(const RenderPassContext &context) override;
     void fillInputs(const RenderPassContext &context) override;
@@ -53,7 +47,6 @@ class CompositePass : public RenderPass {
     VkFormat m_colorFormat;
     float m_width;
     float m_height;
-    float m_exposureStops = 1.0f;
 };
 
 } // namespace Rapture

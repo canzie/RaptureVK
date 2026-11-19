@@ -6,6 +6,7 @@
 #include "gpu/descriptors/DescriptorManager.h"
 #include <rapture/assets/asset_manager/AssetManager.h>
 #include <rapture/gpu/textures/Texture.h>
+#include <rapture/scene/components/Components.h>
 
 #include <rapture/core/utils/Log.h>
 #include <rapture/core/utils/TracyProfiler.h>
@@ -13,6 +14,11 @@
 #include <thread>
 
 namespace Rapture {
+
+static bool s_formatStoresDisplayEncodedColor(VkFormat format)
+{
+    return format == VK_FORMAT_B8G8R8A8_UNORM || format == VK_FORMAT_R8G8B8A8_UNORM;
+}
 
 struct CompositePushConstants {
     uint32_t sceneColorHandle;
@@ -31,7 +37,7 @@ CompositePass::CompositePass(float width, float height, VkFormat colorFormat)
 
     ShaderImportConfig shaderConfig;
     shaderConfig.compileInfo.includePath = shaderPath / "glsl/";
-    if (!Texture_isSrgbFormat(m_colorFormat)) {
+    if (s_formatStoresDisplayEncodedColor(m_colorFormat)) {
         shaderConfig.compileInfo.macros.push_back({"COMPOSITE_APPLY_SRGB_ENCODE"});
     }
 
@@ -103,7 +109,8 @@ CommandBufferLease CompositePass::record(const RenderPassContext &context, const
 
     CompositePushConstants pushConstants;
     pushConstants.sceneColorHandle = context.targets->sceneColorHdr->getBindlessIndex();
-    pushConstants.exposureStops = m_exposureStops;
+    const CameraComponent *camera = context.camera.isValid() ? context.camera.tryRead<CameraComponent>() : nullptr;
+    pushConstants.exposureStops = camera != nullptr ? camera->exposureStops : 0.0f;
 
     vkCmdPushConstants(commandBuffer->getCommandBufferVk(), m_pipeline->getPipelineLayoutVk(), VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                        sizeof(CompositePushConstants), &pushConstants);

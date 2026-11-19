@@ -20,7 +20,7 @@ void main() {
     color *= exposure(pc.exposureStops);
     color = GT7ToneMapping(color);
 
-// Defined when the target is not an _SRGB format, so the hardware does not encode on write
+// Defined when the target is an 8-bit UNORM display format, which stores sRGB-encoded values as written
 #ifdef COMPOSITE_APPLY_SRGB_ENCODE
     color = LinearToSRGB(color);
 #endif
