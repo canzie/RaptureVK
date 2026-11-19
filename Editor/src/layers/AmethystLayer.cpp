@@ -306,6 +306,9 @@ void AmethystLayer::onUpdate(float dt)
     if (m_workspaceManager != nullptr) {
         m_workspaceManager->onUpdate(dt);
     }
+    if (m_bottomBar != nullptr) {
+        m_bottomBar->onUpdate();
+    }
 
     applyEditorCameraCursor();
 

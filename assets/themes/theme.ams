@@ -280,6 +280,27 @@ text-area {
     text-color: @text-1;
 }
 
+.bottom-bar-separator {
+    background-color: @bg-window;
+}
+
+.bottom-bar-stat-value {
+    background-transparency: 1.0;
+    font-family: "IBM Plex Mono";
+    font-size: 11px;
+    text-color: @text-2;
+    text-x-alignment: right;
+    text-y-alignment: center;
+}
+
+.bottom-bar-stat-unit {
+    background-transparency: 1.0;
+    font-family: "IBM Plex Mono";
+    font-size: 11px;
+    text-color: @text-3;
+    text-y-alignment: center;
+}
+
 .command-field {
     font-family: "IBM Plex Mono";
     font-size: 12px;
