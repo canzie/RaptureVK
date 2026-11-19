@@ -126,7 +126,7 @@ void ModuleEditorWorkspace::build()
                     [&](Amethyst::DockScope &b) { b.panel([&](Amethyst::TabBarScope &tb) { propertiesTabBar = &tb.component; }); });
             });
 
-    addPanel(std::make_unique<ViewportPanel>(m_context), viewportTabBar);
+    addPanel(std::make_unique<ViewportPanel>(m_context, ViewportOverlays{.toolbar = true, .orientationGizmo = true}), viewportTabBar);
     addPanel(std::make_unique<TextEditorPanel>(m_context, "Script"), viewportTabBar);
 
     if (m_sceneRoot != nullptr) {

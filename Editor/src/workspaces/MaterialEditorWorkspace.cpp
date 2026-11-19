@@ -82,7 +82,7 @@ void MaterialEditorWorkspace::build()
     // the panel loaded the material before this connection existed, so the sphere is dressed here
     showMaterialOnSphere(handle());
 
-    addPanel(std::make_unique<ViewportPanel>(m_context), previewTabBar);
+    addPanel(std::make_unique<ViewportPanel>(m_context, ViewportOverlays{.toolbar = true, .orientationGizmo = false}), previewTabBar);
 }
 
 void MaterialEditorWorkspace::buildHotbar()

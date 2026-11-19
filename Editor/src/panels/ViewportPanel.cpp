@@ -118,7 +118,8 @@ static void s_showGrownMenu(Amethyst::ContextMenu *menu, Amethyst::UIObject *anc
     menu->show(anchor);
 }
 
-ViewportPanel::ViewportPanel(const WorkspaceContext &context) : Panel("Viewport", context)
+ViewportPanel::ViewportPanel(const WorkspaceContext &context, ViewportOverlays overlays)
+    : Panel("Viewport", context), m_overlays(overlays)
 {
     m_icon = Icons::SVG_VIEWPORT;
 
@@ -188,10 +189,14 @@ void ViewportPanel::build(Amethyst::UIScope &scope)
     gizmoContainer->setBaseProperties({.interactable = false, .size = Amethyst::UDim2::fromScale(1.0f, 1.0f)});
     m_transformGizmo = std::make_unique<gizmo::TransformGizmo>(gizmoContainer);
 
-    setupOverlayButtons();
-    setupOrientationGizmo();
-    buildTransformMenu();
-    buildRenderMenu();
+    if (m_overlays.toolbar) {
+        setupOverlayButtons();
+        buildTransformMenu();
+        buildRenderMenu();
+    }
+    if (m_overlays.orientationGizmo) {
+        setupOrientationGizmo();
+    }
 
     if (m_selection != nullptr) {
         m_selectionChangedConn = m_selection->onChanged.connect([this](Rapture::ecs::EntityAccessor entity) {

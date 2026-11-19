@@ -43,10 +43,18 @@ enum ViewportLightingMode {
     VLM_COUNT
 };
 
+/**
+ * @brief Which overlays a viewport panel shows over its image
+ */
+struct ViewportOverlays {
+    bool toolbar;
+    bool orientationGizmo;
+};
+
 class ViewportPanel : public Panel {
   public:
     std::string_view typeName() const override { return "ViewportPanel"; }
-    explicit ViewportPanel(const WorkspaceContext &context);
+    ViewportPanel(const WorkspaceContext &context, ViewportOverlays overlays);
     ~ViewportPanel() override;
 
     void setViewportImage(Amethyst::AmTextureId imageId);
@@ -158,6 +166,7 @@ class ViewportPanel : public Panel {
     Amethyst::ContextMenu *m_transformMenu = nullptr;
     Amethyst::ContextMenu *m_renderMenu = nullptr;
     OrientationGizmo *m_orientationGizmo = nullptr;
+    ViewportOverlays m_overlays;
 
     Amethyst::RadioGroup m_gizmoOpGroup;
     Amethyst::RadioGroup m_gizmoSpaceGroup;

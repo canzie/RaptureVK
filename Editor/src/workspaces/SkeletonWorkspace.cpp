@@ -58,7 +58,7 @@ void SkeletonWorkspace::build()
                     [&](Amethyst::DockScope &b) { b.panel([&](Amethyst::TabBarScope &tb) { detailsTabBar = &tb.component; }); });
             });
 
-    auto viewport = std::make_unique<ViewportPanel>(m_context);
+    auto viewport = std::make_unique<ViewportPanel>(m_context, ViewportOverlays{.toolbar = true, .orientationGizmo = true});
     m_viewportPanel = viewport.get();
     addPanel(std::move(viewport), viewportTabBar);
 

@@ -101,7 +101,7 @@ void WorldEditorWorkspace::build()
                     [&](Amethyst::DockScope &b) { b.panel([&](Amethyst::TabBarScope &tb) { propertiesTabBar = &tb.component; }); });
             });
 
-    auto *viewportPanel = addPanel(std::make_unique<ViewportPanel>(m_context), viewportTabBar);
+    auto *viewportPanel = addPanel(std::make_unique<ViewportPanel>(m_context, ViewportOverlays{.toolbar = true, .orientationGizmo = true}), viewportTabBar);
     m_viewportClickedConn = viewportPanel->onImageClicked.connect([this]() {
         if (m_playLayer != nullptr && isPlaying()) {
             m_playLayer->takeControl();

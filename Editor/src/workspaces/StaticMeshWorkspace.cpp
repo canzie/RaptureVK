@@ -42,6 +42,6 @@ void StaticMeshWorkspace::build()
             [&](Amethyst::DockScope &l) { l.panel([&](Amethyst::TabBarScope &tb) { viewportTabBar = &tb.component; }); },
             [&](Amethyst::DockScope &r) { r.panel([&](Amethyst::TabBarScope &tb) { detailsTabBar = &tb.component; }); });
 
-    addPanel(std::make_unique<ViewportPanel>(m_context), viewportTabBar);
+    addPanel(std::make_unique<ViewportPanel>(m_context, ViewportOverlays{.toolbar = true, .orientationGizmo = true}), viewportTabBar);
     addPanel(std::make_unique<AssetDetailsPanel>(m_context, handle()), detailsTabBar);
 }
