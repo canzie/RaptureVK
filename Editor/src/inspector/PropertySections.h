@@ -14,6 +14,7 @@
 #include <glm/glm.hpp>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <typeindex>
@@ -180,6 +181,17 @@ class PropertySection {
     void rowDragFloat(Amethyst::TableScope &t, std::string_view label, double *value, double speed, double min, double max,
                       std::string format, const std::function<void(double)> &onChanged);
 
+    /**
+     * @brief Adds a row of drag fields side by side, one per value.
+     * @param t Scope of the table the row is added to.
+     * @param label Text shown in the row's label column.
+     * @param values The values the fields are bound to.
+     * @param wholeNumbers True to edit the values as whole numbers.
+     * @param onChanged Called after any value changes.
+     */
+    void rowFloatFields(Amethyst::TableScope &t, std::string_view label, std::span<float> values, bool wholeNumbers,
+                        const std::function<void(void)> &onChanged);
+
   public:
     /// Height of the bar a section is collapsed down to
     static constexpr float HEADER_HEIGHT = 28.0f;
@@ -235,10 +247,11 @@ class PropertySectionList {
      * ensured, so a base facet's section sits above the ones its derived facets add.
      * @tparam T A PropertySection-derived type.
      * @param present Whether the subject has the facet this section edits.
+     * @param args Passed to the section's constructor when it is created.
      * @return The live section, or nullptr when present is false.
      */
-    template <std::derived_from<PropertySection> T>
-    T *ensure(bool present)
+    template <std::derived_from<PropertySection> T, typename... Args>
+    T *ensure(bool present, Args &&...args)
     {
         std::type_index key(typeid(T));
         auto it = m_sections.find(key);
@@ -252,7 +265,7 @@ class PropertySectionList {
         }
 
         if (it == m_sections.end()) {
-            auto section = std::make_unique<T>();
+            auto section = std::make_unique<T>(std::forward<Args>(args)...);
             buildSection(*section);
             it = m_sections.emplace(key, std::move(section)).first;
         }

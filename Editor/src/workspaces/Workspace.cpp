@@ -217,6 +217,9 @@ void Workspace::resolveHotbarItem(const HotbarItem &item) const
         control.padding =
             Amethyst::UDim4{.right = Amethyst::UDim::fromOffset(HOTBAR_LABEL_MARGIN), .left = Amethyst::UDim::fromOffset(HOTBAR_LABEL_MARGIN)};
         break;
+    case HotbarItemKind::FITTED:
+        control.automaticSize = Amethyst::AutomaticSize::X;
+        break;
     case HotbarItemKind::ICON_LABELLED:
     case HotbarItemKind::SEPARATOR:
         break;
@@ -311,6 +314,22 @@ Amethyst::Frame *Workspace::addHotbarItem(Amethyst::vec2 size, const std::functi
     });
 
     const HotbarItem &item = m_hotbarItems.emplace_back(island, slot, size.x, HotbarItemKind::FIXED, size.y);
+    resolveHotbarItem(item);
+
+    return slot;
+}
+
+Amethyst::Frame *Workspace::addFittedHotbarItem(const std::function<void(Amethyst::UIScope &)> &build)
+{
+    Amethyst::Frame *island = addHotbarIsland();
+
+    Amethyst::Frame *slot = nullptr;
+    Amethyst::UIScope(*island).frame({.classes = {std::string(HOTBAR_ITEM_CLASS)}}, [&](Amethyst::FrameScope &f) {
+        slot = &f.component;
+        build(f);
+    });
+
+    const HotbarItem &item = m_hotbarItems.emplace_back(island, slot, 0.0f, HotbarItemKind::FITTED, 0.0f);
     resolveHotbarItem(item);
 
     return slot;

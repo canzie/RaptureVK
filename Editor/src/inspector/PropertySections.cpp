@@ -318,6 +318,41 @@ void PropertySection::rowDragFloat(Amethyst::TableScope &t, std::string_view lab
     });
 }
 
+void PropertySection::rowFloatFields(Amethyst::TableScope &t, std::string_view label, std::span<float> values, bool wholeNumbers,
+                                     const std::function<void(void)> &onChanged)
+{
+    t.row([&](Amethyst::TableRowScope &tr) {
+        tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
+        tr.cell([values, wholeNumbers, onChanged](Amethyst::UIScope &cell) {
+            const size_t count = values.size();
+            const float share = 1.0f / static_cast<float>(count);
+            for (size_t i = 0; i < count; ++i) {
+                // the outer edges take the control padding, the inner ones half the gutter each
+                const float leftInset = i == 0 ? CONTROL_HPAD : CONTROL_GAP * 0.5f;
+                const float rightInset = i + 1 == count ? CONTROL_HPAD : CONTROL_GAP * 0.5f;
+
+                cell.dragFloat(
+                    {
+                        .classes = {"property-input-field"},
+                        .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
+                                 .position = Amethyst::UDim2(static_cast<float>(i) * share, leftInset, 0.5f, 0.0f),
+                                 .size = Amethyst::UDim2(share, -(leftInset + rightInset), 1.0f, -2.0f * CONTROL_VPAD)},
+                        .format = wholeNumbers ? "%.0f" : "%.3f",
+                        .speed = wholeNumbers ? 1.0 : 0.01,
+                    },
+                    [&values, i, onChanged](Amethyst::DragFloatScope &d) {
+                        d.component.valueF = &values[i];
+                        d.component.onValueChanged = [onChanged](double) {
+                            if (onChanged) {
+                                onChanged();
+                            }
+                        };
+                    });
+            }
+        });
+    });
+}
+
 PropertySectionList::PropertySectionList(Amethyst::Frame &parent, Amethyst::ScrollingFrameProperties props)
 {
     Amethyst::UIScope(parent).scrollingFrame(std::move(props), [this](Amethyst::ScrollingFrameScope &sf) {

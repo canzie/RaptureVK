@@ -1,9 +1,11 @@
 #include "MaterialEditorWorkspace.h"
 
 #include "Icons.h"
+#include "panels/MaterialDetailsPanel.h"
 #include "panels/NodeEditorPanel.h"
 #include "panels/ViewportPanel.h"
 #include "ui/ControlTooltip.h"
+#include "ui/controls/IconLabelButton.h"
 
 #include <rapture/assets/asset_manager/AssetManager.h>
 #include <rapture/assets/asset_manager/ReservedAssets.h>
@@ -15,7 +17,13 @@
 #include <rapture/scene/instances/SceneObject.h>
 #include <rapture/scene/instances/StaticMesh3D.h>
 
+#include <components/extensions/ui_list_layout.h>
+#include <components/text_label.h>
+#include <components/ui_scope.h>
+
 #include <array>
+#include <format>
+#include <string>
 
 enum MaterialEditorTooltip {
     MATERIAL_EDITOR_TOOLTIP_COMPILE,
@@ -28,7 +36,17 @@ static constexpr std::array<ControlTooltip, MATERIAL_EDITOR_TOOLTIP_COUNT> MATER
 
 static constexpr std::string_view PREVIEW_SCENE_NAME = "MaterialPreview";
 
-static constexpr float PREVIEW_SPLIT = 0.7f;
+static constexpr float SIDE_COLUMN_SPLIT = 0.28f;
+static constexpr float PREVIEW_SPLIT = 0.6f;
+
+static constexpr std::string_view COMPILE_BUTTON_CLASS = "hotbar-primary-button";
+static constexpr float COMPILE_STATUS_DOT_SIZE = 8.0f;
+static constexpr float COMPILE_STATUS_GAP = 8.0f;
+static constexpr std::array<std::string_view, MaterialEditorWorkspace::COMPILE_STATUS_COUNT> COMPILE_STATUS_DOT_CLASSES = {
+    "compile-status-compiled",
+    "compile-status-changed",
+    "compile-status-failed",
+};
 
 static constexpr float SKY_INTENSITY = 1.0f;
 static constexpr float SUN_INTENSITY = 3.0f;
@@ -79,32 +97,94 @@ std::string_view MaterialEditorWorkspace::tabIcon() const
 
 void MaterialEditorWorkspace::build()
 {
-    Amethyst::TabBar *canvasTabBar = nullptr;
     Amethyst::TabBar *previewTabBar = nullptr;
+    Amethyst::TabBar *detailsTabBar = nullptr;
+    Amethyst::TabBar *graphTabBar = nullptr;
     Amethyst::DockScope(*m_contentDock)
         .split(
-            Amethyst::SplitAxis::VERTICAL, PREVIEW_SPLIT,
-            [&](Amethyst::DockScope &l) { l.panel([&](Amethyst::TabBarScope &tb) { canvasTabBar = &tb.component; }); },
-            [&](Amethyst::DockScope &r) { r.panel([&](Amethyst::TabBarScope &tb) { previewTabBar = &tb.component; }); });
-
-    m_nodeEditor = addPanel(std::make_unique<NodeEditorPanel>(m_context, handle()), canvasTabBar);
-    m_materialSelectedConn =
-        m_nodeEditor->onMaterialSelectionChanged().connect([this](Rapture::AssetHandle shown) { showMaterialOnSphere(shown); });
-
-    // the panel loaded the material before this connection existed, so the sphere is dressed here
-    showMaterialOnSphere(handle());
+            Amethyst::SplitAxis::VERTICAL, SIDE_COLUMN_SPLIT,
+            [&](Amethyst::DockScope &side) {
+                side.split(
+                    Amethyst::SplitAxis::HORIZONTAL, PREVIEW_SPLIT,
+                    [&](Amethyst::DockScope &top) { top.panel([&](Amethyst::TabBarScope &tb) { previewTabBar = &tb.component; }); },
+                    [&](Amethyst::DockScope &bottom) { bottom.panel([&](Amethyst::TabBarScope &tb) { detailsTabBar = &tb.component; }); });
+            },
+            [&](Amethyst::DockScope &main) { main.panel([&](Amethyst::TabBarScope &tb) { graphTabBar = &tb.component; }); });
 
     addPanel(std::make_unique<ViewportPanel>(m_context, ViewportOverlays{.toolbar = true, .orientationGizmo = false}), previewTabBar);
+
+    m_nodeEditor = addPanel(std::make_unique<NodeEditorPanel>(m_context, handle()), graphTabBar);
+    m_materialSelectedConn =
+        m_nodeEditor->onMaterialSelectionChanged().connect([this](Rapture::AssetHandle shown) { showMaterialOnSphere(shown); });
+    m_compiledConn = m_nodeEditor->onCompiled().connect(
+        [this](bool succeeded, size_t nodeCount) {
+            (void)nodeCount;
+            showCompileStatus(succeeded ? COMPILE_STATUS_COMPILED : COMPILE_STATUS_FAILED);
+        });
+    m_nodeEditedConn = m_nodeEditor->onNodeEdited().connect([this](uint32_t nodeId) {
+        (void)nodeId;
+        showCompileStatus(COMPILE_STATUS_CHANGED);
+    });
+    m_nodeValuesConn = m_nodeEditor->onNodeValuesChanged().connect([this](uint32_t nodeId) {
+        (void)nodeId;
+        showCompileStatus(COMPILE_STATUS_CHANGED);
+    });
+
+    addPanel(std::make_unique<MaterialDetailsPanel>(m_context, handle(), *m_nodeEditor), detailsTabBar);
+
+    // the panel loaded the material before these connections existed, so the sphere and status are set here
+    showMaterialOnSphere(handle());
+    showCompileStatus(COMPILE_STATUS_COMPILED);
 }
 
 void MaterialEditorWorkspace::buildHotbar()
 {
-    Amethyst::TextButton *compileButton = addHotbarButton("Compile", [this]() {
+    IconLabelButton *compileButton = addHotbarButton("Compile", Icons::SVG_BUILD, COMPILE_BUTTON_CLASS, [this]() {
         if (m_nodeEditor != nullptr) {
             m_nodeEditor->compileGraph();
         }
     });
     ControlTooltip_attach(*compileButton, MATERIAL_EDITOR_TOOLTIPS[MATERIAL_EDITOR_TOOLTIP_COMPILE], m_editor);
+    addHotbarSeparator();
+
+    addFittedHotbarItem([this](Amethyst::UIScope &slot) {
+        auto *row = slot.get().as<Amethyst::Frame>()->addExtension<Amethyst::UIListLayout>();
+        row->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
+        row->verticalAlignment = Amethyst::VerticalAlignment::ALIGN_CENTER_V;
+        row->innerPadding = Amethyst::UDim::fromOffset(COMPILE_STATUS_GAP);
+
+        slot.frame(
+            {
+                .base = {.layoutOrder = 0, .size = Amethyst::UDim2::fromOffset(COMPILE_STATUS_DOT_SIZE, COMPILE_STATUS_DOT_SIZE)},
+            },
+            [this](Amethyst::FrameScope &dot) { m_compileStatusDot = &dot.component; });
+        slot.textLabel(
+            {
+                .classes = {"compile-status-note"},
+                .base = {.automaticSize = Amethyst::AutomaticSize::X, .layoutOrder = 1, .size = Amethyst::UDim2::fromScale(0.0f, 1.0f)},
+            },
+            [this](Amethyst::TextLabelScope &label) { m_compileStatusLabel = &label.component; });
+        m_compileStatusDot->ignore(Amethyst::INTERACTION_CATEGORY_ALL);
+        m_compileStatusLabel->ignore(Amethyst::INTERACTION_CATEGORY_ALL);
+    });
+}
+
+void MaterialEditorWorkspace::showCompileStatus(CompileStatus status)
+{
+    m_compileStatusDot->setClasses({std::string(COMPILE_STATUS_DOT_CLASSES[status])});
+    switch (status) {
+    case COMPILE_STATUS_COMPILED:
+        m_compileStatusLabel->setText(std::format("Compiled, {} nodes", m_nodeEditor->getNodeCount()));
+        break;
+    case COMPILE_STATUS_CHANGED:
+        m_compileStatusLabel->setText("Changed since the last compile");
+        break;
+    case COMPILE_STATUS_FAILED:
+        m_compileStatusLabel->setText("Compile failed, see the log");
+        break;
+    case COMPILE_STATUS_COUNT:
+        break;
+    }
 }
 
 void MaterialEditorWorkspace::showMaterialOnSphere(Rapture::AssetHandle handle)

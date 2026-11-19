@@ -234,6 +234,13 @@ class Workspace {
      */
     Amethyst::Frame *addHotbarItem(Amethyst::vec2 size, const std::function<void(Amethyst::UIScope &)> &build);
 
+    /**
+     * @brief Adds an item the hotbar has no ready made shape for, as wide as what it holds
+     * @param build Fills the item's frame, called once
+     * @return The item's frame
+     */
+    Amethyst::Frame *addFittedHotbarItem(const std::function<void(Amethyst::UIScope &)> &build);
+
     const EditorConfig &config() const;
 
     /**
@@ -243,6 +250,7 @@ class Workspace {
         FIXED,         ///< as wide as it was asked to be
         LABELLED,      ///< as wide as the text it holds
         ICON_LABELLED, ///< as wide as the icon and text it holds
+        FITTED,        ///< as wide as the children it holds
         SEPARATOR,     ///< a full height line between islands
     };
 

@@ -25,6 +25,22 @@ class SearchField : public Amethyst::Frame {
      */
     void setOnTextChanged(std::function<void(const std::string &)> callback);
 
+    /**
+     * @brief Sets what runs when Enter is pressed in the field
+     * @param callback Called on Enter
+     */
+    void setOnEnterPressed(std::function<void()> callback);
+
+    /**
+     * @brief Empties the field
+     */
+    void clear(void);
+
+    /**
+     * @brief Gives the field keyboard focus, as if it had been clicked
+     */
+    void focus(void);
+
   private:
     Amethyst::TextInput *m_input = nullptr;
 };

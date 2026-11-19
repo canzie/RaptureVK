@@ -46,3 +46,18 @@ void SearchField::setOnTextChanged(std::function<void(const std::string &)> call
 {
     m_input->onTextChanged = std::move(callback);
 }
+
+void SearchField::setOnEnterPressed(std::function<void()> callback)
+{
+    m_input->onEnterPressed = std::move(callback);
+}
+
+void SearchField::clear()
+{
+    m_input->setText({});
+}
+
+void SearchField::focus()
+{
+    m_input->focus();
+}

@@ -551,8 +551,211 @@ text-area {
     image-color: @type-folder;
 }
 
-.graph-node-body {
+// the material graph: its canvas, nodes, wires and the overlays floating over it
+.graph-canvas {
+    background-color: @bg-canvas;
+    corner-radius: 3px;
+}
+
+.graph-canvas-dots {
+    background-color: @bg-header;
+    corner-radius: 1px;
+    background-repeat: repeat;
+    background-size: 2px 2px;
+    background-step: 24px;
+}
+
+.graph-node {
+    background-color: @bg-panel;
+    border-pixel-size: 1px;
+    border-color: @border-4;
+    border-mode: outline;
+    corner-radius: 6px;
+}
+
+.graph-node:hover {
+    border-color: @input-border-hover;
+}
+
+.graph-node:active {
+    border-pixel-size: 2px;
+    border-color: @accent;
+}
+
+.graph-node-header {
+    corner-radius: 6px 6px 0px 0px;
+}
+
+.graph-node-icon {
+    background-transparency: 1.0;
+    image-color: @text-2;
+}
+
+.graph-node-title {
+    background-transparency: 1.0;
+    font-family: "Roboto Bold";
+    font-size: 12px;
     text-color: @text-1;
+    text-y-alignment: center;
+}
+
+.graph-node-pin-label {
+    background-transparency: 1.0;
+    font-size: 12px;
+    text-color: @text-2;
+    text-y-alignment: center;
+}
+
+.graph-node-axis-label {
+    background-transparency: 1.0;
+    font-size: 11px;
+    text-color: @text-3;
+    text-y-alignment: center;
+}
+
+.graph-node-field {
+    font-size: 11px;
+    text-x-alignment: center;
+}
+
+.graph-node-preview {
+    background-color: @bg-input;
+    corner-radius: 4px;
+    border-pixel-size: 1px;
+    border-color: @border-1;
+}
+
+.graph-pin {
+    border-pixel-size: 2px;
+}
+
+.graph-wire {
+    curve-thickness: 2px;
+}
+
+.graph-toolbar {
+    background-color: @bg-input;
+    background-transparency: 0.22;
+    corner-radius: 6px;
+}
+
+.graph-toolbar-button {
+    background-color: @white;
+    background-transparency: 1.0;
+    image-color: @text-2;
+    corner-radius: 4px;
+}
+
+.graph-toolbar-button:hover {
+    background-transparency: 0.9;
+    image-color: @text-1;
+}
+
+.graph-crumb-icon {
+    background-transparency: 1.0;
+}
+
+.graph-crumb {
+    background-transparency: 1.0;
+    font-size: 12px;
+    text-color: @text-2;
+    text-y-alignment: center;
+}
+
+.graph-crumb-current {
+    background-transparency: 1.0;
+    font-size: 12px;
+    text-color: @text-1;
+    text-y-alignment: center;
+}
+
+.graph-crumb-separator {
+    background-transparency: 1.0;
+    image-color: @text-4;
+}
+
+.graph-add-menu {
+    background-color: @bg-header;
+    border-pixel-size: 1px;
+    border-color: @border-4;
+    corner-radius: 6px;
+}
+
+.graph-add-results {
+    background-transparency: 1.0;
+    scrollbar-color: @bg-header;
+    scrollbar-thumb-color: @bg-contrast;
+}
+
+.graph-add-section {
+    background-transparency: 1.0;
+}
+
+.graph-add-section-title {
+    background-transparency: 1.0;
+    font-size: 11px;
+    text-color: @text-3;
+    text-y-alignment: center;
+}
+
+.graph-add-section-line {
+    background-color: @border-4;
+}
+
+.graph-add-entry {
+    background-color: @hover;
+    background-transparency: 1.0;
+    corner-radius: 4px;
+}
+
+.graph-add-entry:hover {
+    background-transparency: 0.0;
+}
+
+.graph-add-entry:active {
+    background-color: @selection;
+    background-transparency: 0.0;
+}
+
+.graph-add-swatch {
+    corner-radius: 2px;
+}
+
+.graph-add-name {
+    background-transparency: 1.0;
+    font-size: 13px;
+    text-color: @text-1;
+    text-y-alignment: center;
+}
+
+.graph-add-description {
+    background-transparency: 1.0;
+    font-size: 11px;
+    text-color: @text-3;
+    text-y-alignment: center;
+}
+
+.compile-status-note {
+    background-transparency: 1.0;
+    font-size: 12px;
+    text-color: @text-3;
+    text-x-alignment: left;
+    text-y-alignment: center;
+}
+
+.compile-status-compiled {
+    background-color: @status-success;
+    corner-radius: 4px;
+}
+
+.compile-status-changed {
+    background-color: @text-4;
+    corner-radius: 4px;
+}
+
+.compile-status-failed {
+    background-color: @status-error;
+    corner-radius: 4px;
 }
 
 .viewport-context-menu {
