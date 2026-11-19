@@ -4,7 +4,8 @@
 
 #include <components/ui_scope.h>
 
-static const Amethyst::Color4 COL_TAB_ICON{0.7f, 0.7f, 0.7f, 1.0f};
+#include <optional>
+#include <utility>
 
 static constexpr float TAB_CLOSE_BUTTON_CLEARANCE = 26.0f;
 
@@ -26,13 +27,13 @@ static TabLabelSizes s_takeTabLabelSizes(const EditorConfig &config)
     };
 }
 
-static void s_buildTabLabel(const std::string &label, const std::string &iconSvg, Amethyst::Color4 iconColor,
+static void s_buildTabLabel(const std::string &label, const std::string &iconSvg, std::optional<Amethyst::Color4> iconColor,
                             const TabLabelSizes &sizes, Amethyst::FrameScope &scope)
 {
     float textOffset = sizes.padding;
 
     if (!iconSvg.empty()) {
-        scope.imageLabel({
+        Amethyst::ImageLabelProperties icon = {
             .base =
                 {
                     .anchorPoint = Amethyst::vec2(0.0f, 0.5f),
@@ -40,9 +41,13 @@ static void s_buildTabLabel(const std::string &label, const std::string &iconSvg
                     .size = Amethyst::UDim2::fromOffset(sizes.iconSize, sizes.iconSize),
                 },
             .style = {.backgroundTransparency = 1.0f},
-            .image = {.imageColor = iconColor},
             .svg = iconSvg,
-        });
+        };
+        if (iconColor.has_value()) {
+            icon.classes = {"tab-icon-tinted"};
+            icon.image.imageColor = *iconColor;
+        }
+        scope.imageLabel(std::move(icon));
         textOffset = sizes.padding + sizes.iconSize + sizes.iconGap;
     }
 
@@ -65,7 +70,10 @@ static void s_buildTabLabel(const std::string &label, const std::string &iconSvg
 
 std::function<void(Amethyst::Frame &)> iconTabLabel(std::string_view label, std::string_view iconSvg, const EditorConfig &config)
 {
-    return iconTabLabel(label, iconSvg, COL_TAB_ICON, config);
+    return [label = std::string(label), iconSvg = std::string(iconSvg), sizes = s_takeTabLabelSizes(config)](Amethyst::Frame &frame) {
+        Amethyst::FrameScope scope(frame);
+        s_buildTabLabel(label, iconSvg, std::nullopt, sizes, scope);
+    };
 }
 
 std::function<void(Amethyst::Frame &)> iconTabLabel(std::string_view label, std::string_view iconSvg, Amethyst::Color4 iconColor,
@@ -83,6 +91,6 @@ std::function<void(Amethyst::FrameScope &)> iconTabLabelScope(std::string_view l
 {
     return [label = std::string(label), iconSvg = std::string(iconSvg),
             sizes = s_takeTabLabelSizes(config)](Amethyst::FrameScope &scope) {
-        s_buildTabLabel(label, iconSvg, COL_TAB_ICON, sizes, scope);
+        s_buildTabLabel(label, iconSvg, std::nullopt, sizes, scope);
     };
 }

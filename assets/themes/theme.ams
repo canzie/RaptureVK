@@ -158,18 +158,21 @@ text-area {
 }
 
 .panel-tab#tab {
+    image-color: @text-3;
     text-color: @text-3;
     font-size: 13px;
     background-transparency: 1.0;
 }
 
 .panel-tab#tab:hover {
+    image-color: @text-2;
     background-color: @bg-frame;
     text-color: @text-2;
     background-transparency: 0.0;
 }
 
 .panel-tab#tab:active {
+    image-color: @text-1;
     background-color: @bg-panel;
     text-color: @text-1;
     background-transparency: 0.0;
@@ -194,23 +197,35 @@ text-area {
 }
 
 .workspace-tab#tab {
+    image-color: @text-3;
     background-color: @bg-frame;
     text-color: @text-3;
     font-size: 13px;
     background-transparency: 0.0;
 }
 .workspace-tab#tab:hover {
+    image-color: @text-2;
     background-color: @tab-hover;
     text-color: @text-2;
     background-transparency: 0.0;
 }
 .workspace-tab#tab:active {
+    image-color: @text-1;
     background-color: @bg-panel;
     text-color: @text-1;
     background-transparency: 0.0;
 }
 
 
+
+.tab-icon-tinted {
+    image-transparency: 0.4;
+}
+
+.tab-icon-tinted:hover,
+.tab-icon-tinted:active {
+    image-transparency: 0.0;
+}
 
 .workspace-hotbar {
     background-color: @bg-panel;
