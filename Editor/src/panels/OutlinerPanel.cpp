@@ -3,6 +3,7 @@
 #include "Icons.h"
 #include "panels/AddSceneObjectMenu.h"
 #include "ui/AssetVisuals.h"
+#include "ui/controls/SearchField.h"
 #include "ui/menus/ContextMenuItems.h"
 #include <rapture/assets/asset_manager/AssetManager.h>
 #include <rapture/core/ecs/entity_accessor.h>
@@ -16,6 +17,8 @@
 #include <components/text_input.h>
 #include <components/text_label.h>
 #include <components/ui_scope.h>
+#include <algorithm>
+#include <cctype>
 #include <memory>
 #include <unordered_set>
 
@@ -24,6 +27,15 @@
 static constexpr float ROW_ICON_SIZE = 13.0f;
 static constexpr float ROW_ICON_PAD = 2.0f;
 static constexpr float ROW_ICON_GAP = 5.0f;
+static constexpr float LABEL_TEXT_LEFT = 2.0f;
+static constexpr float DISCLOSURE_TRIANGLE_SIZE = 24.0f;
+static constexpr float DISCLOSURE_TRIANGLE_PADDING = 4.0f;
+static constexpr float NAME_TEXT_LEFT =
+    DISCLOSURE_TRIANGLE_SIZE + DISCLOSURE_TRIANGLE_PADDING * 2.0f + ROW_ICON_PAD + ROW_ICON_SIZE + ROW_ICON_GAP;
+static constexpr float SEARCH_FIELD_MARGIN = 8.0f;
+static constexpr float SEARCH_FIELD_HEIGHT = 26.0f;
+static constexpr float SEARCH_TREE_GAP = 6.0f;
+static constexpr float TREE_TOP = SEARCH_FIELD_MARGIN + SEARCH_FIELD_HEIGHT + SEARCH_TREE_GAP;
 
 static bool s_showsInOutliner(const Rapture::SceneObject *object)
 {
@@ -31,10 +43,30 @@ static bool s_showsInOutliner(const Rapture::SceneObject *object)
     return visibility == nullptr || visibility->inOutliner;
 }
 
+static std::string s_toLowercase(std::string_view text)
+{
+    std::string lowered(text);
+    std::ranges::transform(lowered, lowered.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return lowered;
+}
+
+static bool s_subtreeMatchesFilter(const Rapture::SceneObject *object, std::string_view loweredFilter)
+{
+    if (loweredFilter.empty() || s_toLowercase(object->name()).find(loweredFilter) != std::string::npos) {
+        return true;
+    }
+    for (const auto &child : object->children()) {
+        if (s_showsInOutliner(child.get()) && s_subtreeMatchesFilter(child.get(), loweredFilter)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static void s_nameLabel(Amethyst::UIScope &s, const std::string &text, std::string_view className,
                         const SceneObjectIcon *icon = nullptr)
 {
-    float textLeft = 2.0f;
+    float textLeft = LABEL_TEXT_LEFT;
 
     if (icon != nullptr) {
         s.imageLabel({
@@ -68,43 +100,36 @@ OutlinerPanel::OutlinerPanel(const WorkspaceContext &context) : Panel("Outliner"
 
 void OutlinerPanel::build(Amethyst::UIScope &scope)
 {
-    scope
-        .frame({
-            .base = {.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
-            .style = {.backgroundTransparency = 1.0f},
-        })
-        .scrollingFrame(
-            {
-                .classes = {"panel"},
-                .base =
-                    {
-                        .clipsDescendants = true,
-                        .size = Amethyst::UDim2::fromScale(1.0f, 1.0f),
-                    },
-                .scroll =
-                    {
-                        .scrollAxis = Amethyst::ScrollAxis::Y,
-                        .scrollBarVisibility = Amethyst::ScrollBarVisibility::AUTO,
-                        .automaticCanvasSize = Amethyst::AutomaticSize::Y,
-                    },
-            },
-            [this](Amethyst::ScrollingFrameScope &sf) {
-                m_scrollingFrame = &sf.component;
-                sf.treeView(
-                    {
-                        .base = {.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
-                        .treeView = {.cellPadding = Amethyst::UDim4{{0.0f, 0.0f}},
-                                     .showColumnSeparators = false,
-                                     .disclosureTriangleSize = 24.0f,
-                                     .showHeader = true},
-                    },
-                    [this](Amethyst::TreeViewScope &tv) {
-                        m_treeView = &tv.component;
-                        tv.column({.header = "Name", .weight = 3.0f, .labelPadding = Amethyst::UDim4{.left = {0.0f, 0.0f}}});
-                        tv.column("Type", 1.0f);
-                        tv.column("", 0.5f);
-                    });
-            });
+    SearchField *searchField = scope.get().add<SearchField>("Search");
+    searchField->setBaseProperties({
+        .position = Amethyst::UDim2::fromOffset(SEARCH_FIELD_MARGIN, SEARCH_FIELD_MARGIN),
+        .size = Amethyst::UDim2(1.0f, -2.0f * SEARCH_FIELD_MARGIN, 0.0f, SEARCH_FIELD_HEIGHT),
+    });
+    searchField->setOnTextChanged([this](const std::string &text) {
+        m_loweredFilter = s_toLowercase(text);
+        m_pendingRefresh = true;
+    });
+
+    scope.treeView(
+        {
+            .base =
+                {
+                    .position = Amethyst::UDim2::fromOffset(0.0f, TREE_TOP),
+                    .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -TREE_TOP),
+                },
+            .treeView = {.cellPadding = Amethyst::UDim4{{0.0f, 0.0f}},
+                         .showColumnSeparators = false,
+                         .disclosureTriangleSize = DISCLOSURE_TRIANGLE_SIZE,
+                         .disclosureTrianglePadding = DISCLOSURE_TRIANGLE_PADDING,
+                         .fillRows = true,
+                         .showHeader = true},
+        },
+        [this](Amethyst::TreeViewScope &tv) {
+            m_treeView = &tv.component;
+            tv.column({.header = "Name", .weight = 3.0f, .labelPadding = Amethyst::UDim4{.left = {0.0f, NAME_TEXT_LEFT}}});
+            tv.column({.header = "Type", .weight = 1.0f, .labelPadding = Amethyst::UDim4{.left = {0.0f, LABEL_TEXT_LEFT}}});
+            tv.column("", 0.5f);
+        });
 
     m_treeView->onRowClicked = [this](uint32_t row) { onRowClicked(row); };
     m_treeView->onRowRightClicked = [this](uint32_t row, Amethyst::vec2 pos) { onRowRightClicked(row, pos); };
@@ -118,7 +143,6 @@ void OutlinerPanel::build(Amethyst::UIScope &scope)
 
 void OutlinerPanel::onRootDestroyed()
 {
-    m_scrollingFrame = nullptr;
     m_treeView = nullptr;
     m_contextMenu = nullptr;
     m_renameInput = nullptr;
@@ -178,13 +202,17 @@ void OutlinerPanel::refresh()
         return;
     }
 
-    // a rebuilt row starts expanded, so what the user collapsed is carried across by instance
-    std::unordered_set<const Rapture::SceneObject *> collapsed;
-    for (uint32_t row = 0; row < m_rowInstances.size(); row++) {
-        if (!m_treeView->isExpanded(row)) {
-            collapsed.insert(m_rowInstances[row]);
+    // a rebuilt row starts expanded, so what the user collapsed is carried across by instance; a filtered
+    // tree shows every match expanded, so it leaves the collapsed set from before the search alone
+    if (!m_builtWithFilter) {
+        m_collapsedInstances.clear();
+        for (uint32_t row = 0; row < m_rowInstances.size(); row++) {
+            if (!m_treeView->isExpanded(row)) {
+                m_collapsedInstances.insert(m_rowInstances[row]);
+            }
         }
     }
+    m_builtWithFilter = !m_loweredFilter.empty();
 
     m_renameInput = nullptr;
     m_renamingInstance = nullptr;
@@ -201,14 +229,17 @@ void OutlinerPanel::refresh()
 
     for (const auto &child : sceneRoot->children()) {
         Rapture::SceneObject *instance = child.get();
-        if (!s_showsInOutliner(instance)) {
+        if (!s_showsInOutliner(instance) || !s_subtreeMatchesFilter(instance, m_loweredFilter)) {
             continue;
         }
         tvScope.row([this, instance](Amethyst::TreeRowScope &row) { buildInstanceTree(instance, row); });
     }
 
+    if (m_builtWithFilter) {
+        return;
+    }
     for (uint32_t row = 0; row < m_rowInstances.size(); row++) {
-        if (collapsed.contains(m_rowInstances[row])) {
+        if (m_collapsedInstances.contains(m_rowInstances[row])) {
             m_treeView->collapse(row);
         }
     }
@@ -239,7 +270,7 @@ void OutlinerPanel::buildInstanceTree(Rapture::SceneObject *instance, Amethyst::
 
     for (const auto &child : instance->children()) {
         Rapture::SceneObject *childInstance = child.get();
-        if (!s_showsInOutliner(childInstance)) {
+        if (!s_showsInOutliner(childInstance) || !s_subtreeMatchesFilter(childInstance, m_loweredFilter)) {
             continue;
         }
         rowScope.row([this, childInstance](Amethyst::TreeRowScope &childRow) { buildInstanceTree(childInstance, childRow); });

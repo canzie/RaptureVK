@@ -12,6 +12,7 @@
 #include <rapture/scene/Scene.h>
 #include <rapture/scene/instances/Instance.h>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 class OutlinerPanel : public Panel {
@@ -54,7 +55,6 @@ class OutlinerPanel : public Panel {
     Rapture::SceneObject *instanceForRow(uint32_t row) const;
 
   private:
-    Amethyst::ScrollingFrame *m_scrollingFrame = nullptr;
     Amethyst::TreeView *m_treeView = nullptr;
     Amethyst::ContextMenu *m_contextMenu = nullptr;
     Amethyst::TextInput *m_renameInput = nullptr;
@@ -66,6 +66,9 @@ class OutlinerPanel : public Panel {
      * @brief Maps a TreeView logical row index to its instance, filled in DFS build order during refresh().
      */
     std::vector<Rapture::SceneObject *> m_rowInstances;
+    std::unordered_set<const Rapture::SceneObject *> m_collapsedInstances;
+    std::string m_loweredFilter;
+    bool m_builtWithFilter = false;
 
     Rapture::SceneObject *m_renamingInstance = nullptr;
     uint32_t m_renameRow = 0;

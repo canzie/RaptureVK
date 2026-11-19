@@ -101,6 +101,19 @@ tree-view {
     border-pixel-size: 0px;
     row-background-color: @bg-panel;
     row-alternate-color: @bg-frame;
+    row-hover-color: @row-hover;
+    row-selected-color: @selection;
+    header-height: 24px;
+    header-color: @bg-frame;
+    separator-width: 2px;
+    separator-color: @bg-window;
+}
+
+tree-view#header {
+    font-size: 12px;
+    text-color: @text-3;
+    border-pixel-size: 1px;
+    border-color: @bg-window;
 }
 
 scrolling-frame {
@@ -298,6 +311,31 @@ text-area {
     font-family: "IBM Plex Mono";
     font-size: 11px;
     text-color: @text-3;
+    text-y-alignment: center;
+}
+
+.search-field {
+    background-color: @bg-input;
+    corner-radius: 4px;
+    border-pixel-size: 1px;
+    border-color: @input-border;
+}
+
+.search-field:hover {
+    border-color: @input-border-hover;
+}
+
+.search-field-icon {
+    background-transparency: 1.0;
+    image-color: @text-3;
+}
+
+.search-field-input {
+    background-transparency: 1.0;
+    border-pixel-size: 0px;
+    font-size: 13px;
+    text-color: @text-1;
+    placeholder-color: @text-4;
     text-y-alignment: center;
 }
 
