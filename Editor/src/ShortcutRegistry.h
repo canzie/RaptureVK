@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <functional>
 #include <glm/glm.hpp>
+#include <string>
 #include <vector>
 
 enum EditorCommand {
@@ -38,6 +39,13 @@ struct Shortcut {
 
     bool operator==(const Shortcut &) const = default;
 };
+
+/**
+ * @brief The keys of a shortcut as they are written for people, such as Ctrl+S
+ * @param shortcut The shortcut to write out
+ * @return The modifiers then the key joined by +, empty for a shortcut that runs on nothing
+ */
+std::string Shortcut_toString(const Shortcut &shortcut);
 
 /**
  * @brief The shortcuts currently standing for the editor's commands.

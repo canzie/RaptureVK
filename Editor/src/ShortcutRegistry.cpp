@@ -3,9 +3,80 @@
 #include <rapture/core/utils/Log.h>
 #include <rapture/core/utils/rp_assert.h>
 
+#include <string>
+
 static bool s_isModifierDown(const Rapture::Input &input, Rapture::KeyCode left, Rapture::KeyCode right)
 {
     return input.isKeyPressed(left) || input.isKeyPressed(right);
+}
+
+static std::string s_keyName(Rapture::KeyCode key)
+{
+    const int code = static_cast<int>(key);
+    if (code >= Rapture::KEY_F1 && code <= Rapture::KEY_F12) {
+        return "F" + std::to_string(code - Rapture::KEY_F1 + 1);
+    }
+
+    switch (key) {
+    case Rapture::KEY_SPACE:
+        return "Space";
+    case Rapture::KEY_ESCAPE:
+        return "Esc";
+    case Rapture::KEY_ENTER:
+        return "Enter";
+    case Rapture::KEY_TAB:
+        return "Tab";
+    case Rapture::KEY_BACKSPACE:
+        return "Backspace";
+    case Rapture::KEY_INSERT:
+        return "Insert";
+    case Rapture::KEY_DELETE:
+        return "Delete";
+    case Rapture::KEY_RIGHT:
+        return "Right";
+    case Rapture::KEY_LEFT:
+        return "Left";
+    case Rapture::KEY_DOWN:
+        return "Down";
+    case Rapture::KEY_UP:
+        return "Up";
+    case Rapture::KEY_PAGE_UP:
+        return "Page Up";
+    case Rapture::KEY_PAGE_DOWN:
+        return "Page Down";
+    case Rapture::KEY_HOME:
+        return "Home";
+    case Rapture::KEY_END:
+        return "End";
+    default:
+        break;
+    }
+
+    // printable keys carry the code of the character on them
+    if (code > 32 && code < 127) {
+        return std::string(1, static_cast<char>(code));
+    }
+    return "Key " + std::to_string(code);
+}
+
+std::string Shortcut_toString(const Shortcut &shortcut)
+{
+    if (!shortcut.isValid()) {
+        return {};
+    }
+
+    std::string text;
+    if ((shortcut.modifiers & SHORTCUT_MOD_CONTROL) != 0) {
+        text += "Ctrl+";
+    }
+    if ((shortcut.modifiers & SHORTCUT_MOD_SHIFT) != 0) {
+        text += "Shift+";
+    }
+    if ((shortcut.modifiers & SHORTCUT_MOD_ALT) != 0) {
+        text += "Alt+";
+    }
+    text += s_keyName(shortcut.key);
+    return text;
 }
 
 bool ShortcutRegistry::isShortcutDown(const Rapture::Input &input, const Shortcut &shortcut)
