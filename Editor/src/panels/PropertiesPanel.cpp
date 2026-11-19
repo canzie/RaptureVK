@@ -67,10 +67,6 @@ void PropertiesPanel::setupSearchBar(Amethyst::UIScope &scope)
                         },
                 },
                 [this](Amethyst::FrameScope &sf) {
-                    auto *searchFrame = &sf.component;
-                    sf.track(sf.component.onHoverChanged.connect([searchFrame](bool hovered) {
-                        searchFrame->setBaseStyleProperties({.borderPixelSize = hovered ? 1.0f : 0.0f});
-                    }));
                     sf.imageLabel({
                         .base =
                             {

@@ -5,15 +5,22 @@
 #include <components/checkbox.h>
 #include <components/common.h>
 
+#include <array>
+#include <span>
+#include <string_view>
+
 static constexpr float ROW_HEIGHT = 30.0f;
 static constexpr float PICKER_ROW_HEIGHT = 52.0f;
 static constexpr float PICKER_PREVIEW_SIZE = 28.0f;
 static constexpr float LABEL_FRAC = 0.4f;
-static constexpr float LABEL_PAD = 12.0f;
+static constexpr float LABEL_PAD = 30.0f;
 static constexpr float CONTROL_VPAD = 4.0f;
 static constexpr float CONTROL_HPAD = 10.0f;
 static constexpr float CONTROL_GAP = 6.0f;
 static constexpr float SINGLE_FIELD_WIDTH = 190.0f;
+static constexpr float AXIS_BAR_WIDTH = 3.0f;
+
+static constexpr std::array<std::string_view, 3> AXIS_BAR_CLASSES = {"axis-bar-x", "axis-bar-y", "axis-bar-z"};
 
 static constexpr float HEADER_HEIGHT = PropertySection::HEADER_HEIGHT;
 static constexpr float SECTION_SPACING = PropertySection::SECTION_SPACING;
@@ -40,6 +47,7 @@ void PropertySection::fieldTable(Amethyst::CollapsibleHeaderScope &ch, const std
                     .showHeader = false,
                     .rowBackgroundColor = Amethyst::Color4(0.0f, 0.0f, 0.0f, 0.0f),
                     .rowAlternateColor = Amethyst::Color4(0.0f, 0.0f, 0.0f, 0.0f),
+                    .selectedRowColor = Amethyst::Color4(0.0f, 0.0f, 0.0f, 0.0f),
                     .scrollBarVisibility = Amethyst::ScrollBarVisibility::NEVER,
                 },
         },
@@ -52,12 +60,12 @@ void PropertySection::fieldTable(Amethyst::CollapsibleHeaderScope &ch, const std
         });
 }
 
-void PropertySection::rowVec3(Amethyst::TableScope &t, std::string_view label, double (&values)[3], double speed, double min,
-                              double max, const std::function<void(void)> &onChanged)
+static void s_rowVec3(Amethyst::TableScope &t, std::string_view label, double (&values)[3], double speed, double min, double max,
+                      const std::function<void(void)> &onChanged, std::span<const std::string_view> axisBarClasses)
 {
     t.row([&](Amethyst::TableRowScope &tr) {
         tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
-        tr.cell([&values, speed, min, max, onChanged](Amethyst::UIScope &cell) {
+        tr.cell([&values, speed, min, max, onChanged, axisBarClasses](Amethyst::UIScope &cell) {
             const float w = 1.0f / 3.0f;
             for (int axis = 0; axis < 3; ++axis) {
                 // the outer edges take the control padding, the inner ones half the gutter each
@@ -75,7 +83,17 @@ void PropertySection::rowVec3(Amethyst::TableScope &t, std::string_view label, d
                         .max = max,
                         .value = &values[axis],
                     },
-                    [onChanged](Amethyst::DragFloatScope &d) {
+                    [onChanged, axis, axisBarClasses](Amethyst::DragFloatScope &d) {
+                        if (!axisBarClasses.empty()) {
+                            d.frame({
+                                .classes = {std::string(axisBarClasses[axis])},
+                                .base =
+                                    {
+                                        .interactable = false,
+                                        .size = Amethyst::UDim2(0.0f, AXIS_BAR_WIDTH, 1.0f, 0.0f),
+                                    },
+                            });
+                        }
                         d.component.onValueChanged = [onChanged](double) {
                             if (onChanged) {
                                 onChanged();
@@ -87,6 +105,18 @@ void PropertySection::rowVec3(Amethyst::TableScope &t, std::string_view label, d
     });
 }
 
+void PropertySection::rowVec3(Amethyst::TableScope &t, std::string_view label, double (&values)[3], double speed, double min,
+                              double max, const std::function<void(void)> &onChanged)
+{
+    s_rowVec3(t, label, values, speed, min, max, onChanged, {});
+}
+
+void PropertySection::rowAxesVec3(Amethyst::TableScope &t, std::string_view label, double (&values)[3], double speed, double min,
+                                  double max, const std::function<void(void)> &onChanged)
+{
+    s_rowVec3(t, label, values, speed, min, max, onChanged, AXIS_BAR_CLASSES);
+}
+
 void PropertySection::rowSlider(Amethyst::TableScope &t, std::string_view label, float *value, float min, float max,
                                 const std::function<void(float)> &onChanged, std::string format)
 {
@@ -95,7 +125,7 @@ void PropertySection::rowSlider(Amethyst::TableScope &t, std::string_view label,
         tr.cell([value, min, max, onChanged, format](Amethyst::UIScope &cell) {
             cell.sliderFloat(
                 {
-                    .classes = {"property-input-field"},
+                    .classes = {"property-input-field", "property-slider"},
                     .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
                              .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
                              .size = Amethyst::UDim2(0.0f, SINGLE_FIELD_WIDTH, 1.0f, -2.0f * CONTROL_VPAD)},
@@ -238,7 +268,7 @@ Amethyst::Dropdown *PropertySection::rowDropdown(Amethyst::TableScope &t, std::s
         tr.cell([&](Amethyst::UIScope &cell) {
             cell.dropdown(
                 {
-                    .classes = {"property-input-field"},
+                    .classes = {"property-input-field", "property-dropdown"},
                     .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
                              .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
                              .size = Amethyst::UDim2(0.0f, SINGLE_FIELD_WIDTH, 1.0f, -2.0f * CONTROL_VPAD)},

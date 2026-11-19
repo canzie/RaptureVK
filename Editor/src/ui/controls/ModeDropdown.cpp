@@ -16,7 +16,7 @@ Amethyst::Dropdown *ModeDropdown_add(Amethyst::Instance &parent, std::span<const
 
     Amethyst::UIScope(parent).dropdown(
         {
-            .classes = {"property-input-field"},
+            .classes = {"property-input-field", "property-dropdown"},
             .base = {.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
             .label = std::string(EDITOR_MODE_LABELS[modes.front()]),
         },

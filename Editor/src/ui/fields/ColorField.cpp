@@ -10,8 +10,9 @@
 #include <string_view>
 #include <utility>
 
-static constexpr float SWATCH_SIZE = 18.0f;
+static constexpr float SWATCH_SIZE = 22.0f;
 static constexpr float SWATCH_GAP = 6.0f;
+static constexpr float HEX_INPUT_WIDTH = 90.0f;
 static constexpr float POPUP_WIDTH = 240.0f;
 static constexpr float POPUP_HEIGHT = 260.0f;
 static constexpr float POPUP_PADDING = 8.0f;
@@ -179,8 +180,8 @@ void ColorField::buildField(Amethyst::UIScope &parent)
 {
     parent.frame(
         {
-            .classes = m_classes,
             .base = {.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
+            .style = {.backgroundTransparency = 1.0f},
         },
         [this](Amethyst::FrameScope &f) {
             m_root = &f.component;
@@ -203,7 +204,7 @@ void ColorField::buildField(Amethyst::UIScope &parent)
                     .base =
                         {
                             .position = Amethyst::UDim2(0.0f, SWATCH_SIZE + SWATCH_GAP, 0.0f, 0.0f),
-                            .size = Amethyst::UDim2(1.0f, -(SWATCH_SIZE + SWATCH_GAP), 1.0f, 0.0f),
+                            .size = Amethyst::UDim2(0.0f, HEX_INPUT_WIDTH, 1.0f, 0.0f),
                         },
                     .placeholder = "#RRGGBB",
                 },

@@ -45,9 +45,9 @@ Amethyst::Dropdown *ComponentEditorBase::rowMobility(Amethyst::TableScope &t, Ra
 void Node3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
     fieldTable(ch, [this](Amethyst::TableScope &t) {
-        rowVec3(t, "Translation", m_values[0], 0.1, -100000.0, 100000.0, [this]() { apply(0); });
-        rowVec3(t, "Rotation", m_values[1], 0.5, -360.0, 360.0, [this]() { apply(1); });
-        rowVec3(t, "Scale", m_values[2], 0.01, -1000.0, 1000.0, [this]() { apply(2); });
+        rowAxesVec3(t, "Translation", m_values[0], 0.1, -100000.0, 100000.0, [this]() { apply(0); });
+        rowAxesVec3(t, "Rotation", m_values[1], 0.5, -360.0, 360.0, [this]() { apply(1); });
+        rowAxesVec3(t, "Scale", m_values[2], 0.01, -1000.0, 1000.0, [this]() { apply(2); });
     });
 }
 
@@ -669,7 +669,7 @@ void CharacterBody3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
                                 m_shapeDropdown->setText(std::string(Rapture::physics::CollisionShape_toString(type)));
                             }
                         });
-        rowVec3(t, "Shape Offset", m_shapeOffset, 0.01, -100.0, 100.0, [this]() {
+        rowAxesVec3(t, "Shape Offset", m_shapeOffset, 0.01, -100.0, 100.0, [this]() {
             if (m_characterBody != nullptr) {
                 m_characterBody->setShapeOffset(glm::vec3(static_cast<float>(m_shapeOffset[0]),
                                                           static_cast<float>(m_shapeOffset[1]),

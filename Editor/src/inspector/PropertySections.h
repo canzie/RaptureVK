@@ -78,6 +78,19 @@ class PropertySection {
                  const std::function<void(void)> &onChanged);
 
     /**
+     * @brief Adds a row of three drag fields for the X, Y and Z axes, each field edged in its axis color.
+     * @param t Scope of the table the row is added to.
+     * @param label Text shown in the row's label column.
+     * @param values The three values the fields are bound to.
+     * @param speed Units moved per pixel dragged.
+     * @param min Lower bound of every axis.
+     * @param max Upper bound of every axis.
+     * @param onChanged Called after any axis changes.
+     */
+    void rowAxesVec3(Amethyst::TableScope &t, std::string_view label, double (&values)[3], double speed, double min, double max,
+                     const std::function<void(void)> &onChanged);
+
+    /**
      * @brief Adds a row holding a single slider.
      * @param t Scope of the table the row is added to.
      * @param label Text shown in the row's label column.
