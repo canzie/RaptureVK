@@ -3,6 +3,8 @@
 #include <rapture/core/utils/Log.h>
 #include <rapture/core/utils/rp_assert.h>
 
+#include <components/ui_input.h>
+
 #include <string>
 
 static bool s_isModifierDown(const Rapture::Input &input, Rapture::KeyCode left, Rapture::KeyCode right)
@@ -157,7 +159,10 @@ void ShortcutRegistry::onUpdate(const Rapture::Input &input, const glm::vec2 &cu
         const bool wasPressed = isDown && !binding.wasDown;
         binding.wasDown = isDown;
 
-        if (wasPressed) {
+        // keys without Ctrl or Alt are typing while a text field holds focus, not commands
+        const bool typing = Amethyst::UIInput::getFocusedInput() != nullptr &&
+                            (binding.shortcut.modifiers & (SHORTCUT_MOD_CONTROL | SHORTCUT_MOD_ALT)) == 0;
+        if (wasPressed && !typing) {
             runHandlerUnderCursor(static_cast<EditorCommand>(command), cursor);
         }
     }
