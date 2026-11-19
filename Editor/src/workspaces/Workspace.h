@@ -296,18 +296,10 @@ class Workspace {
     void placeContentDock();
 
     /**
-     * @brief Sizes and places one hotbar item, called as it is added and again on a scale change
+     * @brief Sizes and places one hotbar item by the paddings the editor config holds
      * @param item The item to lay out
      */
     void resolveHotbarItem(const HotbarItem &item) const;
-
-    /**
-     * @brief How wide a text is in the font and size of the style it is shown with
-     * @param text The text to measure
-     * @param style The style the text is shown with
-     * @return The width in pixels
-     */
-    float measureTextWidth(const std::string &text, const Amethyst::TextStyleProperties &style) const;
 
     /**
      * @brief Adds an island to the end of the hotbar for one control

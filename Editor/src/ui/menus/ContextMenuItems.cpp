@@ -10,8 +10,8 @@
 #include <components/frame.h>
 #include <components/image_label.h>
 #include <components/text_label.h>
-#include <modules/text_processor.h>
-#include <parsers/freetype/font_registry.h>
+#include <components/extensions/ui_flex_item.h>
+#include <components/extensions/ui_list_layout.h>
 
 using namespace Amethyst;
 
@@ -365,7 +365,16 @@ std::unique_ptr<ContextMenu::ItemData> SeparatorMenuItem::create(std::string lab
 Frame *SeparatorMenuItemView::create(ContextMenu &owner)
 {
     Frame *row = SeparatorItemView::create(owner);
-    row->setBaseProperties({.interactable = false});
+    row->setBaseProperties({
+        .interactable = false,
+        .padding = UDim4{.right = UDim::fromOffset(ROW_PADDING), .left = UDim::fromOffset(ROW_PADDING)},
+    });
+    // the line runs from the label, or from the start when there is none, to the end of the row
+    auto *layout = row->addExtension<UIListLayout>();
+    layout->fillDirection = FillDirection::FILL_HORIZONTAL;
+    layout->horizontalFlex = UiFlexAlignment::FILL;
+    layout->verticalAlignment = VerticalAlignment::ALIGN_CENTER_V;
+    layout->innerPadding = UDim::fromOffset(SEPARATOR_GAP);
 
     m_label = row->add<TextLabel>();
     m_label->setTextStyleProperties({
@@ -374,12 +383,17 @@ Frame *SeparatorMenuItemView::create(ContextMenu &owner)
         .textYAlignment = owner.getTextStyleProperties().textYAlignment,
     });
     m_label->setBaseStyleProperties({.backgroundTransparency = 1.0f, .borderPixelSize = 0.0f});
-    m_label->setBaseProperties(
-        {.anchorPoint = {0.0f, 0.5f}, .interactable = false, .position = UDim2(0.0f, ROW_PADDING, 0.5f, 0.0f)});
+    m_label->setBaseProperties({
+        .automaticSize = AutomaticSize::X,
+        .interactable = false,
+        .layoutOrder = 0,
+        .size = UDim2::fromScale(0.0f, 1.0f),
+    });
 
     m_line = row->add<Frame>();
     m_line->setBaseStyleProperties({.borderPixelSize = 0.0f});
-    m_line->setBaseProperties({.anchorPoint = {0.0f, 0.5f}, .interactable = false});
+    m_line->setBaseProperties({.interactable = false, .layoutOrder = 1, .size = UDim2::fromOffset(0.0f, 1.0f)});
+    m_line->addExtension<UIFlexItem>();
 
     return row;
 }
@@ -389,26 +403,8 @@ void SeparatorMenuItemView::bind(ContextMenu::ItemData &item)
     m_boundItem = &item;
     auto &sep = item.as<SeparatorMenuItem>();
 
-    if (sep.label.empty()) {
-        m_label->setBaseProperties({.visible = false});
-        m_line->setBaseProperties({
-            .position = UDim2(0.0f, ROW_PADDING, 0.5f, 0.0f),
-            .size = UDim2(1.0f, -(ROW_PADDING * 2.0f), 0.0f, 1.0f),
-        });
-        return;
-    }
-
-    const TextStyleProperties &labelStyle = m_label->getTextStyleProperties();
-    const FontId labelFont = FontRegistry::instance().findFont(labelStyle.fontFamily);
-    float labelWidth = m_textProcessor->measureTextAtlas(sep.label, labelFont, static_cast<uint32_t>(labelStyle.fontSize)).x;
-    m_label->setBaseProperties({.size = UDim2(0.0f, labelWidth, 1.0f, 0.0f), .visible = true});
     m_label->setText(sep.label);
-
-    float lineLeft = ROW_PADDING + labelWidth + SEPARATOR_GAP;
-    m_line->setBaseProperties({
-        .position = UDim2(0.0f, lineLeft, 0.5f, 0.0f),
-        .size = UDim2(1.0f, -(lineLeft + ROW_PADDING), 0.0f, 1.0f),
-    });
+    m_label->setBaseProperties({.visible = !sep.label.empty()});
 }
 
 std::unique_ptr<ContextMenu::ItemData>

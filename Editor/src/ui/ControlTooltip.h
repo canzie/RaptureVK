@@ -26,7 +26,7 @@ struct ControlTooltip {
  * @brief Shows a tooltip when the cursor rests on a control, replacing one it already shows
  * @param control The control the tooltip describes
  * @param tooltip The text it shows, its description or else its name, and the command whose keys it shows
- * @param editor The editor whose text measuring and shortcuts the tooltip uses
+ * @param editor The editor whose shortcuts the tooltip shows
  */
 void ControlTooltip_attach(Amethyst::UIObject &control, const ControlTooltip &tooltip, const EditorContext &editor);
 

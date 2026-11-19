@@ -236,7 +236,9 @@ void ViewportPanel::setupOverlayButtons()
                 .classes = {std::string(VIEWPORT_TOOLBAR_CLASS)},
                 .base =
                     {
+                        .automaticSize = Amethyst::AutomaticSize::X,
                         .padding = Amethyst::UDim4::fromOffset(VIEWPORT_TOOLBAR_PADDING),
+                        .size = Amethyst::UDim2::fromOffset(0.0f, VIEWPORT_TOOLBAR_HEIGHT),
                         .zIndex = 101,
                     },
             },
@@ -252,17 +254,16 @@ void ViewportPanel::setupOverlayButtons()
     const std::vector<std::string> buttonClasses = {std::string(VIEWPORT_TOOLBAR_BUTTON_CLASS)};
 
     m_transformMenuBtn = m_viewportToolbar->add<IconLabelButton>(Icons::SVG_TRANSFORM, "Transform", buttonClasses);
-    m_transformMenuBtn->setBaseProperties({.layoutOrder = 0});
+    const float buttonHeight = VIEWPORT_TOOLBAR_HEIGHT - 2.0f * VIEWPORT_TOOLBAR_PADDING;
+    m_transformMenuBtn->setBaseProperties({.layoutOrder = 0, .size = Amethyst::UDim2::fromOffset(0.0f, buttonHeight)});
     m_transformMenuBtn->track(m_transformMenuBtn->onMouseButton1ClickCb.connect(
         [this]() { s_showGrownMenu(m_transformMenu, m_transformMenuBtn, m_root); }));
 
     m_renderMenuBtn = m_viewportToolbar->add<IconLabelButton>(Icons::SVG_PERSPECTIVE, VIEWPORT_LIGHTING_MODE_LABELS[VLM_LIT],
                                                               buttonClasses);
-    m_renderMenuBtn->setBaseProperties({.layoutOrder = 1});
+    m_renderMenuBtn->setBaseProperties({.layoutOrder = 1, .size = Amethyst::UDim2::fromOffset(0.0f, buttonHeight)});
     m_renderMenuBtn->track(
         m_renderMenuBtn->onMouseButton1ClickCb.connect([this]() { s_showGrownMenu(m_renderMenu, m_renderMenuBtn, m_root); }));
-
-    fitViewportToolbar();
 }
 
 void ViewportPanel::setupOrientationGizmo()
@@ -284,21 +285,6 @@ void ViewportPanel::setupOrientationGizmo()
     };
 }
 
-void ViewportPanel::fitViewportToolbar()
-{
-    const Amethyst::TextProcessor &textProcessor = m_context.editor->amethyst->getTextProcessor();
-    const float buttonHeight = VIEWPORT_TOOLBAR_HEIGHT - 2.0f * VIEWPORT_TOOLBAR_PADDING;
-
-    const float transformWidth = m_transformMenuBtn->measureFittedWidth(textProcessor);
-    const float renderWidth = m_renderMenuBtn->measureFittedWidth(textProcessor);
-
-    m_transformMenuBtn->setBaseProperties({.size = Amethyst::UDim2::fromOffset(transformWidth, buttonHeight)});
-    m_renderMenuBtn->setBaseProperties({.size = Amethyst::UDim2::fromOffset(renderWidth, buttonHeight)});
-
-    const float toolbarWidth = transformWidth + renderWidth + VIEWPORT_TOOLBAR_GAP + 2.0f * VIEWPORT_TOOLBAR_PADDING;
-    m_viewportToolbar->setBaseProperties({.size = Amethyst::UDim2::fromOffset(toolbarWidth, VIEWPORT_TOOLBAR_HEIGHT)});
-}
-
 void ViewportPanel::buildTransformMenu()
 {
     m_transformMenu = m_root->add<Amethyst::ContextMenu>();
@@ -306,7 +292,7 @@ void ViewportPanel::buildTransformMenu()
     m_transformMenu->popupWidth *= 1.3f;
     m_transformMenu->maxVisibleItems = INT_MAX;
     m_transformMenu->setRowFactories({
-        .separator = [textProcessor = &m_context.editor->amethyst->getTextProcessor()] { return std::make_unique<SeparatorMenuItemView>(*textProcessor); },
+        .separator = [] { return std::make_unique<SeparatorMenuItemView>(); },
         .radio = [] { return std::make_unique<RadioMenuItemView>(); },
     });
 
@@ -345,14 +331,13 @@ void ViewportPanel::buildRenderMenu()
     m_renderMenu->popupWidth *= 1.3f;
     m_renderMenu->maxVisibleItems = INT_MAX;
     m_renderMenu->setRowFactories({.toggle = [] { return std::make_unique<ToggleMenuItemView>(); },
-                                   .separator = [textProcessor = &m_context.editor->amethyst->getTextProcessor()] { return std::make_unique<SeparatorMenuItemView>(*textProcessor); },
+                                   .separator = [] { return std::make_unique<SeparatorMenuItemView>(); },
                                    .radio = [] { return std::make_unique<RadioMenuItemView>(); }});
 
     m_lightingModeGroupConn = m_lightingModeGroup.onChanged.connect([this]() {
         const auto mode = static_cast<ViewportLightingMode>(m_lightingModeGroup.value);
         applyLightingMode(mode);
         m_renderMenuBtn->getLabel().setText(std::string(VIEWPORT_LIGHTING_MODE_LABELS[mode]));
-        fitViewportToolbar();
     });
 
     m_probeDebugModeGroupConn = m_probeDebugModeGroup.onChanged.connect([this]() {

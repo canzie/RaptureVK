@@ -138,7 +138,7 @@ void WorldEditorWorkspace::build()
     addPanel(std::make_unique<ImagePreviewPanel>(m_context, "Texture Viewer", ImagePreviewMode::ASSET_PICKER), propertiesTabBar);
 
     m_addMenu = m_container->add<Amethyst::ContextMenu>();
-    m_addMenu->setRowFactories({.separator = [textProcessor = &m_editor.amethyst->getTextProcessor()] { return std::make_unique<SeparatorMenuItemView>(*textProcessor); }});
+    m_addMenu->setRowFactories({.separator = [] { return std::make_unique<SeparatorMenuItemView>(); }});
 
     setupShortcuts();
 }

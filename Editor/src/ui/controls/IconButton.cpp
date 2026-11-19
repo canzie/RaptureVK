@@ -15,14 +15,16 @@ IconButton::IconButton(std::string_view iconSvg, float iconSize, const std::vect
             .base =
                 {
                     .anchorPoint = Amethyst::vec2(0.5f, 0.5f),
-                    .interactable = false,
                     .position = Amethyst::UDim2::fromScale(0.5f, 0.5f),
                     .size = Amethyst::UDim2::fromOffset(iconSize, iconSize),
                 },
             .style = {.backgroundTransparency = 1.0f, .borderPixelSize = 0.0f},
             .svg = std::string(iconSvg),
         },
-        [this](Amethyst::ImageLabelScope &icon) { m_icon = &icon.component; });
+        [this](Amethyst::ImageLabelScope &icon) {
+            m_icon = &icon.component;
+            m_icon->ignore(Amethyst::INTERACTION_CATEGORY_ALL);
+        });
 
     track(onHoverChanged.connect([this](bool hovered) {
         (void)hovered;

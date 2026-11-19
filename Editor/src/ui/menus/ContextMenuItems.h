@@ -16,10 +16,6 @@
 #include <string>
 #include <vector>
 
-namespace Amethyst {
-class TextProcessor;
-} // namespace Amethyst
-
 namespace AM = Amethyst;
 
 namespace Rapture {
@@ -156,13 +152,10 @@ class SeparatorMenuItem : public AM::ContextMenu::SeparatorItemData {
 
 class SeparatorMenuItemView : public AM::ContextMenu::SeparatorItemView {
   public:
-    explicit SeparatorMenuItemView(const AM::TextProcessor &textProcessor) : m_textProcessor(&textProcessor) {}
-
     AM::Frame *create(AM::ContextMenu &owner) override;
     void bind(AM::ContextMenu::ItemData &item) override;
 
   private:
-    const AM::TextProcessor *m_textProcessor = nullptr;
     AM::TextLabel *m_label = nullptr;
     AM::Frame *m_line = nullptr;
 };

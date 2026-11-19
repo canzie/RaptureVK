@@ -588,7 +588,7 @@ void ContentBrowserPanel::setupContextMenu()
     m_addMenu->maxVisibleItems = INT_MAX;
     m_addMenu->setRowFactories({
         .action = [] { return std::make_unique<AddAssetMenuItemView>(); },
-        .separator = [textProcessor = &m_context.editor->amethyst->getTextProcessor()] { return std::make_unique<SeparatorMenuItemView>(*textProcessor); },
+        .separator = [] { return std::make_unique<SeparatorMenuItemView>(); },
     });
 }
 

@@ -7,7 +7,6 @@
 #include <components/extensions/ui_list_layout.h>
 #include <components/ui_scope.h>
 #include <parsers/config/layout_config.h>
-#include <parsers/freetype/font_registry.h>
 #include <rapture/core/utils/rp_assert.h>
 
 static constexpr std::string_view WORKSPACE_CLASS = "workspace";
@@ -197,40 +196,32 @@ void Workspace::resolveHotbarItem(const HotbarItem &item) const
         return;
     }
 
-    float controlWidth = 0.0f;
+    const float islandPadding = config().getFloat(EDITOR_CONFIG_HOTBAR_PADDING);
+    item.island->setBaseProperties({
+        .automaticSize = Amethyst::AutomaticSize::X,
+        .padding = Amethyst::UDim4{.right = Amethyst::UDim::fromOffset(islandPadding), .left = Amethyst::UDim::fromOffset(islandPadding)},
+        .size = Amethyst::UDim2::fromScale(0.0f, 1.0f),
+    });
+
+    Amethyst::BasePropertiesArgs control = {
+        .anchorPoint = Amethyst::vec2(0.0f, 0.5f),
+        .position = Amethyst::UDim2::fromScale(0.0f, 0.5f),
+        .size = Amethyst::UDim2::fromOffset(0.0f, HOTBAR_CONTROL_HEIGHT),
+    };
     switch (item.kind) {
     case HotbarItemKind::FIXED:
-        controlWidth = item.width;
+        control.size = Amethyst::UDim2::fromOffset(item.width, item.height);
         break;
-    case HotbarItemKind::LABELLED: {
-        const auto *button = item.control->as<Amethyst::TextButton>();
-        controlWidth = measureTextWidth(button->getText(), button->getTextStyleProperties()) + 2.0f * HOTBAR_LABEL_MARGIN;
+    case HotbarItemKind::LABELLED:
+        control.automaticSize = Amethyst::AutomaticSize::X;
+        control.padding =
+            Amethyst::UDim4{.right = Amethyst::UDim::fromOffset(HOTBAR_LABEL_MARGIN), .left = Amethyst::UDim::fromOffset(HOTBAR_LABEL_MARGIN)};
         break;
-    }
-    case HotbarItemKind::ICON_LABELLED: {
-        RP_ASSERT(m_editor.amethyst != nullptr, "a workspace was built without the ui context");
-        controlWidth = item.control->as<IconLabelButton>()->measureFittedWidth(m_editor.amethyst->getTextProcessor());
-        break;
-    }
+    case HotbarItemKind::ICON_LABELLED:
     case HotbarItemKind::SEPARATOR:
         break;
     }
-
-    const float islandPadding = config().getFloat(EDITOR_CONFIG_HOTBAR_PADDING);
-    item.island->setBaseProperties({.size = Amethyst::UDim2(0.0f, controlWidth + 2.0f * islandPadding, 1.0f, 0.0f)});
-    item.control->setBaseProperties({
-        .anchorPoint = Amethyst::vec2(0.5f, 0.5f),
-        .position = Amethyst::UDim2::fromScale(0.5f, 0.5f),
-        .size = Amethyst::UDim2::fromOffset(controlWidth, item.kind == HotbarItemKind::FIXED ? item.height : HOTBAR_CONTROL_HEIGHT),
-    });
-}
-
-float Workspace::measureTextWidth(const std::string &text, const Amethyst::TextStyleProperties &style) const
-{
-    RP_ASSERT(m_editor.amethyst != nullptr, "a workspace was built without the ui context");
-
-    const Amethyst::FontId font = Amethyst::FontRegistry::instance().findFont(style.fontFamily);
-    return m_editor.amethyst->getTextProcessor().measureTextAtlas(text, font, static_cast<uint32_t>(style.fontSize)).x;
+    item.control->setBaseProperties(control);
 }
 
 Amethyst::Frame *Workspace::addHotbarIsland()

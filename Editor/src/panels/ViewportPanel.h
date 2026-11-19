@@ -139,10 +139,6 @@ class ViewportPanel : public Panel {
      */
     void setupOrientationGizmo(void);
 
-    /**
-     * @brief Sizes the toolbar floating over the image, and the buttons in it, to the labels they show
-     */
-    void fitViewportToolbar();
     void buildTransformMenu(void);
     void buildRenderMenu(void);
     void applyLightingMode(ViewportLightingMode mode);
