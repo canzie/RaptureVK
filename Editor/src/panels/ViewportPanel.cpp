@@ -90,6 +90,13 @@ static constexpr float VIEWPORT_TOOLBAR_GAP = 2.0f;
 static constexpr std::string_view VIEWPORT_TOOLBAR_CLASS = "viewport-toolbar";
 static constexpr std::string_view VIEWPORT_TOOLBAR_BUTTON_CLASS = "viewport-toolbar-button";
 
+static constexpr double FIELD_OF_VIEW_MIN_DEGREES = 10.0;
+static constexpr double FIELD_OF_VIEW_MAX_DEGREES = 120.0;
+static constexpr double FIELD_OF_VIEW_DRAG_SPEED = 0.2;
+static constexpr double EXPOSURE_MIN_STOPS = -10.0;
+static constexpr double EXPOSURE_MAX_STOPS = 10.0;
+static constexpr double EXPOSURE_DRAG_SPEED = 0.02;
+
 static constexpr std::array<std::string_view, VLM_COUNT> VIEWPORT_LIGHTING_MODE_LABELS = {
     "Lit",
     "Raw Irradiance",
@@ -256,8 +263,10 @@ void ViewportPanel::setupOverlayButtons()
     m_transformMenuBtn = m_viewportToolbar->add<IconLabelButton>(Icons::SVG_TRANSFORM, "Transform", buttonClasses);
     const float buttonHeight = VIEWPORT_TOOLBAR_HEIGHT - 2.0f * VIEWPORT_TOOLBAR_PADDING;
     m_transformMenuBtn->setBaseProperties({.layoutOrder = 0, .size = Amethyst::UDim2::fromOffset(0.0f, buttonHeight)});
-    m_transformMenuBtn->track(m_transformMenuBtn->onMouseButton1ClickCb.connect(
-        [this]() { s_showGrownMenu(m_transformMenu, m_transformMenuBtn, m_root); }));
+    m_transformMenuBtn->track(m_transformMenuBtn->onMouseButton1ClickCb.connect([this]() {
+        syncCameraMenuItems();
+        s_showGrownMenu(m_transformMenu, m_transformMenuBtn, m_root);
+    }));
 
     m_renderMenuBtn = m_viewportToolbar->add<IconLabelButton>(Icons::SVG_PERSPECTIVE, VIEWPORT_LIGHTING_MODE_LABELS[VLM_LIT],
                                                               buttonClasses);
@@ -294,6 +303,7 @@ void ViewportPanel::buildTransformMenu()
     m_transformMenu->setRowFactories({
         .separator = [] { return std::make_unique<SeparatorMenuItemView>(); },
         .radio = [] { return std::make_unique<RadioMenuItemView>(); },
+        .number = [] { return std::make_unique<NumberMenuItemView>(); },
     });
 
     m_gizmoOpGroupConn = m_gizmoOpGroup.onChanged.connect(
@@ -321,7 +331,46 @@ void ViewportPanel::buildTransformMenu()
     items.push_back(SeparatorMenuItem::create("Camera"));
     items.push_back(RadioMenuItem::create("Orbit", &m_cameraModeGroup, static_cast<int32_t>(Rapture::CameraControlMode::ORBIT)));
     items.push_back(RadioMenuItem::create("Fly", &m_cameraModeGroup, static_cast<int32_t>(Rapture::CameraControlMode::FLY)));
+
+    if (m_context.editorCamera != nullptr) {
+        Rapture::Camera3D &camera = m_context.editorCamera->camera();
+
+        auto fieldOfView = NumberMenuItem::create("Field of view", camera.fieldOfView(), [&camera](double degrees) {
+            camera.setFieldOfView(static_cast<float>(degrees));
+        });
+        m_fieldOfViewItem = &fieldOfView->as<NumberMenuItem>();
+        m_fieldOfViewItem->speed = FIELD_OF_VIEW_DRAG_SPEED;
+        m_fieldOfViewItem->min = FIELD_OF_VIEW_MIN_DEGREES;
+        m_fieldOfViewItem->max = FIELD_OF_VIEW_MAX_DEGREES;
+        m_fieldOfViewItem->format = "%.1f";
+        items.push_back(std::move(fieldOfView));
+
+        auto exposure = NumberMenuItem::create("Exposure", camera.exposureStops(),
+                                               [&camera](double stops) { camera.setExposureStops(static_cast<float>(stops)); });
+        m_exposureItem = &exposure->as<NumberMenuItem>();
+        m_exposureItem->speed = EXPOSURE_DRAG_SPEED;
+        m_exposureItem->min = EXPOSURE_MIN_STOPS;
+        m_exposureItem->max = EXPOSURE_MAX_STOPS;
+        m_exposureItem->format = "%.2f";
+        items.push_back(std::move(exposure));
+    }
+
     m_transformMenu->setItems(std::move(items));
+}
+
+void ViewportPanel::syncCameraMenuItems()
+{
+    if (m_context.editorCamera == nullptr) {
+        return;
+    }
+
+    const Rapture::Camera3D &camera = m_context.editorCamera->camera();
+    if (m_fieldOfViewItem != nullptr) {
+        m_fieldOfViewItem->value = camera.fieldOfView();
+    }
+    if (m_exposureItem != nullptr) {
+        m_exposureItem->value = camera.exposureStops();
+    }
 }
 
 void ViewportPanel::buildRenderMenu()

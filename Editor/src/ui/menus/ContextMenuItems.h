@@ -7,6 +7,7 @@
 #include <rapture/assets/asset_manager/AssetCommon.h>
 
 #include <components/common.h>
+#include <components/drag.h>
 #include <components/frame.h>
 #include <components/image_label.h>
 #include <components/text_label.h>
@@ -140,6 +141,25 @@ class RadioMenuItemView : public AM::ContextMenu::RadioItemView {
     AM::RadioButton *m_radio = nullptr;
     AM::ImageLabel *m_icon = nullptr;
     AM::TextLabel *m_label = nullptr;
+};
+
+class NumberMenuItem : public AM::ContextMenu::NumberItemData {
+  public:
+    static std::unique_ptr<AM::ContextMenu::ItemData> create(std::string label, double value, std::function<void(double)> onChanged);
+
+  public:
+    std::string label;
+    bool enabled = true;
+};
+
+class NumberMenuItemView : public AM::ContextMenu::NumberItemView {
+  public:
+    AM::Frame *create(AM::ContextMenu &owner) override;
+    void bind(AM::ContextMenu::ItemData &item) override;
+
+  private:
+    AM::TextLabel *m_label = nullptr;
+    AM::DragFloat *m_drag = nullptr;
 };
 
 class SeparatorMenuItem : public AM::ContextMenu::SeparatorItemData {

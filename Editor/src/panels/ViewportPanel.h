@@ -23,6 +23,7 @@ class Texture;
 } // namespace Rapture
 
 class IconLabelButton;
+class NumberMenuItem;
 class OrientationGizmo;
 
 enum ViewportLightingMode {
@@ -141,6 +142,11 @@ class ViewportPanel : public Panel {
 
     void buildTransformMenu(void);
     void buildRenderMenu(void);
+
+    /**
+     * @brief Points the camera rows of the transform menu at the editor camera's current values
+     */
+    void syncCameraMenuItems();
     void applyLightingMode(ViewportLightingMode mode);
     Rapture::CameraController *cameraController(void) const;
 
@@ -161,6 +167,8 @@ class ViewportPanel : public Panel {
     IconLabelButton *m_renderMenuBtn = nullptr;
     Amethyst::ContextMenu *m_transformMenu = nullptr;
     Amethyst::ContextMenu *m_renderMenu = nullptr;
+    NumberMenuItem *m_fieldOfViewItem = nullptr;
+    NumberMenuItem *m_exposureItem = nullptr;
     OrientationGizmo *m_orientationGizmo = nullptr;
     ViewportOverlays m_overlays;
 

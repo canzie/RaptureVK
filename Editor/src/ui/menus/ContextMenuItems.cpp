@@ -24,6 +24,8 @@ static constexpr float ICON_GAP = 10.0f;
 static constexpr float MENU_CHECKBOX_SIZE = 16.0f;
 static constexpr float MENU_RADIO_SIZE = 12.0f;
 static constexpr float SEPARATOR_GAP = 8.0f;
+static constexpr float NUMBER_FIELD_WIDTH_SCALE = 0.45f;
+static constexpr std::string_view NUMBER_FIELD_CLASS = "property-input-field";
 static constexpr float ADD_ASSET_ROW_HEIGHT = 44.0f;
 static constexpr float ADD_ASSET_WELL_SIZE = 32.0f;
 static constexpr float ADD_ASSET_ICON_SIZE = 26.0f;
@@ -352,6 +354,64 @@ void RadioMenuItemView::bind(ContextMenu::ItemData &item)
     });
     m_label->setText(radioItem.label);
     m_row->setBaseProperties({.interactable = radioItem.enabled});
+}
+
+std::unique_ptr<ContextMenu::ItemData> NumberMenuItem::create(std::string label, double value, std::function<void(double)> onChanged)
+{
+    auto item = std::make_unique<NumberMenuItem>();
+    item->label = std::move(label);
+    item->value = value;
+    item->onChanged = std::move(onChanged);
+
+    return item;
+}
+
+Frame *NumberMenuItemView::create(ContextMenu &owner)
+{
+    Frame *row = NumberItemView::create(owner);
+
+    m_label = row->add<TextLabel>();
+    m_label->setTextStyleProperties(owner.getTextStyleProperties());
+    m_label->setBaseStyleProperties({.backgroundTransparency = 1.0f, .borderPixelSize = 0.0f});
+    m_label->setBaseProperties({
+        .interactable = false,
+        .padding = UDim4{UDim::fromOffset(0.0f), UDim::fromOffset(ROW_PADDING), UDim::fromOffset(0.0f),
+                         UDim::fromOffset(ROW_PADDING + MENU_CHECKBOX_SIZE + ICON_GAP)},
+        .size = UDim2::fromScale(1.0f, 1.0f),
+    });
+
+    m_drag = row->add<DragFloat>();
+    m_drag->addClass(NUMBER_FIELD_CLASS);
+    m_drag->setBaseProperties({
+        .anchorPoint = {1.0f, 0.5f},
+        .position = UDim2(1.0f, -ROW_PADDING, 0.5f, 0.0f),
+        .size = UDim2(NUMBER_FIELD_WIDTH_SCALE, 0.0f, 1.0f, -ICON_INSET),
+    });
+
+    return row;
+}
+
+void NumberMenuItemView::bind(ContextMenu::ItemData &item)
+{
+    m_boundItem = &item;
+    auto &numberItem = item.as<NumberMenuItem>();
+
+    m_label->setText(numberItem.label);
+    m_row->setBaseProperties({.interactable = numberItem.enabled});
+
+    m_drag->speed = numberItem.speed;
+    m_drag->min = numberItem.min;
+    m_drag->max = numberItem.max;
+    if (!numberItem.format.empty()) {
+        m_drag->setFormat(numberItem.format);
+    }
+    m_drag->value = &numberItem.value;
+    m_drag->onValueChanged = [&numberItem](double value) {
+        if (numberItem.onChanged != nullptr) {
+            numberItem.onChanged(value);
+        }
+    };
+    m_drag->markDirty();
 }
 
 std::unique_ptr<ContextMenu::ItemData> SeparatorMenuItem::create(std::string label)

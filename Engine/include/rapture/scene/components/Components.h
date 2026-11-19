@@ -65,6 +65,7 @@ struct CameraComponent {
     float aspectRatio;
     float nearPlane;
     float farPlane;
+    float exposureStops = 1.0f;
 
     // whether the slot holds matrices from a previous update, so prevViewProj can carry them
     bool hasRenderData = false;

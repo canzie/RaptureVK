@@ -9,6 +9,7 @@ static constexpr std::string_view KEY_CAMERA = "camera";
 static constexpr std::string_view KEY_FIELD_OF_VIEW = "fieldOfView";
 static constexpr std::string_view KEY_NEAR_PLANE = "nearPlane";
 static constexpr std::string_view KEY_FAR_PLANE = "farPlane";
+static constexpr std::string_view KEY_EXPOSURE_STOPS = "exposureStops";
 
 Camera3D::Camera3D(Scene &scene, std::string_view name) : Node3D(scene, name)
 {
@@ -83,6 +84,20 @@ void Camera3D::onWorldTransformChanged()
     m_entity.write<CameraComponent>()->updateViewMatrix(worldTransform());
 }
 
+float Camera3D::exposureStops() const
+{
+    const auto *camera = m_entity.tryRead<CameraComponent>();
+    return camera != nullptr ? camera->exposureStops : 0.0f;
+}
+
+void Camera3D::setExposureStops(float stops)
+{
+    if (!m_entity.has<CameraComponent>()) {
+        return;
+    }
+    m_entity.write<CameraComponent>()->exposureStops = stops;
+}
+
 void Camera3D::serialize(WriteNode node) const
 {
     Node3D::serialize(node);
@@ -91,6 +106,7 @@ void Camera3D::serialize(WriteNode node) const
     camera.set(KEY_FIELD_OF_VIEW, fieldOfView());
     camera.set(KEY_NEAR_PLANE, nearPlane());
     camera.set(KEY_FAR_PLANE, farPlane());
+    camera.set(KEY_EXPOSURE_STOPS, exposureStops());
 }
 
 void Camera3D::deserialize(ReadNode node)
@@ -108,6 +124,7 @@ void Camera3D::deserialize(ReadNode node)
     setFieldOfView(static_cast<float>(camera.child(KEY_FIELD_OF_VIEW).asF64(fieldOfView())));
     setNearPlane(static_cast<float>(camera.child(KEY_NEAR_PLANE).asF64(nearPlane())));
     setFarPlane(static_cast<float>(camera.child(KEY_FAR_PLANE).asF64(farPlane())));
+    setExposureStops(static_cast<float>(camera.child(KEY_EXPOSURE_STOPS).asF64(exposureStops())));
 }
 
 } // namespace Rapture

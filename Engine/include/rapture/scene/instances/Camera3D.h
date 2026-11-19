@@ -21,6 +21,14 @@ class Camera3D : public Node3D {
     float farPlane() const;
     void setFarPlane(float farPlane);
 
+    float exposureStops() const;
+
+    /**
+     * @brief Sets the exposure applied before tone mapping
+     * @param stops Exposure in f-stops, each one doubling the brightness
+     */
+    void setExposureStops(float stops);
+
     void serialize(WriteNode node) const override;
     void deserialize(ReadNode node) override;
 
