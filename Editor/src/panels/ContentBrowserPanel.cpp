@@ -155,10 +155,10 @@ static void s_fillTooltip(Amethyst::Tooltip &surface, const TooltipRows &rows)
 {
     surface.removeAllChildren();
     surface.setClasses({"tooltip"});
+    surface.setBaseProperties({.padding = Amethyst::UDim4::fromOffset(TOOLTIP_PADDING)});
+    const Amethyst::vec4 insets = surface.resolveContentInsets(surface.absoluteSize);
     surface.setBaseProperties({
-        .padding = Amethyst::UDim4::fromOffset(TOOLTIP_PADDING),
-        .size = Amethyst::UDim2::fromOffset(TOOLTIP_WIDTH,
-                                            2.0f * TOOLTIP_PADDING + static_cast<float>(rows.size()) * TOOLTIP_ROW_HEIGHT),
+        .size = Amethyst::UDim2::fromOffset(TOOLTIP_WIDTH, insets.x + insets.z + static_cast<float>(rows.size()) * TOOLTIP_ROW_HEIGHT),
     });
 
     auto *layout = surface.addExtension<Amethyst::UIListLayout>();

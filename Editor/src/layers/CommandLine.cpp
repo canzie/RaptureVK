@@ -256,7 +256,8 @@ void CommandLine::resetPopup(size_t rowCount)
         m_popup->removeChild(m_popup->getChildren().back().get());
     }
 
-    const float height = 2.0f * COMMAND_POPUP_PADDING + static_cast<float>(rowCount) * COMMAND_POPUP_ROW_HEIGHT;
+    const Amethyst::vec4 insets = m_popup->resolveContentInsets(m_popup->absoluteSize);
+    const float height = insets.x + insets.z + 2.0f * COMMAND_POPUP_PADDING + static_cast<float>(rowCount) * COMMAND_POPUP_ROW_HEIGHT;
     m_popup->setBaseProperties({.size = Amethyst::UDim2::fromOffset(COMMAND_POPUP_WIDTH, height)});
 }
 
