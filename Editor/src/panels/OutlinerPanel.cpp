@@ -111,7 +111,7 @@ void OutlinerPanel::build(Amethyst::UIScope &scope)
 
     m_contextMenu = m_root->add<Amethyst::ContextMenu>();
     m_contextMenu->setContextMenuProperties({.itemHoverBackground = COL_MENU_HOVER});
-    m_contextMenu->setRowFactories({.separator = [] { return std::make_unique<SeparatorMenuItemView>(); }});
+    m_contextMenu->setRowFactories({.separator = [textProcessor = &m_context.editor->amethyst->getTextProcessor()] { return std::make_unique<SeparatorMenuItemView>(*textProcessor); }});
 
     setScene(m_context.scene);
 }

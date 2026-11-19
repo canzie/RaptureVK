@@ -172,8 +172,7 @@ void PropertySection::rowCheckbox(Amethyst::TableScope &t, std::string_view labe
     t.row([&](Amethyst::TableRowScope &tr) {
         tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
         tr.cell([value, onChanged](Amethyst::UIScope &cell) {
-            cell.checkbox({.classes = {"property-input-field"},
-                           .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
+            cell.checkbox({.base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
                                     .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
                                     .size = Amethyst::UDim2::fromOffset(18.0f, 18.0f)},
                            .value = value},

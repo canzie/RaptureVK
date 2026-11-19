@@ -518,11 +518,31 @@ text-area {
 }
 
 
-radio-button.viewport-context-menu {
+checkbox {
     background-color: @bg-input;
+    background-transparency: 0.0;
+    border-pixel-size: 1px;
+    border-color: @border-4;
+    corner-radius: 4px;
+    padding: 2px;
+    check-color: @accent;
 }
 
-radio-button.viewport-context-menu:active {
+checkbox:hover {
+    border-color: @text-3;
+}
+
+.menu-checkbox {
+    corner-radius: 3px;
+}
+
+radio-button {
+    background-color: @bg-input;
+    background-transparency: 0.0;
+    border-pixel-size: 0px;
+}
+
+radio-button:active {
     background-color: @text-1;
 }
 

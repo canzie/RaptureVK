@@ -10,6 +10,8 @@
 #include <components/frame.h>
 #include <components/image_label.h>
 #include <components/text_label.h>
+#include <modules/text_processor.h>
+#include <parsers/freetype/font_registry.h>
 
 using namespace Amethyst;
 
@@ -19,7 +21,8 @@ static constexpr float THUMB_GAP = 6.0f;
 static constexpr float ACCENT_HEIGHT = 2.0f;
 static constexpr float ICON_INSET = 4.0f;
 static constexpr float ICON_GAP = 10.0f;
-static constexpr float RADIO_DIAMETER_SCALE = 0.4f;
+static constexpr float MENU_CHECKBOX_SIZE = 16.0f;
+static constexpr float MENU_RADIO_SIZE = 12.0f;
 static constexpr float SEPARATOR_GAP = 8.0f;
 static constexpr float ADD_ASSET_ROW_HEIGHT = 44.0f;
 static constexpr float ADD_ASSET_WELL_SIZE = 32.0f;
@@ -242,10 +245,12 @@ Frame *ToggleMenuItemView::create(ContextMenu &owner)
     Frame *row = ToggleItemView::create(owner);
 
     m_checkbox = row->add<Checkbox>();
+    m_checkbox->addClass("menu-checkbox");
     m_checkbox->setBaseProperties({
         .anchorPoint = {0.0f, 0.5f},
         .interactable = false, // decorative only since the row handles the click
         .position = UDim2(0.0f, ROW_PADDING, 0.5f, 0.0f),
+        .size = UDim2::fromOffset(MENU_CHECKBOX_SIZE, MENU_CHECKBOX_SIZE),
     });
 
     m_icon = row->add<ImageLabel>();
@@ -266,11 +271,10 @@ void ToggleMenuItemView::bind(ContextMenu::ItemData &item)
     auto &toggleItem = item.as<ToggleMenuItem>();
 
     float iconSize = m_owner->itemHeight - ICON_INSET;
-    m_checkbox->setBaseProperties({.size = UDim2::fromOffset(iconSize, iconSize)});
     m_checkbox->value = &toggleItem.value;
     m_checkbox->markDirty();
 
-    float labelLeft = ROW_PADDING + iconSize + ICON_GAP;
+    float labelLeft = ROW_PADDING + MENU_CHECKBOX_SIZE + ICON_GAP;
     bool hasIcon = !toggleItem.svgIcon.empty();
     m_icon->setBaseProperties({.visible = hasIcon});
     if (hasIcon) {
@@ -305,7 +309,11 @@ Frame *RadioMenuItemView::create(ContextMenu &owner)
     Frame *row = RadioItemView::create(owner);
 
     m_radio = row->add<RadioButton>();
-    m_radio->setBaseProperties({.anchorPoint = {0.0f, 0.5f}, .position = UDim2(0.0f, ROW_PADDING, 0.5f, 0.0f)});
+    m_radio->setBaseProperties({
+        .anchorPoint = {0.0f, 0.5f},
+        .position = UDim2(0.0f, ROW_PADDING + (MENU_CHECKBOX_SIZE - MENU_RADIO_SIZE) * 0.5f, 0.5f, 0.0f),
+        .size = UDim2::fromOffset(MENU_RADIO_SIZE, MENU_RADIO_SIZE),
+    });
 
     m_icon = row->add<ImageLabel>();
     m_icon->setBaseStyleProperties({.backgroundTransparency = 1.0f, .borderPixelSize = 0.0f});
@@ -325,12 +333,10 @@ void RadioMenuItemView::bind(ContextMenu::ItemData &item)
     auto &radioItem = item.as<RadioMenuItem>();
 
     float iconSize = m_owner->itemHeight - ICON_INSET;
-    float radioSize = iconSize * RADIO_DIAMETER_SCALE;
-    m_radio->setBaseProperties({.size = UDim2::fromOffset(radioSize, radioSize)});
     m_radio->value = radioItem.value;
     m_radio->setGroup(radioItem.group);
 
-    float labelLeft = ROW_PADDING + radioSize + ICON_GAP;
+    float labelLeft = ROW_PADDING + MENU_CHECKBOX_SIZE + ICON_GAP;
     bool hasIcon = !radioItem.svgIcon.empty();
     m_icon->setBaseProperties({.visible = hasIcon});
     if (hasIcon) {
@@ -392,7 +398,9 @@ void SeparatorMenuItemView::bind(ContextMenu::ItemData &item)
         return;
     }
 
-    float labelWidth = s_estimateTextWidth(sep.label, m_owner->getTextStyleProperties().fontSize);
+    const TextStyleProperties &labelStyle = m_label->getTextStyleProperties();
+    const FontId labelFont = FontRegistry::instance().findFont(labelStyle.fontFamily);
+    float labelWidth = m_textProcessor->measureTextAtlas(sep.label, labelFont, static_cast<uint32_t>(labelStyle.fontSize)).x;
     m_label->setBaseProperties({.size = UDim2(0.0f, labelWidth, 1.0f, 0.0f), .visible = true});
     m_label->setText(sep.label);
 

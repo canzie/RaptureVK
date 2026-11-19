@@ -43,7 +43,7 @@ void SceneObjectTreePanel::build(Amethyst::UIScope &scope)
 
     m_contextMenu = m_root->add<Amethyst::ContextMenu>();
     m_contextMenu->setContextMenuProperties({.itemHoverBackground = COL_MENU_HOVER});
-    m_contextMenu->setRowFactories({.separator = [] { return std::make_unique<SeparatorMenuItemView>(); }});
+    m_contextMenu->setRowFactories({.separator = [textProcessor = &m_context.editor->amethyst->getTextProcessor()] { return std::make_unique<SeparatorMenuItemView>(*textProcessor); }});
 
     if (m_scene != nullptr) {
         // deferred, the signal reaches here from inside a context menu callback

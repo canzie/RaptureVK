@@ -276,7 +276,7 @@ void ViewportPanel::buildTransformMenu()
     m_transformMenu->popupWidth *= 1.3f;
     m_transformMenu->maxVisibleItems = INT_MAX;
     m_transformMenu->setRowFactories({
-        .separator = [] { return std::make_unique<SeparatorMenuItemView>(); },
+        .separator = [textProcessor = &m_context.editor->amethyst->getTextProcessor()] { return std::make_unique<SeparatorMenuItemView>(*textProcessor); },
         .radio = [] { return std::make_unique<RadioMenuItemView>(); },
     });
 
@@ -315,7 +315,7 @@ void ViewportPanel::buildRenderMenu()
     m_renderMenu->popupWidth *= 1.3f;
     m_renderMenu->maxVisibleItems = INT_MAX;
     m_renderMenu->setRowFactories({.toggle = [] { return std::make_unique<ToggleMenuItemView>(); },
-                                   .separator = [] { return std::make_unique<SeparatorMenuItemView>(); },
+                                   .separator = [textProcessor = &m_context.editor->amethyst->getTextProcessor()] { return std::make_unique<SeparatorMenuItemView>(*textProcessor); },
                                    .radio = [] { return std::make_unique<RadioMenuItemView>(); }});
 
     m_lightingModeGroupConn = m_lightingModeGroup.onChanged.connect([this]() {
