@@ -27,6 +27,14 @@ class SurfaceGraphManager;
 // Maximum number of live material instances backed by the shared SSBO arena
 constexpr uint32_t MAX_MATERIALS = 4096;
 
+/**
+ * @brief A parameter a base material exposes and the type of value it holds
+ */
+struct MaterialParameterInfo {
+    ParameterId id;
+    PinType type;
+};
+
 class BaseMaterial {
   public:
     BaseMaterial(std::string name, uint32_t graphId, std::unordered_map<ParameterId, uint32_t> table, MaterialGraph graph);
@@ -61,6 +69,12 @@ class BaseMaterial {
      * @return True if this base exposes the parameter
      */
     bool tryGetOffset(const ParameterId &id, uint32_t &out) const;
+
+    /**
+     * @brief The parameters this base exposes, by name
+     * @return Every parameter and its type, sorted by name
+     */
+    std::vector<MaterialParameterInfo> getParameters() const;
 
   private:
     std::string m_name;

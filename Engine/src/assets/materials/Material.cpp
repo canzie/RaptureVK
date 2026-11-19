@@ -79,6 +79,23 @@ bool BaseMaterial::tryGetOffset(const ParameterId &id, uint32_t &out) const
     return true;
 }
 
+std::vector<MaterialParameterInfo> BaseMaterial::getParameters() const
+{
+    // the table holds where each parameter is written, its type is the one of the slot it writes to
+    const GraphSlotMapping mapping = MaterialManager::getSurfaceGraphManager().getMapping(m_graphId);
+
+    std::vector<MaterialParameterInfo> parameters;
+    parameters.reserve(m_table.size());
+    for (const auto &[id, offset] : m_table) {
+        auto slot = std::find_if(mapping.slots.begin(), mapping.slots.end(), [offset](const auto &entry) { return entry.second.offset == offset; });
+        if (slot != mapping.slots.end()) {
+            parameters.push_back({.id = id, .type = slot->second.type});
+        }
+    }
+    std::sort(parameters.begin(), parameters.end(), [](const MaterialParameterInfo &a, const MaterialParameterInfo &b) { return a.id < b.id; });
+    return parameters;
+}
+
 std::vector<uint8_t> BaseMaterial::serialize() const
 {
     auto appendBytes = [](std::vector<uint8_t> &out, const void *data, size_t size) {
