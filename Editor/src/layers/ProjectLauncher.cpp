@@ -175,7 +175,7 @@ void ProjectLauncher::addRecentRow(Amethyst::UIScope &list, const std::filesyste
                         .position = Amethyst::UDim2(0.0f, ROW_TEXT_LEFT, 0.0f, ROW_NAME_TOP),
                         .size = Amethyst::UDim2(1.0f, -(ROW_TEXT_LEFT + ROW_TEXT_RIGHT), 0.0f, ROW_NAME_HEIGHT),
                     },
-                .text = {.textTruncate = Amethyst::TextTruncate::AT_END},
+                .text = {.textTruncate = Amethyst::TextTruncate::ELLIPSIS},
                 .label = projectPath.stem().string(),
             });
 
@@ -187,7 +187,7 @@ void ProjectLauncher::addRecentRow(Amethyst::UIScope &list, const std::filesyste
                         .position = Amethyst::UDim2(0.0f, ROW_TEXT_LEFT, 0.0f, ROW_PATH_TOP),
                         .size = Amethyst::UDim2(1.0f, -(ROW_TEXT_LEFT + ROW_TEXT_RIGHT), 0.0f, ROW_PATH_HEIGHT),
                     },
-                .text = {.textTruncate = Amethyst::TextTruncate::AT_END},
+                .text = {.textTruncate = Amethyst::TextTruncate::ELLIPSIS},
                 .label = projectPath.parent_path().string(),
             });
         });

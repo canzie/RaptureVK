@@ -62,7 +62,7 @@ static void s_buildTabLabel(const std::string &label, const std::string &iconSvg
             {
                 .textXAlignment = Amethyst::TextXAlignment::LEFT,
                 .textYAlignment = Amethyst::TextYAlignment::CENTER,
-                .textTruncate = Amethyst::TextTruncate::AT_END,
+                .textTruncate = Amethyst::TextTruncate::ELLIPSIS,
             },
         .label = label,
     });

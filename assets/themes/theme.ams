@@ -74,7 +74,7 @@ text-button {
     text-color: @text-3;
     text-x-alignment: center;
     text-y-alignment: center;
-    text-truncate: at_end;
+    text-truncate: ellipsis;
     font-size: 12px;
 }
 
@@ -856,7 +856,7 @@ radio-button:active {
     text-color: @text-2;
     text-x-alignment: left;
     text-y-alignment: center;
-    text-truncate: at_end;
+    text-truncate: ellipsis;
     font-size: 12px;
 }
 

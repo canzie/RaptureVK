@@ -785,7 +785,7 @@ static void s_textCell(Amethyst::UIScope &s, const std::string &text, const Amet
                 .textColor = color,
                 .textXAlignment = align,
                 .textYAlignment = Amethyst::TextYAlignment::CENTER,
-                .textTruncate = Amethyst::TextTruncate::AT_END,
+                .textTruncate = Amethyst::TextTruncate::ELLIPSIS,
             },
         .label = text,
     });
@@ -890,7 +890,7 @@ void FileBrowser::populate()
                              .textColor = isDir ? COL_TEXT_STRONG : COL_TEXT,
                              .textXAlignment = Amethyst::TextXAlignment::LEFT,
                              .textYAlignment = Amethyst::TextYAlignment::CENTER,
-                             .textTruncate = Amethyst::TextTruncate::AT_END,
+                             .textTruncate = Amethyst::TextTruncate::ELLIPSIS,
                          },
                      .label = filename,
                  });

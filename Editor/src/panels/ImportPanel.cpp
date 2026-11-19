@@ -86,7 +86,7 @@ void ImportPanel::build()
                         .textColor = COL_TEXT,
                         .textXAlignment = Amethyst::TextXAlignment::LEFT,
                         .textYAlignment = Amethyst::TextYAlignment::CENTER,
-                        .textTruncate = Amethyst::TextTruncate::AT_END,
+                        .textTruncate = Amethyst::TextTruncate::ELLIPSIS,
                     },
                 .label = "Import: " + m_path.filename().string(),
             });
@@ -119,7 +119,7 @@ void ImportPanel::build()
                  .textColor = COL_TEXT,
                  .textXAlignment = Amethyst::TextXAlignment::LEFT,
                  .textYAlignment = Amethyst::TextYAlignment::CENTER,
-                 .textTruncate = Amethyst::TextTruncate::AT_END},
+                 .textTruncate = Amethyst::TextTruncate::ELLIPSIS},
         .label = m_path.string(),
     });
 
