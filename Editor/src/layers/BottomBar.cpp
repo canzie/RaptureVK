@@ -7,15 +7,13 @@
 
 #include <rapture/app/Application.h>
 #include <rapture/core/utils/Telemetry.h>
-#include <rapture/core/utils/rp_assert.h>
 
 #include <components/common.h>
+#include <components/extensions/ui_list_layout.h>
 #include <components/popup.h>
 #include <components/text_label.h>
 #include <components/ui_scope.h>
 #include <modules/color.h>
-#include <modules/text_processor.h>
-#include <parsers/freetype/font_registry.h>
 
 #include <format>
 
@@ -26,16 +24,15 @@ static constexpr float ISLAND_SEPARATOR_WIDTH = 2.0f;
 static constexpr float STATS_ISLAND_PADDING = 12.0f;
 static constexpr float STAT_GAP = 14.0f;
 static constexpr float STAT_UNIT_GAP = 4.0f;
+static constexpr float FLOATING_BROWSER_GAP = 6.0f;
 static constexpr uint64_t BYTES_PER_MEGABYTE = 1024ull * 1024ull;
 
-static constexpr std::array<std::string_view, BottomBar::BOTTOM_BAR_STAT_COUNT> STAT_WIDEST_VALUES = {"999.9", "9999", "99999"};
 static constexpr std::array<std::string_view, BottomBar::BOTTOM_BAR_STAT_COUNT> STAT_UNITS = {"ms", "fps", "MB VRAM"};
 
-static float s_measureLabelTextWidth(const Amethyst::TextProcessor &textProcessor, std::string_view text,
-                                     const Amethyst::TextStyleProperties &style)
+static void s_setButtonGuiStateFlag(Amethyst::TextButton &button, uint16_t flag, bool on)
 {
-    const Amethyst::FontId font = Amethyst::FontRegistry::instance().findFont(style.fontFamily);
-    return textProcessor.measureTextAtlas(std::string(text), font, static_cast<uint32_t>(style.fontSize)).x;
+    const uint16_t state = button.getGuiState();
+    button.setGuiState(on ? static_cast<uint16_t>(state | flag) : static_cast<uint16_t>(state & ~flag));
 }
 
 static bool s_workspaceContainsContentBrowserPanel(Workspace *workspace)
@@ -121,50 +118,68 @@ void BottomBar::addIslandSeparator(const Amethyst::UDim2 &position)
     });
 }
 
+static void s_addHorizontalList(Amethyst::UIObject &frame, float gap)
+{
+    auto *layout = frame.addExtension<Amethyst::UIListLayout>();
+    layout->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
+    layout->innerPadding = Amethyst::UDim::fromOffset(gap);
+}
+
 void BottomBar::setupStatsIsland()
 {
-    RP_ASSERT(m_editor.amethyst != nullptr, "the bottom bar was built without the ui context");
-    const Amethyst::TextProcessor &textProcessor = m_editor.amethyst->getTextProcessor();
+    // the separator travels with the island's left edge as the readings change its width
+    Amethyst::Frame *edge = nullptr;
+    Amethyst::UIScope(*m_root).frame(
+        {
+            .base =
+                {
+                    .anchorPoint = Amethyst::vec2(1.0f, 0.0f),
+                    .automaticSize = Amethyst::AutomaticSize::X,
+                    .position = Amethyst::UDim2::fromScale(1.0f, 0.0f),
+                    .size = Amethyst::UDim2::fromScale(0.0f, 1.0f),
+                },
+            .style = {.backgroundTransparency = 1.0f},
+        },
+        [&edge](Amethyst::FrameScope &f) { edge = &f.component; });
+    s_addHorizontalList(*edge, 0.0f);
+
+    Amethyst::UIScope edgeScope(*edge);
+    edgeScope.frame({
+        .classes = {"bottom-bar-separator"},
+        .base = {.layoutOrder = 0, .size = Amethyst::UDim2(0.0f, ISLAND_SEPARATOR_WIDTH, 1.0f, 0.0f)},
+    });
 
     Amethyst::Frame *island = nullptr;
-    Amethyst::UIScope(*m_root).frame(
+    edgeScope.frame(
         {
             .classes = {"bottom-bar"},
             .base =
                 {
-                    .anchorPoint = Amethyst::vec2(1.0f, 0.0f),
-                    .position = Amethyst::UDim2::fromScale(1.0f, 0.0f),
+                    .automaticSize = Amethyst::AutomaticSize::X,
+                    .layoutOrder = 1,
+                    .padding = Amethyst::UDim4{.right = Amethyst::UDim::fromOffset(STATS_ISLAND_PADDING),
+                                               .left = Amethyst::UDim::fromOffset(STATS_ISLAND_PADDING)},
+                    .size = Amethyst::UDim2::fromScale(0.0f, 1.0f),
                 },
         },
         [&island](Amethyst::FrameScope &f) { island = &f.component; });
+    s_addHorizontalList(*island, STAT_GAP);
 
-    float cursor = STATS_ISLAND_PADDING;
+    const Amethyst::BasePropertiesArgs fitted = {.automaticSize = Amethyst::AutomaticSize::X, .size = Amethyst::UDim2::fromScale(0.0f, 1.0f)};
     for (size_t stat = 0; stat < BOTTOM_BAR_STAT_COUNT; ++stat) {
-        Amethyst::UIScope islandScope(*island);
-        islandScope.textLabel({.classes = {"bottom-bar-stat-value"}},
-                              [this, stat](Amethyst::TextLabelScope &tl) { m_statValueLabels[stat] = &tl.component; });
-        Amethyst::TextLabel *value = m_statValueLabels[stat];
-        const float valueWidth = s_measureLabelTextWidth(textProcessor, STAT_WIDEST_VALUES[stat], value->getTextStyleProperties());
-        value->setBaseProperties({
-            .position = Amethyst::UDim2::fromOffset(cursor, 0.0f),
-            .size = Amethyst::UDim2(0.0f, valueWidth, 1.0f, 0.0f),
-        });
-        cursor += valueWidth + STAT_UNIT_GAP;
+        Amethyst::Frame *reading = nullptr;
+        Amethyst::UIScope(*island).frame({.style = {.backgroundTransparency = 1.0f}},
+                                         [&reading](Amethyst::FrameScope &f) { reading = &f.component; });
+        reading->setBaseProperties(fitted);
+        reading->setBaseProperties({.layoutOrder = static_cast<uint32_t>(stat)});
+        s_addHorizontalList(*reading, STAT_UNIT_GAP);
 
-        Amethyst::TextLabel *unit = nullptr;
-        islandScope.textLabel({.classes = {"bottom-bar-stat-unit"}, .label = std::string(STAT_UNITS[stat])},
-                              [&unit](Amethyst::TextLabelScope &tl) { unit = &tl.component; });
-        const float unitWidth = s_measureLabelTextWidth(textProcessor, STAT_UNITS[stat], unit->getTextStyleProperties());
-        unit->setBaseProperties({
-            .position = Amethyst::UDim2::fromOffset(cursor, 0.0f),
-            .size = Amethyst::UDim2(0.0f, unitWidth, 1.0f, 0.0f),
-        });
-        cursor += unitWidth + STAT_GAP;
+        Amethyst::UIScope readingScope(*reading);
+        readingScope.textLabel({.classes = {"bottom-bar-stat-value"}, .base = fitted},
+                               [this, stat](Amethyst::TextLabelScope &tl) { m_statValueLabels[stat] = &tl.component; });
+        readingScope.textLabel({.classes = {"bottom-bar-stat-unit"}, .base = fitted, .label = std::string(STAT_UNITS[stat])},
+                               [](Amethyst::TextLabelScope &tl) { tl.component.setBaseProperties({.layoutOrder = 1}); });
     }
-
-    const float islandWidth = cursor - STAT_GAP + STATS_ISLAND_PADDING;
-    island->setBaseProperties({.size = Amethyst::UDim2(0.0f, islandWidth, 1.0f, 0.0f)});
-    addIslandSeparator(Amethyst::UDim2(1.0f, -islandWidth - ISLAND_SEPARATOR_WIDTH, 0.0f, 0.0f));
 }
 
 void BottomBar::onUpdate()
@@ -186,11 +201,14 @@ void BottomBar::setupContentBrowserToggle()
 {
     Amethyst::UIScope(*m_root).popup(
         {
-            .base = {.size = Amethyst::UDim2::fromScale(0.7f, 0.45f)},
-            .style = {.backgroundColor = Amethyst::Color3(0.13f), .borderPixelSize = 0.0f},
+            .classes = {"content-browser-floating"},
+            .base = {.clipsDescendants = true, .size = Amethyst::UDim2::fromScale(0.7f, 0.45f)},
             .placement = Amethyst::PopupPlacement::ABOVE,
+            .offset = Amethyst::vec2(FLOATING_BROWSER_GAP, -FLOATING_BROWSER_GAP),
         },
         [this](Amethyst::PopupScope &p) { m_contentBrowserPopup = &p.component; });
+    m_contentBrowserPopup->onOpened = [this]() { s_setButtonGuiStateFlag(*m_contentBrowserBtn, Amethyst::GUI_STATE_ACTIVE, true); };
+    m_contentBrowserPopup->onClosed = [this]() { s_setButtonGuiStateFlag(*m_contentBrowserBtn, Amethyst::GUI_STATE_ACTIVE, false); };
 
     WorkspaceContext context = m_currWorkspace != nullptr ? m_currWorkspace->getContext() : WorkspaceContext{.editor = &m_editor};
     m_contentBrowserPanel = std::make_unique<ContentBrowserPanel>(context, [this]() { dockContentBrowser(); });
@@ -205,7 +223,13 @@ void BottomBar::dockContentBrowser()
 
     m_currWorkspace->addPanel(std::move(m_contentBrowserPanel), Amethyst::DockZone::BOTTOM);
     m_contentBrowserPanel = nullptr;
+
+    // the emptied popup would otherwise stay open over the layout, taking every click until one lands outside it
+    m_contentBrowserPopup->close();
+    m_contentBrowserPopup->onClosed = nullptr;
+    m_contentBrowserPopup->reparent(nullptr);
     m_contentBrowserPopup = nullptr;
+    s_setButtonGuiStateFlag(*m_contentBrowserBtn, Amethyst::GUI_STATE_ACTIVE, false);
 }
 
 void BottomBar::setCurrentWorkspace(Workspace *workspace)

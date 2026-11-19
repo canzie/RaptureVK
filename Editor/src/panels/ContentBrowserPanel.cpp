@@ -3,6 +3,10 @@
 #include "context/WindowManager.h"
 #include "context/WorkspaceManager.h"
 #include "ui/AssetVisuals.h"
+#include "ui/ControlTooltip.h"
+#include "ui/controls/IconButton.h"
+#include "ui/controls/IconLabelButton.h"
+#include "ui/controls/SearchField.h"
 #include "ui/menus/ContextMenuItems.h"
 #include "workspaces/ScriptingWorkspace.h"
 #include <rapture/app/Application.h>
@@ -26,47 +30,136 @@
 #include <rapture/scene/instances/controllers/PlayerController.h>
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <climits>
 #include <components/common.h>
 #include <components/context_menu_item.h>
-#include <components/extensions/ui_aspect_ratio_constraint.h>
+#include <components/extensions/ui_flex_item.h>
 #include <components/extensions/ui_grid_layout.h>
 #include <components/extensions/ui_list_layout.h>
+#include <components/extensions/ui_size_constraint.h>
 #include <components/frame.h>
+#include <components/input_interface.h>
 #include <components/popup.h>
 #include <components/ui_scope.h>
+#include <format>
+#include <limits>
 #include <memory>
 #include <modules/color.h>
+#include <modules/text_processor.h>
+#include <optional>
 #include <string_view>
 
-static constexpr float TOP_BAR_HEIGHT = 36.0f;
-static constexpr float SIDE_BAR_WIDTH = 200.0f;
-static constexpr float SEARCH_BAR_HEIGHT = 36.0f;
+enum ContentBrowserTooltip {
+    CONTENT_BROWSER_TOOLTIP_ADD,
+    CONTENT_BROWSER_TOOLTIP_IMPORT,
+    CONTENT_BROWSER_TOOLTIP_BACK,
+    CONTENT_BROWSER_TOOLTIP_FORWARD,
+    CONTENT_BROWSER_TOOLTIP_UP,
+    CONTENT_BROWSER_TOOLTIP_DOCK,
+    CONTENT_BROWSER_TOOLTIP_SETTINGS,
+    CONTENT_BROWSER_TOOLTIP_COUNT
+};
+
+static constexpr std::array<ControlTooltip, CONTENT_BROWSER_TOOLTIP_COUNT> CONTENT_BROWSER_TOOLTIPS = {{
+    {.name = "Add", .description = "Creates a folder or an asset in this folder"},
+    {.name = "Import", .description = "Brings a file from disk into this folder"},
+    {.name = "Back", .description = "Back"},
+    {.name = "Forward", .description = "Forward"},
+    {.name = "Up", .description = "Up to the parent folder"},
+    {.name = "Dock", .description = "Docks the browser into the workspace"},
+    {.name = "Settings", .description = "Browser settings"},
+}};
+
+static constexpr float TOOLBAR_HEIGHT = 40.0f;
+static constexpr float SEPARATOR_WIDTH = 2.0f;
+static constexpr float BODY_TOP = TOOLBAR_HEIGHT + SEPARATOR_WIDTH;
+static constexpr float SIDE_BAR_WIDTH = 218.0f;
+static constexpr float CONTENT_LEFT = SIDE_BAR_WIDTH + SEPARATOR_WIDTH;
 static constexpr float STATUS_BAR_HEIGHT = 24.0f;
-static constexpr float SECTION_HEADER_HEIGHT = 26.0f;
 
-static constexpr float TILE_MIN_WIDTH = 150.0f;
-static constexpr float TILE_MAX_WIDTH = 210.0f;
-static constexpr float TILE_ASPECT = 0.75f;
-static constexpr float TILE_FOOTER_HEIGHT = 46.0f;
-static constexpr float TILE_TYPEBAR_HEIGHT = 3.0f;
-static constexpr float TILE_ICON_SIZE = 42.0f;
+static constexpr float ISLAND_PADDING = 12.0f;
+static constexpr float TOOLBAR_CONTROL_HEIGHT = 28.0f;
+static constexpr float NAV_BUTTON_WIDTH = 30.0f;
+static constexpr float NAV_BUTTON_GAP = 2.0f;
+static constexpr float NAV_ICON_SIZE = 17.0f;
+static constexpr float SETTINGS_ICON_SIZE = 19.0f;
+static constexpr float SEARCH_FIELD_MAX_WIDTH = 260.0f;
+static constexpr float SEARCH_FIELD_MIN_WIDTH = 140.0f;
+static constexpr float SEARCH_FIELD_HEIGHT = 26.0f;
 
-#define COL_SELECTION Amethyst::Color3(0.13f, 0.45f, 0.85f)
-#define COL_SEPARATOR Amethyst::Color3::fromHex(0x181818)
-#define COL_ICON      Amethyst::Color4(0.8f, 0.8f, 0.8f, 1.0f)
-#define COL_HOVER     Amethyst::Color3::fromHex(0x4d4d4d)
+static constexpr float CRUMB_HEIGHT = 24.0f;
+static constexpr float CRUMB_PADDING = 6.0f;
+static constexpr float CRUMB_GAP = 2.0f;
+static constexpr float CRUMB_SEPARATOR_SIZE = 10.0f;
 
-static constexpr float CONTENT_PADDING = 10.0f;
+static constexpr float SECTION_HEADER_HEIGHT = 28.0f;
+static constexpr float SECTION_PADDING = 10.0f;
+static constexpr float SECTION_CHEVRON_SIZE = 10.0f;
+static constexpr float SECTION_GAP = 8.0f;
+static constexpr float SECTION_AFTER_TREE_GAP = 4.0f;
+static constexpr float FOLDER_ROW_HEIGHT = 24.0f;
+static constexpr float FOLDER_INDENT = 14.0f;
+static constexpr float FOLDER_EXPANDER_SIZE = 12.0f;
+static constexpr float FOLDER_EXPANDER_PADDING = 4.0f;
+static constexpr float FOLDER_ICON_SIZE = 14.0f;
+static constexpr float FOLDER_ICON_GAP = 6.0f;
+
+static constexpr float CONTENT_PADDING = 12.0f;
+static constexpr float CARD_GAP = 10.0f;
+static constexpr float CARD_WIDTH = 124.0f;
+static constexpr float CARD_HEIGHT = 150.0f;
+static constexpr float CARD_MAX_WIDTH = 156.0f;
+static constexpr float CARD_FOOTER_HEIGHT = 44.0f;
+static constexpr float CARD_TYPEBAR_HEIGHT = 3.0f;
+static constexpr float CARD_ICON_SIZE = 38.0f;
+static constexpr float CARD_TEXT_INSET = 6.0f;
+static constexpr float CARD_NAME_HEIGHT = 16.0f;
+static constexpr float CARD_KIND_HEIGHT = 13.0f;
+static constexpr float CARD_NAME_KIND_GAP = 1.0f;
+
 static constexpr float ADD_MENU_WIDTH = 240.0f;
 
-static constexpr float TOOLTIP_WIDTH = 240.0f;
-static constexpr float TOOLTIP_ROW_HEIGHT = 18.0f;
-static constexpr float TOOLTIP_PADDING = 8.0f;
+static constexpr float ASSET_TOOLTIP_WIDTH = 340.0f;
+static constexpr float ASSET_TOOLTIP_PADDING = 10.0f;
+static constexpr float ASSET_TOOLTIP_PREVIEW_SIZE = 48.0f;
+static constexpr float ASSET_TOOLTIP_PREVIEW_ICON_SIZE = 24.0f;
+static constexpr float ASSET_TOOLTIP_HEAD_HEIGHT = ASSET_TOOLTIP_PREVIEW_SIZE + 2.0f * ASSET_TOOLTIP_PADDING;
+static constexpr float ASSET_TOOLTIP_TITLE_HEIGHT = 18.0f;
+static constexpr float ASSET_TOOLTIP_CHIP_HEIGHT = 14.0f;
+static constexpr float ASSET_TOOLTIP_CHIP_GAP = 4.0f;
+static constexpr float ASSET_TOOLTIP_DOT_SIZE = 8.0f;
+static constexpr float ASSET_TOOLTIP_DOT_GAP = 5.0f;
+static constexpr float ASSET_TOOLTIP_DIVIDER_HEIGHT = 1.0f;
+static constexpr float ASSET_TOOLTIP_FACTS_TOP = 8.0f;
+static constexpr float ASSET_TOOLTIP_FACT_HEIGHT = 16.0f;
+static constexpr float ASSET_TOOLTIP_FACT_GAP = 3.0f;
+static constexpr float ASSET_TOOLTIP_KEY_WIDTH = 92.0f;
+static constexpr float ASSET_TOOLTIP_KEY_VALUE_GAP = 10.0f;
 
 using MenuItems = std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>>;
-using TooltipRows = std::vector<std::pair<std::string, std::string>>;
+
+/**
+ * @brief One line of an asset tooltip's facts
+ */
+struct AssetTooltipFact {
+    std::string key;
+    std::string value;
+    bool monospace;
+};
+
+/**
+ * @brief What an asset tooltip shows about the card it belongs to
+ */
+struct AssetTooltipContent {
+    std::string title;
+    std::string typeLabel;
+    std::string iconSvg;
+    std::string iconClass;
+    std::optional<Amethyst::Color3> typeColor;
+    std::vector<AssetTooltipFact> facts;
+};
 
 // TODO: replace with the asset creation panel these rows will open once it exists
 static void s_createAssetStub(std::string_view what)
@@ -91,11 +184,10 @@ static std::string s_typeLabel(Rapture::AssetType type, const Rapture::TypeInfo 
     return std::string(Rapture::AssetRegistry::displayName(type));
 }
 
-static void s_setActive(Amethyst::UIObject &object, bool active)
+static void s_setGuiStateFlag(Amethyst::UIObject &object, uint16_t flag, bool on)
 {
-    uint16_t state = object.getGuiState();
-    object.setGuiState(active ? static_cast<uint16_t>(state | Amethyst::GUI_STATE_ACTIVE)
-                              : static_cast<uint16_t>(state & ~Amethyst::GUI_STATE_ACTIVE));
+    const uint16_t state = object.getGuiState();
+    object.setGuiState(on ? static_cast<uint16_t>(state | flag) : static_cast<uint16_t>(state & ~flag));
 }
 
 static std::string s_uniqueFolderName(const std::filesystem::path &directory)
@@ -146,41 +238,169 @@ static std::string s_normalizeForSearch(std::string_view text)
     return out;
 }
 
-static float s_estimateTextWidth(const std::string &text, float fontSize)
+
+static uint32_t s_countShownTreeRows(const Amethyst::TreeView &tree)
 {
-    return static_cast<float>(text.size()) * fontSize * 0.55f + 14.0f;
+    uint32_t shown = 0;
+    uint16_t foldedDepth = UINT16_MAX;
+    for (uint32_t row = 0; row < tree.rowCount(); row++) {
+        const uint16_t depth = tree.depth(row);
+        if (depth > foldedDepth) {
+            continue;
+        }
+        foldedDepth = UINT16_MAX;
+        shown++;
+        if (tree.hasChildren(row) && !tree.isExpanded(row)) {
+            foldedDepth = depth;
+        }
+    }
+    return shown;
 }
 
-static void s_fillTooltip(Amethyst::Tooltip &surface, const TooltipRows &rows)
+static Amethyst::TextLabel *s_addAssetTooltipLabel(Amethyst::UIScope &scope, std::string_view styleClass, std::string text,
+                                                   const Amethyst::UDim2 &position, const Amethyst::UDim2 &size)
 {
-    surface.removeAllChildren();
-    surface.setClasses({"tooltip"});
-    surface.setBaseProperties({.padding = Amethyst::UDim4::fromOffset(TOOLTIP_PADDING)});
-    const Amethyst::vec4 insets = surface.resolveContentInsets(surface.absoluteSize);
-    surface.setBaseProperties({
-        .size = Amethyst::UDim2::fromOffset(TOOLTIP_WIDTH, insets.x + insets.z + static_cast<float>(rows.size()) * TOOLTIP_ROW_HEIGHT),
-    });
+    Amethyst::TextLabel *label = nullptr;
+    scope.textLabel(
+        {
+            .classes = {std::string(styleClass)},
+            .base = {.interactable = false, .position = position, .size = size},
+            .label = std::move(text),
+        },
+        [&label](Amethyst::TextLabelScope &tl) { label = &tl.component; });
+    return label;
+}
 
-    auto *layout = surface.addExtension<Amethyst::UIListLayout>();
-    layout->fillDirection = Amethyst::FillDirection::FILL_VERTICAL;
-    layout->horizontalAlignment = Amethyst::HorizontalAlignment::ALIGN_LEFT;
-    layout->verticalAlignment = Amethyst::VerticalAlignment::ALIGN_TOP;
-
-    Amethyst::UIScope scope(surface);
-    uint32_t order = 0;
-    for (const auto &[label, value] : rows) {
-        scope.textLabel({
-            .classes = {"tooltip-row"},
+static void s_fillAssetTooltipHead(Amethyst::UIScope &scope, const AssetTooltipContent &content)
+{
+    scope.frame(
+        {
+            .classes = {"asset-tooltip-preview"},
             .base =
                 {
                     .interactable = false,
-                    .layoutOrder = order++,
-                    .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, TOOLTIP_ROW_HEIGHT),
+                    .position = Amethyst::UDim2::fromOffset(ASSET_TOOLTIP_PADDING, ASSET_TOOLTIP_PADDING),
+                    .size = Amethyst::UDim2::fromOffset(ASSET_TOOLTIP_PREVIEW_SIZE, ASSET_TOOLTIP_PREVIEW_SIZE),
                 },
-            .label = label + ": " + value,
+        },
+        [&content](Amethyst::FrameScope &preview) {
+            preview.imageLabel({
+                .classes = {content.iconClass},
+                .base =
+                    {
+                        .anchorPoint = Amethyst::vec2(0.5f, 0.5f),
+                        .interactable = false,
+                        .position = Amethyst::UDim2::fromScale(0.5f, 0.5f),
+                        .size = Amethyst::UDim2::fromOffset(ASSET_TOOLTIP_PREVIEW_ICON_SIZE, ASSET_TOOLTIP_PREVIEW_ICON_SIZE),
+                    },
+                .svg = content.iconSvg,
+            });
         });
+
+    const float textLeft = 2.0f * ASSET_TOOLTIP_PADDING + ASSET_TOOLTIP_PREVIEW_SIZE;
+    const float textTop =
+        (ASSET_TOOLTIP_HEAD_HEIGHT - ASSET_TOOLTIP_TITLE_HEIGHT - ASSET_TOOLTIP_CHIP_GAP - ASSET_TOOLTIP_CHIP_HEIGHT) * 0.5f;
+    s_addAssetTooltipLabel(scope, "asset-tooltip-title", content.title, Amethyst::UDim2::fromOffset(textLeft, textTop),
+                           Amethyst::UDim2(1.0f, -(textLeft + ASSET_TOOLTIP_PADDING), 0.0f, ASSET_TOOLTIP_TITLE_HEIGHT));
+
+    const float chipTop = textTop + ASSET_TOOLTIP_TITLE_HEIGHT + ASSET_TOOLTIP_CHIP_GAP;
+    float chipTextLeft = textLeft;
+    if (content.typeColor.has_value()) {
+        scope.frame({
+            .classes = {"asset-tooltip-dot"},
+            .base =
+                {
+                    .anchorPoint = Amethyst::vec2(0.0f, 0.5f),
+                    .interactable = false,
+                    .position = Amethyst::UDim2::fromOffset(textLeft, chipTop + ASSET_TOOLTIP_CHIP_HEIGHT * 0.5f),
+                    .size = Amethyst::UDim2::fromOffset(ASSET_TOOLTIP_DOT_SIZE, ASSET_TOOLTIP_DOT_SIZE),
+                },
+            .style = {.backgroundColor = *content.typeColor},
+        });
+        chipTextLeft += ASSET_TOOLTIP_DOT_SIZE + ASSET_TOOLTIP_DOT_GAP;
     }
+    Amethyst::TextLabel *chip = s_addAssetTooltipLabel(scope, "asset-tooltip-chip", content.typeLabel,
+                                                       Amethyst::UDim2::fromOffset(chipTextLeft, chipTop),
+                                                       Amethyst::UDim2::fromOffset(0.0f, ASSET_TOOLTIP_CHIP_HEIGHT));
+    chip->setBaseProperties({.automaticSize = Amethyst::AutomaticSize::X});
+
+    scope.frame({
+        .classes = {"asset-tooltip-divider"},
+        .base =
+            {
+                .interactable = false,
+                .position = Amethyst::UDim2::fromOffset(0.0f, ASSET_TOOLTIP_HEAD_HEIGHT),
+                .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, ASSET_TOOLTIP_DIVIDER_HEIGHT),
+            },
+    });
 }
+
+static void s_fillAssetTooltip(Amethyst::Tooltip &surface, const AssetTooltipContent &content)
+{
+    surface.removeAllChildren();
+    surface.setClasses({"tooltip"});
+    surface.setBaseProperties({
+        .automaticSize = Amethyst::AutomaticSize::OFF,
+        .clipsDescendants = true,
+        .padding = Amethyst::UDim4::fromOffset(0.0f),
+    });
+
+    Amethyst::UIScope scope(surface);
+    s_fillAssetTooltipHead(scope, content);
+
+    const float valueLeft = ASSET_TOOLTIP_PADDING + ASSET_TOOLTIP_KEY_WIDTH + ASSET_TOOLTIP_KEY_VALUE_GAP;
+    float factTop = ASSET_TOOLTIP_HEAD_HEIGHT + ASSET_TOOLTIP_DIVIDER_HEIGHT + ASSET_TOOLTIP_FACTS_TOP;
+    for (const AssetTooltipFact &fact : content.facts) {
+        s_addAssetTooltipLabel(scope, "asset-tooltip-fact-key", fact.key, Amethyst::UDim2::fromOffset(ASSET_TOOLTIP_PADDING, factTop),
+                               Amethyst::UDim2::fromOffset(ASSET_TOOLTIP_KEY_WIDTH, ASSET_TOOLTIP_FACT_HEIGHT));
+        s_addAssetTooltipLabel(scope, fact.monospace ? "asset-tooltip-fact-value-mono" : "asset-tooltip-fact-value", fact.value,
+                               Amethyst::UDim2::fromOffset(valueLeft, factTop),
+                               Amethyst::UDim2(1.0f, -(valueLeft + ASSET_TOOLTIP_PADDING), 0.0f, ASSET_TOOLTIP_FACT_HEIGHT));
+        factTop += ASSET_TOOLTIP_FACT_HEIGHT + ASSET_TOOLTIP_FACT_GAP;
+    }
+
+    const float contentHeight = factTop - ASSET_TOOLTIP_FACT_GAP + ASSET_TOOLTIP_PADDING;
+    const Amethyst::vec4 insets = surface.resolveContentInsets(surface.absoluteSize);
+    surface.setBaseProperties({.size = Amethyst::UDim2::fromOffset(ASSET_TOOLTIP_WIDTH, contentHeight + insets.x + insets.z)});
+}
+
+static AssetTooltipContent s_describeEntryForTooltip(const std::filesystem::directory_entry &entry, const std::string &displayName,
+                                                     const Rapture::AssetMetadata *metadata, Rapture::AssetHandle handle)
+{
+    const std::filesystem::path projectDirectory = Rapture::Application::getInstance().getProject().getProjectDirectory();
+
+    AssetTooltipContent content;
+    content.title = displayName;
+    content.facts.push_back({.key = "Location", .value = entry.path().lexically_relative(projectDirectory).generic_string(), .monospace = true});
+
+    if (entry.is_directory()) {
+        content.typeLabel = "Folder";
+        content.iconSvg = Icons::SVG_FOLDER;
+        content.iconClass = "content-browser-card-icon-folder";
+        return content;
+    }
+
+    std::error_code sizeEc;
+    const uintmax_t bytes = std::filesystem::file_size(entry.path(), sizeEc);
+    if (!sizeEc) {
+        content.facts.push_back({.key = "Size on disk", .value = Rapture::StringFormat_bytesToUnitString(bytes), .monospace = false});
+    }
+
+    content.iconClass = "content-browser-card-icon";
+    if (metadata == nullptr) {
+        const std::string extension = entry.path().extension().string();
+        content.typeLabel = extension.empty() ? "File" : extension;
+        content.iconSvg = Icons::SVG_SCRIPT;
+        return content;
+    }
+
+    content.typeLabel = s_typeLabel(metadata->assetType, metadata->authoredClass);
+    content.iconSvg = Asset_iconForType(metadata->assetType, metadata->authoredClass);
+    content.typeColor = Asset_colorForType(metadata->assetType);
+    content.facts.push_back({.key = "Id", .value = std::format("{:016x}", handle), .monospace = true});
+    return content;
+}
+
 ContentBrowserPanel::ContentBrowserPanel(const WorkspaceContext &context, std::function<void()> onDockRequested)
     : Panel("Content Browser", context), m_onDockRequested(std::move(onDockRequested))
 {
@@ -197,15 +417,9 @@ void ContentBrowserPanel::build(Amethyst::UIScope &scope)
 {
     (void)scope;
 
-    m_baseDirectory = Rapture::Application::getInstance().getProject().getProjectDirectory();
+    m_baseDirectory = Rapture::Application::getInstance().getProject().getContentDirectory();
     m_currentDirectory = m_baseDirectory;
     m_navigationHistory.push_back(m_currentDirectory);
-
-    m_root->setBaseStyleProperties({
-        .borderMode = Amethyst::BorderMode::INSET,
-        .borderPixelSize = 2.0f,
-        .borderColor = Amethyst::Color3::fromHex(0x181818),
-    });
 
     setupTopBar();
     setupSideBar();
@@ -216,364 +430,366 @@ void ContentBrowserPanel::build(Amethyst::UIScope &scope)
     refresh();
 }
 
-void ContentBrowserPanel::setupTopBar()
+Amethyst::Frame *ContentBrowserPanel::addToolbarIsland()
 {
-    Amethyst::UIScope(*m_root).frame(
+    Amethyst::Frame *island = nullptr;
+    Amethyst::UIScope(*m_topBarPane).frame(
         {
-            .classes = {"content-browser-section"},
+            .classes = {"content-browser-toolbar"},
             .base =
                 {
-                    .position = Amethyst::UDim2::fromScale(0.0f),
-                    .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, TOP_BAR_HEIGHT),
+                    .automaticSize = Amethyst::AutomaticSize::X,
+                    .clipsDescendants = true,
+                    .layoutOrder = static_cast<uint32_t>(m_topBarPane->getChildren().size()),
+                    .padding = Amethyst::UDim4{.right = Amethyst::UDim::fromOffset(ISLAND_PADDING), .left = Amethyst::UDim::fromOffset(ISLAND_PADDING)},
+                    .size = Amethyst::UDim2::fromScale(0.0f, 1.0f),
                 },
         },
-        [this](Amethyst::FrameScope &top) {
-            m_topBarPane = &top.component;
-
-            // Single horizontal list-layout cluster so item positions are computed, not hardcoded.
-            // It spans from the left edge up to the settings button reserved on the right.
-            top.frame(
-                {
-                    .base =
-                        {
-                            .anchorPoint = Amethyst::vec2(0.0f, 0.5f),
-                            .clipsDescendants = true,
-                            .position = Amethyst::UDim2(0.0f, CONTENT_PADDING, 0.5f, 0.0f),
-                            .size = Amethyst::UDim2(1.0f, -(CONTENT_PADDING + 40.0f), 1.0f, -10.0f),
-                        },
-                    .style = {.backgroundTransparency = 1.0f},
-                },
-                [this](Amethyst::FrameScope &cluster) {
-                    auto *layout = cluster.component.addExtension<Amethyst::UIListLayout>();
-                    layout->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
-                    layout->verticalAlignment = Amethyst::VerticalAlignment::ALIGN_CENTER_V;
-                    layout->horizontalAlignment = Amethyst::HorizontalAlignment::ALIGN_LEFT;
-                    layout->innerPadding = Amethyst::UDim::fromOffset(4.0f);
-
-                    cluster.textButton(
-                        {
-                            .classes = {"generic-text-button"},
-                            .base = {.layoutOrder = 0, .size = Amethyst::UDim2::fromOffset(56.0f, 24.0f)},
-                            .label = "+ Add",
-                        },
-                        [this](Amethyst::TextButtonScope &b) {
-                            m_addBtn = &b.component;
-                            m_addBtn->track(m_addBtn->onMouseButton1ClickCb.connect(
-                                [this]() { showAddMenu({m_addBtn->absolutePosition.x, m_addBtn->absolutePosition.y}); }));
-                        });
-                    cluster.textButton(
-                        {
-                            .classes = {"generic-text-button"},
-                            .base = {.layoutOrder = 1, .size = Amethyst::UDim2::fromOffset(58.0f, 24.0f)},
-                            .label = "Import",
-                        },
-                        [this](Amethyst::TextButtonScope &b) {
-                            m_importBtn = &b.component;
-                            m_importBtn->track(m_importBtn->onMouseButton1ClickCb.connect([this]() {
-                                WindowManager *windows = m_context.editor->windows;
-                                windows->openFileDialog(FILE_DIALOG_OPEN, [this, windows](const std::filesystem::path &path) {
-                                    windows->openImportPanel(path, m_currentDirectory);
-                                });
-                            }));
-                        });
-                    cluster.imageButton(
-                        {
-                            .base = {.layoutOrder = 2, .size = Amethyst::UDim2::fromOffset(22.0f, 22.0f)},
-                            .style = {.backgroundTransparency = 1.0f, .cornerRadius = 3.0f},
-                            .image = {.imageColor = COL_ICON},
-                            .svg = Icons::SVG_CARET_SMALL,
-                        },
-                        [this](Amethyst::ImageButtonScope &b) {
-                            m_goBackBtn = &b.component;
-                            b.component.setBaseProperties({.rotation = Amethyst::Degrees(90.0f)});
-                            b.component.track(b.component.onMouseButton1ClickCb.connect([this]() { navigateBack(); }));
-                        });
-                    cluster.imageButton(
-                        {
-                            .base = {.layoutOrder = 3, .size = Amethyst::UDim2::fromOffset(22.0f, 22.0f)},
-                            .style = {.backgroundTransparency = 1.0f, .cornerRadius = 3.0f},
-                            .image = {.imageColor = COL_ICON},
-                            .svg = Icons::SVG_CARET_SMALL,
-                        },
-                        [this](Amethyst::ImageButtonScope &b) {
-                            m_goForwardBtn = &b.component;
-                            b.component.setBaseProperties({.rotation = Amethyst::Degrees(-90.0f)});
-                            b.component.track(b.component.onMouseButton1ClickCb.connect([this]() { navigateForward(); }));
-                        });
-                    cluster.imageLabel({
-                        .base = {.layoutOrder = 4, .size = Amethyst::UDim2::fromOffset(16.0f, 16.0f)},
-                        .style = {.backgroundTransparency = 1.0f},
-                        .image = {.imageColor = Amethyst::Color4(0.85f, 0.72f, 0.4f, 1.0f)},
-                        .svg = Icons::SVG_FOLDER,
-                    });
-                    // Breadcrumb is the last item; it consumes the remaining width and clips its overflow.
-                    cluster.frame(
-                        {
-                            .base =
-                                {
-                                    .clipsDescendants = true,
-                                    .layoutOrder = 5,
-                                    .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, 0.0f),
-                                },
-                            .style = {.backgroundTransparency = 1.0f},
-                        },
-                        [this](Amethyst::FrameScope &crumbs) {
-                            m_breadcrumbBar = &crumbs.component;
-                            auto *crumbLayout = crumbs.component.addExtension<Amethyst::UIListLayout>();
-                            crumbLayout->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
-                            crumbLayout->verticalAlignment = Amethyst::VerticalAlignment::ALIGN_CENTER_V;
-                            crumbLayout->horizontalAlignment = Amethyst::HorizontalAlignment::ALIGN_LEFT;
-                            crumbLayout->innerPadding = Amethyst::UDim::fromOffset(2.0f);
-                        });
-                });
-
-            top.imageButton(
-                {
-                    .base =
-                        {
-                            .anchorPoint = Amethyst::vec2(1.0f, 0.5f),
-                            .position = Amethyst::UDim2(1.0f, -8.0f, 0.5f, 0.0f),
-                            .size = Amethyst::UDim2::fromOffset(22.0f, 22.0f),
-                        },
-                    .style = {.backgroundTransparency = 1.0f, .cornerRadius = 3.0f},
-                    .image = {.imageColor = COL_ICON},
-                    .svg = Icons::SVG_SETTINGS,
-                },
-                [this](Amethyst::ImageButtonScope &b) { m_settingsBtn = &b.component; });
-
-            if (m_onDockRequested) {
-                top.textButton(
-                    {
-                        .classes = {"generic-text-button"},
-                        .base =
-                            {
-                                .anchorPoint = Amethyst::vec2(1.0f, 0.5f),
-                                .position = Amethyst::UDim2(1.0f, -38.0f, 0.5f, 0.0f),
-                                .size = Amethyst::UDim2::fromOffset(100.0f, 24.0f),
-                            },
-                        .label = "Dock in layout",
-                    },
-                    [this](Amethyst::TextButtonScope &b) {
-                        b.component.track(b.component.onMouseButton1ClickCb.connect([this, button = &b.component]() {
-                            button->setBaseProperties({.visible = false});
-                            std::function<void()> dock = std::move(m_onDockRequested);
-                            dock();
-                        }));
-                    });
-            }
-        });
+        [&island](Amethyst::FrameScope &f) { island = &f.component; });
+    return island;
 }
 
-static Amethyst::CollapsibleHeaderStylePropertiesArgs s_sidebarHeaderStyle()
+Amethyst::Frame *ContentBrowserPanel::addToolbarSeparator()
 {
-    return {
-        .headerHeight = SECTION_HEADER_HEIGHT,
-        .indicatorSize = 14.0f,
-    };
+    Amethyst::Frame *separator = nullptr;
+    Amethyst::UIScope(*m_topBarPane).frame(
+        {
+            .classes = {"content-browser-separator"},
+            .base =
+                {
+                    .layoutOrder = static_cast<uint32_t>(m_topBarPane->getChildren().size()),
+                    .size = Amethyst::UDim2(0.0f, SEPARATOR_WIDTH, 1.0f, 0.0f),
+                },
+        },
+        [&separator](Amethyst::FrameScope &f) { separator = &f.component; });
+    return separator;
+}
+
+static void s_placeToolbarControl(Amethyst::UIObject &control, float left, const Amethyst::UDim2 &size)
+{
+    control.setBaseProperties({
+        .anchorPoint = Amethyst::vec2(0.0f, 0.5f),
+        .position = Amethyst::UDim2(0.0f, left, 0.5f, 0.0f),
+        .size = size,
+    });
+}
+
+IconLabelButton *ContentBrowserPanel::addToolbarButtonIsland(std::string_view iconSvg, std::string_view label, std::string_view styleClass)
+{
+    auto *button = addToolbarIsland()->add<IconLabelButton>(iconSvg, label, std::vector<std::string>{std::string(styleClass)});
+    s_placeToolbarControl(*button, 0.0f, Amethyst::UDim2::fromOffset(0.0f, TOOLBAR_CONTROL_HEIGHT));
+    return button;
+}
+
+void ContentBrowserPanel::setupTopBar()
+{
+    const EditorContext &editor = *m_context.editor;
+
+    Amethyst::UIScope(*m_root).frame(
+        {
+            .classes = {"content-browser-toolbar"},
+            .base = {.clipsDescendants = true, .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, TOOLBAR_HEIGHT)},
+        },
+        [this](Amethyst::FrameScope &top) { m_topBarPane = &top.component; });
+    auto *islands = m_topBarPane->addExtension<Amethyst::UIListLayout>();
+    islands->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
+    islands->horizontalFlex = Amethyst::UiFlexAlignment::FILL;
+
+    Amethyst::UIScope(*m_root).frame({
+        .classes = {"content-browser-separator"},
+        .base =
+            {
+                .position = Amethyst::UDim2::fromOffset(0.0f, TOOLBAR_HEIGHT),
+                .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, SEPARATOR_WIDTH),
+            },
+    });
+
+    m_addBtn = addToolbarButtonIsland(Icons::SVG_PLUS, "Add", "hotbar-primary-button");
+    m_addBtn->track(m_addBtn->onMouseButton1ClickCb.connect(
+        [this]() { showAddMenu({m_addBtn->absolutePosition.x, m_addBtn->absolutePosition.y}); }));
+    ControlTooltip_attach(*m_addBtn, CONTENT_BROWSER_TOOLTIPS[CONTENT_BROWSER_TOOLTIP_ADD], editor);
+    addToolbarSeparator();
+
+    m_importBtn = addToolbarButtonIsland(Icons::SVG_FOLDER_PLUS, "Import", "hotbar-button");
+    m_importBtn->track(m_importBtn->onMouseButton1ClickCb.connect([this]() {
+        WindowManager *windows = m_context.editor->windows;
+        windows->openFileDialog(FILE_DIALOG_OPEN,
+                                [this, windows](const std::filesystem::path &path) { windows->openImportPanel(path, m_currentDirectory); });
+    }));
+    ControlTooltip_attach(*m_importBtn, CONTENT_BROWSER_TOOLTIPS[CONTENT_BROWSER_TOOLTIP_IMPORT], editor);
+    addToolbarSeparator();
+
+    Amethyst::Frame *navIsland = addToolbarIsland();
+    const std::vector<std::string> navClasses = {"content-browser-nav-button"};
+    const Amethyst::UDim2 navButtonSize = Amethyst::UDim2::fromOffset(NAV_BUTTON_WIDTH, TOOLBAR_CONTROL_HEIGHT);
+    m_goBackBtn = navIsland->add<IconButton>(Icons::SVG_NAV_BACK, NAV_ICON_SIZE, navClasses);
+    m_goForwardBtn = navIsland->add<IconButton>(Icons::SVG_NAV_FORWARD, NAV_ICON_SIZE, navClasses);
+    m_goUpBtn = navIsland->add<IconButton>(Icons::SVG_NAV_UP, NAV_ICON_SIZE, navClasses);
+    s_placeToolbarControl(*m_goBackBtn, 0.0f, navButtonSize);
+    s_placeToolbarControl(*m_goForwardBtn, NAV_BUTTON_WIDTH + NAV_BUTTON_GAP, navButtonSize);
+    s_placeToolbarControl(*m_goUpBtn, 2.0f * (NAV_BUTTON_WIDTH + NAV_BUTTON_GAP), navButtonSize);
+    m_goBackBtn->track(m_goBackBtn->onMouseButton1ClickCb.connect([this]() { navigateBack(); }));
+    m_goForwardBtn->track(m_goForwardBtn->onMouseButton1ClickCb.connect([this]() { navigateForward(); }));
+    m_goUpBtn->track(m_goUpBtn->onMouseButton1ClickCb.connect([this]() { navigateUp(); }));
+    ControlTooltip_attach(*m_goBackBtn, CONTENT_BROWSER_TOOLTIPS[CONTENT_BROWSER_TOOLTIP_BACK], editor);
+    ControlTooltip_attach(*m_goForwardBtn, CONTENT_BROWSER_TOOLTIPS[CONTENT_BROWSER_TOOLTIP_FORWARD], editor);
+    ControlTooltip_attach(*m_goUpBtn, CONTENT_BROWSER_TOOLTIPS[CONTENT_BROWSER_TOOLTIP_UP], editor);
+    addToolbarSeparator();
+
+    // the breadcrumb takes what the other islands leave, sharing it with the search field within its limits
+    Amethyst::Frame *breadcrumbIsland = addToolbarIsland();
+    breadcrumbIsland->setBaseProperties({.automaticSize = Amethyst::AutomaticSize::OFF});
+    breadcrumbIsland->addExtension<Amethyst::UIFlexItem>();
+    Amethyst::UIScope(*breadcrumbIsland).frame(
+        {
+            .base = {.clipsDescendants = true, .size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
+            .style = {.backgroundTransparency = 1.0f},
+        },
+        [this](Amethyst::FrameScope &crumbs) { m_breadcrumbBar = &crumbs.component; });
+    auto *crumbs = m_breadcrumbBar->addExtension<Amethyst::UIListLayout>();
+    crumbs->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
+    crumbs->verticalAlignment = Amethyst::VerticalAlignment::ALIGN_CENTER_V;
+    crumbs->innerPadding = Amethyst::UDim::fromOffset(CRUMB_GAP);
+    addToolbarSeparator();
+
+    Amethyst::Frame *searchIsland = addToolbarIsland();
+    searchIsland->setBaseProperties({
+        .automaticSize = Amethyst::AutomaticSize::OFF,
+        .size = Amethyst::UDim2(0.0f, SEARCH_FIELD_MAX_WIDTH + 2.0f * ISLAND_PADDING, 1.0f, 0.0f),
+    });
+    searchIsland->addExtension<Amethyst::UIFlexItem>();
+    auto *searchLimits = searchIsland->addExtension<Amethyst::UISizeConstraint>();
+    searchLimits->minSize = Amethyst::vec2(SEARCH_FIELD_MIN_WIDTH + 2.0f * ISLAND_PADDING, 0.0f);
+    searchLimits->maxSize = Amethyst::vec2(SEARCH_FIELD_MAX_WIDTH + 2.0f * ISLAND_PADDING, std::numeric_limits<float>::max());
+    m_searchField = searchIsland->add<SearchField>("Search content");
+    s_placeToolbarControl(*m_searchField, 0.0f, Amethyst::UDim2(1.0f, 0.0f, 0.0f, SEARCH_FIELD_HEIGHT));
+    m_searchField->setOnTextChanged([this](const std::string &text) { onSearchTextChanged(text); });
+    addToolbarSeparator();
+
+    if (m_onDockRequested) {
+        IconLabelButton *dockButton = addToolbarButtonIsland(Icons::SVG_PIN, "Dock", "hotbar-button");
+        Amethyst::Frame *dockSeparator = addToolbarSeparator();
+        dockButton->track(dockButton->onMouseButton1ClickCb.connect([this, dockButton, dockSeparator]() {
+            // the browser lives in the layout from here on, so the island offering to put it there goes
+            dockButton->parent->asUiObject()->setBaseProperties({.visible = false});
+            dockSeparator->setBaseProperties({.visible = false});
+            std::function<void()> dock = std::move(m_onDockRequested);
+            dock();
+        }));
+        ControlTooltip_attach(*dockButton, CONTENT_BROWSER_TOOLTIPS[CONTENT_BROWSER_TOOLTIP_DOCK], editor);
+    }
+
+    m_settingsBtn = addToolbarIsland()->add<IconButton>(Icons::SVG_SETTINGS, SETTINGS_ICON_SIZE, navClasses);
+    s_placeToolbarControl(*m_settingsBtn, 0.0f, navButtonSize);
+    ControlTooltip_attach(*m_settingsBtn, CONTENT_BROWSER_TOOLTIPS[CONTENT_BROWSER_TOOLTIP_SETTINGS], editor);
 }
 
 void ContentBrowserPanel::setupSideBar()
 {
     Amethyst::UIScope(*m_root).frame(
         {
-            .classes = {"content-browser-section"},
+            .classes = {"content-browser-sidebar"},
             .base =
                 {
-                    .position = Amethyst::UDim2(0.0f, 0.0f, 0.0f, TOP_BAR_HEIGHT),
-                    .size = Amethyst::UDim2(0.0f, SIDE_BAR_WIDTH, 1.0f, -TOP_BAR_HEIGHT),
+                    .clipsDescendants = true,
+                    .position = Amethyst::UDim2::fromOffset(0.0f, BODY_TOP),
+                    .size = Amethyst::UDim2(0.0f, SIDE_BAR_WIDTH, 1.0f, -BODY_TOP),
                 },
         },
-        [this](Amethyst::FrameScope &side) {
-            m_sideBarPane = &side.component;
-            auto *ll = m_sideBarPane->addExtension<Amethyst::UIListLayout>();
-            ll->fillDirection = Amethyst::FillDirection::FILL_VERTICAL;
+        [this](Amethyst::FrameScope &side) { m_sideBarPane = &side.component; });
+    auto *sections = m_sideBarPane->addExtension<Amethyst::UIListLayout>();
+    sections->fillDirection = Amethyst::FillDirection::FILL_VERTICAL;
 
-            side.collapsibleHeader(
-                {
-                    .classes = {"component-header"},
-                    .base =
-                        {
-                            .clipsDescendants = true,
-                            .layoutOrder = 0,
-                        },
-                    .header = s_sidebarHeaderStyle(),
-                    .title = "Project",
-                },
-                [this](Amethyst::CollapsibleHeaderScope &ch) {
-                    m_projectSection = &ch.component;
-                    ch.component.onToggled = [this](bool) { layoutSideBar(); };
-                    ch.treeView(
-                        {
-                            .base = {.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
-                        },
-                        [this](Amethyst::TreeViewScope &tv) {
-                            m_directoryTree = &tv.component;
-                            tv.column("", 1.0f);
-                        });
-                });
-            side.collapsibleHeader(
-                {
-                    .classes = {"component-header"},
-                    .base =
-                        {
-                            .clipsDescendants = true,
-                            .layoutOrder = 1,
-                        },
-                    .header = s_sidebarHeaderStyle(),
-                    .title = "Recent",
-                },
-                [this](Amethyst::CollapsibleHeaderScope &ch) {
-                    m_recentSection = &ch.component;
-                    ch.component.onToggled = [this](bool) { layoutSideBar(); };
-                });
+    m_projectSection.expanded = true;
+    buildSidebarSection(m_projectSection, "PROJECT", 0);
+
+    // as tall as its shown rows until that outgrows the sidebar, then it scrolls them itself
+    Amethyst::UIScope(*m_sideBarPane)
+        .treeView(
+            {
+                .classes = {"content-browser-folder-tree"},
+                .base =
+                    {
+                        .layoutOrder = 1,
+                        .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -(2.0f * SECTION_HEADER_HEIGHT + SECTION_AFTER_TREE_GAP)),
+                    },
+                .treeView =
+                    {
+                        .rowHeight = FOLDER_ROW_HEIGHT,
+                        .cellPadding = Amethyst::UDim4{{0.0f, 0.0f}},
+                        .showColumnSeparators = false,
+                        .disclosureTriangleSize = FOLDER_EXPANDER_SIZE,
+                        .disclosureTrianglePadding = FOLDER_EXPANDER_PADDING,
+                        .indentPerLevel = FOLDER_INDENT,
+                        .fillRows = false,
+                        .showHeader = false,
+                    },
+            },
+            [this](Amethyst::TreeViewScope &tv) {
+                m_directoryTree = &tv.component;
+                tv.column("", 1.0f);
+            });
+    m_directoryTreeLimits = m_directoryTree->addExtension<Amethyst::UISizeConstraint>();
+    m_directoryTreeLimits->maxSize = Amethyst::vec2(std::numeric_limits<float>::max(), 0.0f);
+    m_directoryTree->onRowClicked = [this](uint32_t row) {
+        if (row < m_directoryRowPaths.size()) {
+            navigateToDirectory(m_directoryRowPaths[row]);
+        }
+    };
+    m_directoryTree->onRowToggled = [this](uint32_t row, bool expanded) {
+        (void)row;
+        (void)expanded;
+        layoutSideBar();
+    };
+
+    Amethyst::UIScope(*m_sideBarPane)
+        .frame({
+            .base = {.interactable = false, .layoutOrder = 2, .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, SECTION_AFTER_TREE_GAP)},
+            .style = {.backgroundTransparency = 1.0f},
         });
+
+    m_recentSection.expanded = false;
+    buildSidebarSection(m_recentSection, "RECENT", 3);
+
+    Amethyst::UIScope(*m_root).frame({
+        .classes = {"content-browser-separator"},
+        .base =
+            {
+                .position = Amethyst::UDim2::fromOffset(SIDE_BAR_WIDTH, BODY_TOP),
+                .size = Amethyst::UDim2(0.0f, SEPARATOR_WIDTH, 1.0f, -BODY_TOP),
+            },
+    });
 
     layoutSideBar();
 }
 
+void ContentBrowserPanel::buildSidebarSection(SidebarSection &section, std::string_view title, uint32_t layoutOrder)
+{
+    section.header = m_sideBarPane->add<Amethyst::InvisibleButton>();
+    section.header->setBaseProperties({
+        .layoutOrder = layoutOrder,
+        .padding = Amethyst::UDim4{.right = Amethyst::UDim::fromOffset(SECTION_PADDING), .left = Amethyst::UDim::fromOffset(SECTION_PADDING)},
+        .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, SECTION_HEADER_HEIGHT),
+    });
+    // the line after the title takes the rest of the row
+    auto *row = section.header->addExtension<Amethyst::UIListLayout>();
+    row->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
+    row->horizontalFlex = Amethyst::UiFlexAlignment::FILL;
+    row->verticalAlignment = Amethyst::VerticalAlignment::ALIGN_CENTER_V;
+    row->innerPadding = Amethyst::UDim::fromOffset(SECTION_GAP);
+
+    Amethyst::UIScope scope(*section.header);
+    scope.imageLabel(
+        {
+            .classes = {"content-browser-section-chevron"},
+            .base =
+                {
+                    .interactable = false,
+                    .layoutOrder = 0,
+                    .size = Amethyst::UDim2::fromOffset(SECTION_CHEVRON_SIZE, SECTION_CHEVRON_SIZE),
+                },
+            .svg = section.expanded ? Icons::SVG_CHEVRON_DOWN : Icons::SVG_CARET_RIGHT,
+        },
+        [&section](Amethyst::ImageLabelScope &il) { section.chevron = &il.component; });
+    scope.textLabel({
+        .classes = {"content-browser-section-title"},
+        .base =
+            {
+                .automaticSize = Amethyst::AutomaticSize::X,
+                .interactable = false,
+                .layoutOrder = 1,
+                .size = Amethyst::UDim2::fromScale(0.0f, 1.0f),
+            },
+        .label = std::string(title),
+    });
+    scope.frame(
+        {
+            .classes = {"content-browser-section-line"},
+            .base =
+                {
+                    .interactable = false,
+                    .layoutOrder = 2,
+                    .size = Amethyst::UDim2::fromOffset(0.0f, 1.0f),
+                },
+        },
+        [](Amethyst::FrameScope &line) { line.component.addExtension<Amethyst::UIFlexItem>(); });
+
+    section.header->track(section.header->onMouseButton1ClickCb.connect([this, &section]() {
+        section.expanded = !section.expanded;
+        section.chevron->setSvg(section.expanded ? Icons::SVG_CHEVRON_DOWN : Icons::SVG_CARET_RIGHT);
+        layoutSideBar();
+    }));
+}
+
 void ContentBrowserPanel::layoutSideBar()
 {
-    // Recent holds nothing yet, so it is its header at either state and Project takes whatever is left
-    const float recentHeight = SECTION_HEADER_HEIGHT;
-    m_recentSection->setBaseProperties({.size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, recentHeight)});
-
-    const bool projectExpanded = static_cast<bool>(m_projectSection->getCollapsibleHeaderProperties().expanded);
-    m_projectSection->setBaseProperties({
-        .size = projectExpanded ? Amethyst::UDim2(1.0f, 0.0f, 1.0f, -recentHeight)
-                                : Amethyst::UDim2(1.0f, 0.0f, 0.0f, SECTION_HEADER_HEIGHT),
-    });
+    const float shownRowsHeight = static_cast<float>(s_countShownTreeRows(*m_directoryTree)) * FOLDER_ROW_HEIGHT;
+    m_directoryTreeLimits->maxSize.y = shownRowsHeight;
+    m_directoryTree->setBaseProperties({.visible = m_projectSection.expanded});
+    m_directoryTree->markDirty();
+    m_sideBarPane->markDirty();
 }
 
 void ContentBrowserPanel::setupContentArea()
 {
-    Amethyst::UIScope(*m_root).frame(
+    Amethyst::UIScope rootScope(*m_root);
+    rootScope.scrollingFrame(
         {
+            .classes = {"grid-sink"},
             .base =
                 {
-                    .position = Amethyst::UDim2(0.0f, SIDE_BAR_WIDTH, 0.0f, TOP_BAR_HEIGHT),
-                    .size = Amethyst::UDim2(1.0f, -SIDE_BAR_WIDTH, 1.0f, -TOP_BAR_HEIGHT),
+                    .clipsDescendants = true,
+                    .padding = Amethyst::UDim4::fromOffset(CONTENT_PADDING),
+                    .position = Amethyst::UDim2::fromOffset(CONTENT_LEFT, BODY_TOP),
+                    .size = Amethyst::UDim2(1.0f, -CONTENT_LEFT, 1.0f, -(BODY_TOP + SEPARATOR_WIDTH + STATUS_BAR_HEIGHT)),
+                },
+            .scroll =
+                {
+                    .scrollAxis = Amethyst::ScrollAxis::Y,
+                    .scrollBarVisibility = Amethyst::ScrollBarVisibility::AUTO,
+                    .automaticCanvasSize = Amethyst::AutomaticSize::Y,
                 },
         },
-        [this](Amethyst::FrameScope &content) {
-            m_contentPane = &content.component;
-            auto *ll = m_contentPane->addExtension<Amethyst::UIListLayout>();
-            ll->fillDirection = Amethyst::FillDirection::FILL_VERTICAL;
-
-            // Search / options bar (section 5)
-            content.frame(
-                {
-                    .classes = {"content-browser-section"},
-                    .base =
-                        {
-                            .layoutOrder = 0,
-                            .padding = {},
-                            .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, SEARCH_BAR_HEIGHT),
-                        },
-                },
-                [this](Amethyst::FrameScope &options) {
-                    m_searchBar = &options.component;
-
-                    options.frame(
-                        {
-                            .classes = {"searchbar"},
-                            .base =
-                                {
-                                    .anchorPoint = Amethyst::vec2(0.0f, 0.5f),
-                                    .position = Amethyst::UDim2(0.0f, 0.0f, 0.5f, 0.0f),
-                                    .size = Amethyst::UDim2(0.8f, -2.0f * CONTENT_PADDING, 1.0f, -8.0f),
-                                },
-                        },
-                        [this](Amethyst::FrameScope &field) {
-                            field.imageLabel({
-                                .base =
-                                    {
-                                        .anchorPoint = Amethyst::vec2(0.0f, 0.5f),
-                                        .position = Amethyst::UDim2(0.0f, 8.0f, 0.5f, 0.0f),
-                                        .size = Amethyst::UDim2::fromOffset(14.0f, 14.0f),
-                                    },
-                                .style = {.backgroundTransparency = 1.0f},
-                                .image = {.imageColor = Amethyst::Color4(0.5f, 0.5f, 0.5f, 1.0f)},
-                                .svg = Icons::SVG_SEARCH,
-                            });
-                            field.textInput(
-                                {
-                                    .base =
-                                        {
-                                            .position = Amethyst::UDim2(0.0f, 28.0f, 0.0f, 0.0f),
-                                            .size = Amethyst::UDim2(1.0f, -34.0f, 1.0f, 0.0f),
-                                        },
-                                    .style = {.backgroundTransparency = 1.0f},
-                                    .textInput = {.text = {.textYAlignment = Amethyst::TextYAlignment::CENTER}},
-                                    .placeholder = "Search...",
-                                },
-                                [this](Amethyst::TextInputScope &ti) {
-                                    m_searchInput = &ti.component;
-                                    ti.component.onTextChanged = [this](const std::string &text) { onSearchTextChanged(text); };
-                                });
-                        });
-                });
-
-            content.scrollingFrame(
-                {
-                    .classes = {"grid-sink"},
-                    .base =
-                        {
-                            .clipsDescendants = true,
-                            .layoutOrder = 1,
-                            .padding = Amethyst::UDim4::fromOffset(CONTENT_PADDING),
-                            .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -(SEARCH_BAR_HEIGHT + STATUS_BAR_HEIGHT)),
-                        },
-                    .scroll =
-                        {
-                            .scrollAxis = Amethyst::ScrollAxis::Y,
-                            .scrollBarVisibility = Amethyst::ScrollBarVisibility::AUTO,
-                            .automaticCanvasSize = Amethyst::AutomaticSize::Y,
-                        },
-                },
-                [this](Amethyst::ScrollingFrameScope &sf) {
-                    m_contentContainer = &sf.component;
-                    m_contentContainer->track(m_contentContainer->onInputBeganCb.connect([this](const Amethyst::InputObject &io) {
-                        if (io.type != Amethyst::InputType::MOUSE_BUTTON_2) {
-                            return;
-                        }
-                        showAddMenu(Amethyst::vec2(io.position.x, io.position.y));
-                    }));
-                    auto *gridLayout = sf.component.addExtension<Amethyst::UIGridLayout>();
-                    gridLayout->cellSize = Amethyst::UDim2::fromOffset(TILE_MIN_WIDTH, TILE_MIN_WIDTH / TILE_ASPECT);
-                    gridLayout->cellPadding = Amethyst::UDim2::fromOffset(CONTENT_PADDING, CONTENT_PADDING);
-                    gridLayout->flexCells = true;
-                    gridLayout->maxCellWidth = TILE_MAX_WIDTH;
-                    gridLayout->cellAspectRatio = TILE_ASPECT;
-                    gridLayout->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
-                    gridLayout->horizontalAlignment = Amethyst::HorizontalAlignment::ALIGN_LEFT;
-                    gridLayout->startCorner = Amethyst::StartCorner::TOP_LEFT;
-                });
-
-            // Status bar (item count)
-            content.frame(
-                {
-                    .classes = {"status-bar"},
-                    .base =
-                        {
-                            .layoutOrder = 2,
-                            .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, STATUS_BAR_HEIGHT),
-                        },
-                },
-                [this](Amethyst::FrameScope &status) {
-                    status.textLabel(
-                        {
-                            .classes = {"status-bar"},
-                            .base =
-                                {
-                                    .position = Amethyst::UDim2(0.0f, 10.0f, 0.0f, 0.0f),
-                                    .size = Amethyst::UDim2(1.0f, -10.0f, 1.0f, 0.0f),
-                                },
-                            .style = {.backgroundTransparency = 1.0f},
-                            .label = "0 items",
-                        },
-                        [this](Amethyst::TextLabelScope &lbl) { m_statusLabel = &lbl.component; });
-                });
+        [this](Amethyst::ScrollingFrameScope &sf) {
+            m_contentContainer = &sf.component;
+            m_contentContainer->track(m_contentContainer->onInputBeganCb.connect([this](const Amethyst::InputObject &io) {
+                if (io.type != Amethyst::InputType::MOUSE_BUTTON_2) {
+                    return;
+                }
+                showAddMenu(Amethyst::vec2(io.position.x, io.position.y));
+            }));
+            auto *gridLayout = sf.component.addExtension<Amethyst::UIGridLayout>();
+            gridLayout->cellSize = Amethyst::UDim2::fromOffset(CARD_WIDTH, CARD_HEIGHT);
+            gridLayout->cellPadding = Amethyst::UDim2::fromOffset(CARD_GAP, CARD_GAP);
+            gridLayout->flexCells = true;
+            gridLayout->maxCellWidth = CARD_MAX_WIDTH;
+            gridLayout->cellAspectRatio = CARD_WIDTH / CARD_HEIGHT;
+            gridLayout->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
+            gridLayout->horizontalAlignment = Amethyst::HorizontalAlignment::ALIGN_LEFT;
+            gridLayout->startCorner = Amethyst::StartCorner::TOP_LEFT;
         });
+
+    rootScope.frame({
+        .classes = {"content-browser-separator"},
+        .base =
+            {
+                .position = Amethyst::UDim2(0.0f, CONTENT_LEFT, 1.0f, -(SEPARATOR_WIDTH + STATUS_BAR_HEIGHT)),
+                .size = Amethyst::UDim2(1.0f, -CONTENT_LEFT, 0.0f, SEPARATOR_WIDTH),
+            },
+    });
+
+    rootScope.textLabel(
+        {
+            .classes = {"content-browser-status"},
+            .base =
+                {
+                    .padding = Amethyst::UDim4{.left = Amethyst::UDim::fromOffset(CONTENT_PADDING)},
+                    .position = Amethyst::UDim2(0.0f, CONTENT_LEFT, 1.0f, -STATUS_BAR_HEIGHT),
+                    .size = Amethyst::UDim2(1.0f, -CONTENT_LEFT, 0.0f, STATUS_BAR_HEIGHT),
+                },
+            .label = "0 items",
+        },
+        [this](Amethyst::TextLabelScope &lbl) { m_statusLabel = &lbl.component; });
 }
 
 void ContentBrowserPanel::setupContextMenu()
@@ -712,8 +928,8 @@ void ContentBrowserPanel::startEditing(ContentItemComponents &item, const std::s
         item.nameInput = item.footer->add<Amethyst::TextInput>();
         item.nameInput->addClass("content-browser-card-name-input");
         item.nameInput->setBaseProperties({
-            .position = Amethyst::UDim2(0.0f, 4.0f, 0.0f, 6.0f),
-            .size = Amethyst::UDim2(1.0f, -8.0f, 0.0f, 22.0f),
+            .position = item.name->getBaseProperties().position,
+            .size = item.name->getBaseProperties().size,
             .zIndex = 3,
         });
         item.nameInput->onEnterPressed = [this]() { commitEdit(); };
@@ -868,9 +1084,8 @@ void ContentBrowserPanel::rebuildBreadcrumb()
         return;
     }
     m_breadcrumbBar->removeAllChildren();
-
     std::vector<std::pair<std::string, std::filesystem::path>> segments;
-    segments.emplace_back("All", m_baseDirectory);
+    segments.emplace_back(m_baseDirectory.filename().string(), m_baseDirectory);
 
     std::error_code ec;
     std::filesystem::path rel = std::filesystem::relative(m_currentDirectory, m_baseDirectory, ec);
@@ -885,43 +1100,46 @@ void ContentBrowserPanel::rebuildBreadcrumb()
         }
     }
 
-    uint32_t order = 0;
     Amethyst::UIScope scope(*m_breadcrumbBar);
     for (size_t i = 0; i < segments.size(); i++) {
         if (i > 0) {
             scope.imageLabel({
+                .classes = {"content-browser-crumb-separator"},
                 .base =
                     {
-                        .layoutOrder = order++,
-                        .size = Amethyst::UDim2::fromOffset(12.0f, 12.0f),
+                        .interactable = false,
+                        .layoutOrder = static_cast<uint32_t>(m_breadcrumbBar->getChildren().size()),
+                        .size = Amethyst::UDim2::fromOffset(CRUMB_SEPARATOR_SIZE, CRUMB_SEPARATOR_SIZE),
                     },
-                .style = {.backgroundTransparency = 1.0f},
                 .svg = Icons::SVG_CARET_RIGHT,
             });
         }
 
-        const std::string &label = segments[i].first;
         const std::filesystem::path &target = segments[i].second;
-
-        scope.textButton(
-            {
-                .base =
-                    {
-                        .layoutOrder = order++,
-                        .size = Amethyst::UDim2(0.0f, s_estimateTextWidth(label, 12.0f), 0.0f, 22.0f),
-                    },
-                .style = {.backgroundTransparency = 1.0f, .cornerRadius = 3.0f},
-                .text =
-                    {
-                        .fontSize = 12.0f,
-                        .textXAlignment = Amethyst::TextXAlignment::CENTER,
-                        .textYAlignment = Amethyst::TextYAlignment::CENTER,
-                    },
-                .label = label,
-            },
-            [this, target](Amethyst::TextButtonScope &b) {
-                b.component.track(b.component.onMouseButton1ClickCb.connect([this, target]() { navigateToDirectory(target); }));
-            });
+        const uint32_t layoutOrder = static_cast<uint32_t>(m_breadcrumbBar->getChildren().size());
+        Amethyst::TextButton *crumb = nullptr;
+        if (i == 0) {
+            auto *rootCrumb = m_breadcrumbBar->add<IconLabelButton>(Icons::SVG_FOLDER, segments[i].first,
+                                                                     std::vector<std::string>{"content-browser-crumb"});
+            rootCrumb->getIcon().setClasses({"content-browser-crumb-icon"});
+            crumb = rootCrumb;
+        } else {
+            scope.textButton(
+                {
+                    .classes = {"content-browser-crumb"},
+                    .base =
+                        {
+                            .automaticSize = Amethyst::AutomaticSize::X,
+                            .padding = Amethyst::UDim4{.right = Amethyst::UDim::fromOffset(CRUMB_PADDING),
+                                                       .left = Amethyst::UDim::fromOffset(CRUMB_PADDING)},
+                        },
+                    .label = segments[i].first,
+                },
+                [&crumb](Amethyst::TextButtonScope &b) { crumb = &b.component; });
+        }
+        crumb->setBaseProperties({.layoutOrder = layoutOrder, .size = Amethyst::UDim2::fromOffset(0.0f, CRUMB_HEIGHT)});
+        crumb->track(crumb->onMouseButton1ClickCb.connect([this, target]() { navigateToDirectory(target); }));
+        s_setGuiStateFlag(*crumb, Amethyst::GUI_STATE_ACTIVE, i + 1 == segments.size());
     }
 }
 
@@ -930,6 +1148,8 @@ void ContentBrowserPanel::refresh()
     m_selectedItem = SIZE_MAX;
     refreshFileBrowser();
     rebuildBreadcrumb();
+    refreshNavigationButtons();
+    selectCurrentDirectoryRow();
 }
 
 void ContentBrowserPanel::setBaseDirectory(const std::filesystem::path &path)
@@ -988,41 +1208,24 @@ void ContentBrowserPanel::refreshFileBrowser()
 
         if (isDir) {
             item.icon->setSvg(Icons::SVG_FOLDER);
-            item.icon->setImageStyleProperties({.imageColor = Amethyst::Color4(0.85f, 0.72f, 0.4f, 1.0f)});
-            layoutCardFooter(item, false);
-            item.type->setBaseProperties({.visible = false});
+            item.icon->setClasses({"content-browser-card-icon-folder"});
+            layoutCardFooter(item, "", std::nullopt);
         } else if (metadata != nullptr) {
             item.icon->setSvg(Asset_iconForType(metadata->assetType, metadata->authoredClass));
-            item.icon->setImageStyleProperties({.imageColor = COL_ICON});
-            layoutCardFooter(item, true);
-            item.typeBar->setBaseStyleProperties({.backgroundColor = Asset_colorForType(metadata->assetType)});
-            item.type->setBaseProperties({.visible = true});
-            item.type->setText(s_typeLabel(metadata->assetType, metadata->authoredClass));
+            item.icon->setClasses({"content-browser-card-icon"});
+            layoutCardFooter(item, s_typeLabel(metadata->assetType, metadata->authoredClass), Asset_colorForType(metadata->assetType));
         } else {
             item.icon->setSvg(Icons::SVG_SCRIPT);
-            item.icon->setImageStyleProperties({.imageColor = COL_ICON});
-            layoutCardFooter(item, false);
-            item.type->setBaseProperties({.visible = true});
+            item.icon->setClasses({"content-browser-card-icon"});
             std::string extension = entry.path().extension().string();
-            item.type->setText(extension.empty() ? "file" : extension);
+            layoutCardFooter(item, extension.empty() ? "file" : extension, std::nullopt);
         }
 
         item.name->setText(displayName);
 
-        TooltipRows tooltipRows;
-        tooltipRows.emplace_back("Name", displayName);
-        if (isDir) {
-            tooltipRows.emplace_back("Type", "Folder");
-        } else {
-            tooltipRows.emplace_back("Type", metadata != nullptr ? s_typeLabel(metadata->assetType, metadata->authoredClass)
-                                                                 : entry.path().extension().string());
-            std::error_code sizeEc;
-            uintmax_t bytes = std::filesystem::file_size(entry.path(), sizeEc);
-            if (!sizeEc) {
-                tooltipRows.emplace_back("Size", Rapture::StringFormat_bytesToUnitString(bytes));
-            }
-        }
-        item.tooltip->build = [rows = std::move(tooltipRows)](Amethyst::Tooltip &surface) { s_fillTooltip(surface, rows); };
+        item.tooltip->build = [content = s_describeEntryForTooltip(entry, displayName, metadata, assetHandle)](Amethyst::Tooltip &surface) {
+            s_fillAssetTooltip(surface, content);
+        };
 
         size_t itemIndex = index;
         item.clickConnection = item.action->onMouseButton1ClickCb.connect([this, itemIndex]() { selectItem(itemIndex); });
@@ -1063,6 +1266,12 @@ void ContentBrowserPanel::refreshFileBrowser()
             items.push_back(
                 Amethyst::makeActionItem("Rename", [this, itemIndex, itemPath]() { beginRename(itemIndex, itemPath); }));
             items.push_back(Amethyst::makeActionItem("Delete", [] {}));
+            items.push_back(Amethyst::makeSeparatorItem());
+            items.push_back(Amethyst::makeActionItem(
+                "Copy Filename", [itemPath]() { Amethyst::InputInterface::setClipboardText(itemPath.filename().string()); }));
+            items.push_back(Amethyst::makeActionItem("Copy Full Path", [itemPath]() {
+                Amethyst::InputInterface::setClipboardText(std::filesystem::absolute(itemPath).string());
+            }));
             showContextMenu(Amethyst::vec2(static_cast<float>(x), static_cast<float>(y)), std::move(items));
         });
 
@@ -1075,18 +1284,17 @@ void ContentBrowserPanel::refreshFileBrowser()
         item.clickConnection.disconnect();
         item.contextMenuConnection.disconnect();
 
+        item.tooltip->build = nullptr;
+
         if (m_edit.kind == CONTENT_EDIT_FOLDER) {
             item.icon->setSvg(Icons::SVG_FOLDER);
-            layoutCardFooter(item, false);
-            item.type->setBaseProperties({.visible = false});
+            item.icon->setClasses({"content-browser-card-icon-folder"});
+            layoutCardFooter(item, "", std::nullopt);
         } else {
             Rapture::AssetType assetType = m_edit.kind == CONTENT_EDIT_MODULE ? Rapture::ASSET_MODULE : Rapture::ASSET_SCRIPT;
             item.icon->setSvg(Asset_iconForType(assetType, m_edit.objectClass));
-            item.icon->setImageStyleProperties({.imageColor = COL_ICON});
-            layoutCardFooter(item, true);
-            item.typeBar->setBaseStyleProperties({.backgroundColor = Asset_colorForType(assetType)});
-            item.type->setBaseProperties({.visible = true});
-            item.type->setText(s_typeLabel(assetType, m_edit.objectClass));
+            item.icon->setClasses({"content-browser-card-icon"});
+            layoutCardFooter(item, s_typeLabel(assetType, m_edit.objectClass), Asset_colorForType(assetType));
         }
 
         m_edit.itemIndex = index;
@@ -1098,15 +1306,32 @@ void ContentBrowserPanel::refreshFileBrowser()
     updateStatus(index);
 }
 
-void ContentBrowserPanel::layoutCardFooter(ContentItemComponents &item, bool hasTypeBar)
+void ContentBrowserPanel::layoutCardFooter(ContentItemComponents &item, std::string_view kind, std::optional<Amethyst::Color3> typeColor)
 {
-    const float barHeight = hasTypeBar ? TILE_TYPEBAR_HEIGHT : 0.0f;
+    const float textAreaHeight = CARD_FOOTER_HEIGHT - CARD_TYPEBAR_HEIGHT;
+    const Amethyst::UDim2 nameSize(1.0f, -2.0f * CARD_TEXT_INSET, 0.0f, CARD_NAME_HEIGHT);
 
-    item.typeBar->setBaseProperties({.visible = hasTypeBar});
-    item.footer->setBaseProperties({
-        .position = Amethyst::UDim2(0.0f, 0.0f, 1.0f, -barHeight),
-        .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, TILE_FOOTER_HEIGHT + TILE_TYPEBAR_HEIGHT - barHeight),
-    });
+    const bool showsKind = !kind.empty();
+    float nameTop = (textAreaHeight - CARD_NAME_HEIGHT) * 0.5f;
+    if (showsKind) {
+        nameTop = (textAreaHeight - CARD_NAME_HEIGHT - CARD_NAME_KIND_GAP - CARD_KIND_HEIGHT) * 0.5f;
+        item.type->setText(std::string(kind));
+        item.type->setBaseProperties({
+            .position = Amethyst::UDim2::fromOffset(CARD_TEXT_INSET, nameTop + CARD_NAME_HEIGHT + CARD_NAME_KIND_GAP),
+            .size = Amethyst::UDim2(1.0f, -2.0f * CARD_TEXT_INSET, 0.0f, CARD_KIND_HEIGHT),
+        });
+    }
+    item.type->setBaseProperties({.visible = showsKind});
+
+    item.name->setBaseProperties({.position = Amethyst::UDim2::fromOffset(CARD_TEXT_INSET, nameTop), .size = nameSize});
+    if (item.nameInput != nullptr) {
+        item.nameInput->setBaseProperties({.position = Amethyst::UDim2::fromOffset(CARD_TEXT_INSET, nameTop), .size = nameSize});
+    }
+
+    item.typeBar->setBaseProperties({.visible = typeColor.has_value()});
+    if (typeColor.has_value()) {
+        item.typeBar->setBaseStyleProperties({.backgroundColor = *typeColor});
+    }
 }
 
 void ContentBrowserPanel::updateStatus(size_t itemCount)
@@ -1114,62 +1339,98 @@ void ContentBrowserPanel::updateStatus(size_t itemCount)
     if (m_statusLabel == nullptr) {
         return;
     }
-    size_t selected = (m_selectedItem == SIZE_MAX) ? 0 : 1;
-    std::string text = std::to_string(itemCount) + " items (" + std::to_string(selected) + " selected)";
+    std::string text = std::to_string(itemCount) + (itemCount == 1 ? " item" : " items");
+    if (m_selectedItem != SIZE_MAX) {
+        text += ", 1 selected";
+    }
     m_statusLabel->setText(text);
 }
 
-static std::unique_ptr<Amethyst::TextButton> s_makeTreeCell(const std::string &label)
+static std::unique_ptr<Amethyst::Frame> s_makeDirectoryCell(const std::string &label)
 {
-    auto btn = std::make_unique<Amethyst::TextButton>();
-    btn->setBaseProperties({.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)});
-    btn->setBaseStyleProperties({.backgroundColor = COL_HOVER, .backgroundTransparency = 1.0f});
-    btn->setTextStyleProperties({.fontSize = 13.0f});
-    btn->setText(label);
-    auto *raw = btn.get();
-    raw->track(raw->onHoverChanged.connect(
-        [raw](bool hovered) { raw->setBaseStyleProperties({.backgroundTransparency = hovered ? 0.0f : 1.0f}); }));
-    return btn;
+    auto cell = std::make_unique<Amethyst::Frame>();
+    cell->setBaseProperties({.interactable = false, .size = Amethyst::UDim2::fromScale(1.0f, 1.0f)});
+    cell->setBaseStyleProperties({.backgroundTransparency = 1.0f});
+
+    Amethyst::UIScope scope(*cell);
+    scope.imageLabel({
+        .classes = {"treeview-icon-folder"},
+        .base =
+            {
+                .anchorPoint = Amethyst::vec2(0.0f, 0.5f),
+                .interactable = false,
+                .position = Amethyst::UDim2(0.0f, 0.0f, 0.5f, 0.0f),
+                .size = Amethyst::UDim2::fromOffset(FOLDER_ICON_SIZE, FOLDER_ICON_SIZE),
+            },
+        .style = {.backgroundTransparency = 1.0f},
+        .svg = Icons::SVG_FOLDER,
+    });
+    scope.textLabel({
+        .classes = {"content-browser-folder-label"},
+        .base =
+            {
+                .interactable = false,
+                .position = Amethyst::UDim2::fromOffset(FOLDER_ICON_SIZE + FOLDER_ICON_GAP, 0.0f),
+                .size = Amethyst::UDim2(1.0f, -(FOLDER_ICON_SIZE + FOLDER_ICON_GAP), 1.0f, 0.0f),
+            },
+        .label = label,
+    });
+    return cell;
 }
 
 void ContentBrowserPanel::buildDirectoryTree()
 {
     m_directoryTree->clear();
+    m_directoryRowPaths.clear();
 
     if (std::filesystem::exists(m_baseDirectory)) {
-        m_directoryTree->addRow(0);
-        {
-            std::filesystem::path base = m_baseDirectory;
-            auto btn = s_makeTreeCell(m_baseDirectory.filename().string());
-            btn->track(btn->onMouseButton1ClickCb.connect([this, base]() { navigateToDirectory(base); }));
-            m_directoryTree->nextCell(std::move(btn));
-        }
+        addDirectoryRow(m_baseDirectory, 0);
         buildFilesSubtree(m_baseDirectory, 1);
     }
+
+    layoutSideBar();
+    selectCurrentDirectoryRow();
+}
+
+void ContentBrowserPanel::addDirectoryRow(const std::filesystem::path &path, uint16_t depth)
+{
+    m_directoryTree->addRow(depth);
+    m_directoryTree->nextCell(s_makeDirectoryCell(path.filename().string()));
+    m_directoryRowPaths.push_back(path);
 }
 
 void ContentBrowserPanel::buildFilesSubtree(const std::filesystem::path &path, uint16_t depth)
 {
     for (const auto &entry : std::filesystem::directory_iterator(path)) {
-        if (!entry.is_directory()) continue;
+        if (!entry.is_directory()) {
+            continue;
+        }
 
-        m_directoryTree->addRow(depth);
-
-        std::filesystem::path dirPath = entry.path();
-        auto btn = s_makeTreeCell(entry.path().filename().string());
-        btn->track(btn->onMouseButton1ClickCb.connect([this, dirPath]() { navigateToDirectory(dirPath); }));
-        m_directoryTree->nextCell(std::move(btn));
-
+        addDirectoryRow(entry.path(), depth);
         buildFilesSubtree(entry.path(), static_cast<uint16_t>(depth + 1));
     }
 }
 
+void ContentBrowserPanel::selectCurrentDirectoryRow()
+{
+    if (m_directoryTree == nullptr) {
+        return;
+    }
+
+    const auto found = std::ranges::find(m_directoryRowPaths, m_currentDirectory);
+    m_directoryTree->selectedRow = found != m_directoryRowPaths.end() ? static_cast<int32_t>(found - m_directoryRowPaths.begin())
+                                                                      : Amethyst::TreeView::NO_ROW_SELECTION;
+    m_directoryTree->markDirty();
+}
+
 void ContentBrowserPanel::navigateToDirectory(const std::filesystem::path &path)
 {
-    if (!std::filesystem::exists(path) || !std::filesystem::is_directory(path)) return;
+    if (!std::filesystem::exists(path) || !std::filesystem::is_directory(path)) {
+        return;
+    }
 
     if (m_historyIndex < m_navigationHistory.size() - 1) {
-        m_navigationHistory.erase(m_navigationHistory.begin() + m_historyIndex + 1, m_navigationHistory.end());
+        m_navigationHistory.erase(m_navigationHistory.begin() + static_cast<std::ptrdiff_t>(m_historyIndex) + 1, m_navigationHistory.end());
     }
 
     m_currentDirectory = path;
@@ -1197,6 +1458,24 @@ void ContentBrowserPanel::navigateForward()
     }
 }
 
+void ContentBrowserPanel::navigateUp()
+{
+    if (m_currentDirectory != m_baseDirectory) {
+        navigateToDirectory(m_currentDirectory.parent_path());
+    }
+}
+
+void ContentBrowserPanel::refreshNavigationButtons()
+{
+    if (m_goBackBtn == nullptr) {
+        return;
+    }
+
+    m_goBackBtn->setGuiStateFlag(Amethyst::GUI_STATE_DISABLED, m_historyIndex == 0);
+    m_goForwardBtn->setGuiStateFlag(Amethyst::GUI_STATE_DISABLED, m_historyIndex + 1 >= m_navigationHistory.size());
+    m_goUpBtn->setGuiStateFlag(Amethyst::GUI_STATE_DISABLED, m_currentDirectory == m_baseDirectory);
+}
+
 void ContentBrowserPanel::onSearchTextChanged(const std::string &text)
 {
     m_searchFilter = s_normalizeForSearch(text);
@@ -1209,16 +1488,6 @@ void ContentBrowserPanel::selectItem(size_t index)
         return;
     }
 
-    /*
-     * TODO: check if this is safe, and maybe use something else? instead of active? since it would be the same as selected but,
-     * reads very differently
-     * auto &newCard = m_contentItemPool[index];
-     * newCard.container->setGuiState(newCard.container->getGuiState() | Amethyst::GUI_STATE_ACTIVE);
-     *
-     * auto &oldCard = m_contentItemPool[m_selectedItem];
-     * oldCard.container->setGuiState(oldCard.container->getGuiState() & ~Amethyst::GUI_STATE_ACTIVE);
-     */
-
     if (m_selectedItem < m_contentItemPool.size()) {
         applyItemSelection(m_contentItemPool[m_selectedItem], false);
     }
@@ -1229,95 +1498,82 @@ void ContentBrowserPanel::selectItem(size_t index)
         applyItemSelection(m_contentItemPool[m_selectedItem], true);
     }
 
-    updateStatus(m_contentItemPool.size());
+    size_t shownItems = 0;
+    for (const ContentItemComponents &item : m_contentItemPool) {
+        if (item.attached) {
+            shownItems++;
+        }
+    }
+    updateStatus(shownItems);
 }
 
 void ContentBrowserPanel::applyItemSelection(ContentItemComponents &item, bool selected)
 {
-    s_setActive(*item.container, selected);
-    s_setActive(*item.footer, selected);
+    s_setGuiStateFlag(*item.container, Amethyst::GUI_STATE_ACTIVE, selected);
+    s_setGuiStateFlag(*item.footer, Amethyst::GUI_STATE_ACTIVE, selected);
+    s_setGuiStateFlag(*item.type, Amethyst::GUI_STATE_ACTIVE, selected);
+}
+
+void ContentBrowserPanel::applyItemHover(ContentItemComponents &item, bool hovered)
+{
+    s_setGuiStateFlag(*item.container, Amethyst::GUI_STATE_HOVERED, hovered);
+    s_setGuiStateFlag(*item.footer, Amethyst::GUI_STATE_HOVERED, hovered);
 }
 
 ContentBrowserPanel::ContentItemComponents &ContentBrowserPanel::acquirePoolItem(size_t index)
 {
     if (index >= m_contentItemPool.size()) {
-        // The InvisibleButton must be the topmost hittable node in the tile, so the visual
+        // The InvisibleButton must be the topmost hittable node in the card, so the visual
         // children are marked non-interactable; otherwise they swallow the click/hover.
         ContentItemComponents item;
 
         item.container = m_contentContainer->add<Amethyst::Frame>();
-        item.container->setClasses({"content-browser-card-well"});
+        item.container->setClasses({"content-browser-card"});
+        item.container->setBaseProperties({.clipsDescendants = true});
+
+        item.icon = item.container->add<Amethyst::ImageLabel>();
+        item.icon->setBaseProperties({
+            .anchorPoint = Amethyst::vec2(0.5f, 0.5f),
+            .interactable = false,
+            .position = Amethyst::UDim2(0.5f, 0.0f, 0.5f, -CARD_FOOTER_HEIGHT * 0.5f),
+            .size = Amethyst::UDim2::fromOffset(CARD_ICON_SIZE, CARD_ICON_SIZE),
+        });
+
+        item.footer = item.container->add<Amethyst::Frame>();
+        item.footer->addClass("content-browser-card-footer");
+        item.footer->setBaseProperties({
+            .anchorPoint = Amethyst::vec2(0.0f, 1.0f),
+            .interactable = false,
+            .position = Amethyst::UDim2::fromScale(0.0f, 1.0f),
+            .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, CARD_FOOTER_HEIGHT),
+        });
+
+        item.name = item.footer->add<Amethyst::TextLabel>();
+        item.name->addClass("content-browser-card-name");
+        item.name->setBaseProperties({.interactable = false});
+
+        item.type = item.footer->add<Amethyst::TextLabel>();
+        item.type->addClass("content-browser-card-kind");
+        item.type->setBaseProperties({.interactable = false});
+
+        item.typeBar = item.footer->add<Amethyst::Frame>();
+        item.typeBar->setBaseProperties({
+            .anchorPoint = Amethyst::vec2(0.0f, 1.0f),
+            .interactable = false,
+            .position = Amethyst::UDim2::fromScale(0.0f, 1.0f),
+            .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, CARD_TYPEBAR_HEIGHT),
+        });
 
         item.action = item.container->add<Amethyst::InvisibleButton>();
         item.action->setBaseProperties({.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)});
         item.tooltip = item.action->addExtension<Amethyst::UITooltip>();
 
-        item.thumbWell = item.action->add<Amethyst::Frame>();
-        item.thumbWell->setBaseProperties({
-            .interactable = false,
-            .position = Amethyst::UDim2::fromScale(0.0f),
-            .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -(TILE_FOOTER_HEIGHT + TILE_TYPEBAR_HEIGHT)),
-            .zIndex = 1,
-        });
-        // opaque so a selected card's accent stops at the well rather than running behind the icon
-        item.thumbWell->addClass("content-browser-card-thumb");
-
-        auto *thumbAspect = item.thumbWell->addExtension<Amethyst::UIAspectRatioConstraint>();
-        thumbAspect->aspectRatio = 1.0f;
-        thumbAspect->dominantAxis = Amethyst::DominantAxis::WIDTH;
-
-        item.icon = item.thumbWell->add<Amethyst::ImageLabel>();
-        item.icon->setBaseProperties({
-            .anchorPoint = Amethyst::vec2(0.5f, 0.5f),
-            .interactable = false,
-            .position = Amethyst::UDim2::fromScale(0.5f, 0.5f),
-            .size = Amethyst::UDim2::fromOffset(TILE_ICON_SIZE, TILE_ICON_SIZE),
-            .zIndex = 2,
-        });
-        item.icon->setBaseStyleProperties({.backgroundTransparency = 1.0f});
-        item.icon->setImageStyleProperties({.imageColor = COL_ICON});
-
-        item.footer = item.container->add<Amethyst::Frame>();
-        item.footer->setBaseProperties({
-            .anchorPoint = Amethyst::vec2(0.0f, 1.0f),
-            .interactable = false,
-            .position = Amethyst::UDim2(0.0f, 0.0f, 1.0f, -TILE_TYPEBAR_HEIGHT),
-            .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, TILE_FOOTER_HEIGHT),
-            .zIndex = 1,
-        });
-        item.footer->addClass("content-browser-card-footer");
-
-        item.name = item.footer->add<Amethyst::TextLabel>();
-        item.name->addClass("content-browser-card-footer");
-        item.name->setBaseProperties({
-            .interactable = false,
-            .position = Amethyst::UDim2(0.0f, 4.0f, 0.0f, 6.0f),
-            .size = Amethyst::UDim2(1.0f, -8.0f, 0.0f, 22.0f),
-            .zIndex = 2,
-        });
-        item.name->setBaseStyleProperties({.backgroundTransparency = 1.0f});
-
-        item.type = item.footer->add<Amethyst::TextLabel>();
-        item.type->addClass("content-browser-card-footer-type");
-        item.type->setBaseProperties({
-            .anchorPoint = Amethyst::vec2(0.0f, 1.0f),
-            .interactable = false,
-            .position = Amethyst::UDim2(0.0f, 4.0f, 1.0f, -4.0f),
-            .size = Amethyst::UDim2(1.0f, -8.0f, 0.0f, 14.0f),
-            .zIndex = 2,
-        });
-
-        item.typeBar = item.action->add<Amethyst::Frame>();
-        item.typeBar->setBaseProperties({
-            .anchorPoint = Amethyst::vec2(0.0f, 1.0f),
-            .interactable = false,
-            .position = Amethyst::UDim2::fromScale(0.0f, 1.0f),
-            .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, TILE_TYPEBAR_HEIGHT),
-            .zIndex = 2,
-        });
-
         item.attached = true;
         m_contentItemPool.push_back(std::move(item));
+
+        const size_t poolIndex = m_contentItemPool.size() - 1;
+        m_contentItemPool[poolIndex].action->track(m_contentItemPool[poolIndex].action->onHoverChanged.connect(
+            [this, poolIndex](bool hovered) { applyItemHover(m_contentItemPool[poolIndex], hovered); }));
     }
 
     auto &item = m_contentItemPool[index];
@@ -1326,7 +1582,7 @@ ContentBrowserPanel::ContentItemComponents &ContentBrowserPanel::acquirePoolItem
         item.attached = true;
     }
 
-    // a pooled tile can come back from having been named or selected, so it starts every refresh showing neither
+    // a pooled card can come back from having been named or selected, so it starts every refresh showing neither
     if (item.nameInput != nullptr) {
         item.nameInput->setBaseProperties({.visible = false});
     }

@@ -153,8 +153,6 @@ text-area {
     tab-spacing: 2px;
     tab-offset: 6px;
     tab-corner-radius: 4px 4px 0px 0px;
-    tab-close-color: @text-4;
-
 }
 
 .panel-tab#tab {
@@ -179,12 +177,25 @@ text-area {
 }
 
 
+.panel-tab#close,
+.workspace-tab#close {
+    background-color: @hover;
+    background-transparency: 1.0;
+    text-color: @text-4;
+    corner-radius: 2px;
+}
+
+.panel-tab#close:hover,
+.workspace-tab#close:hover {
+    background-transparency: 0.0;
+    text-color: @text-1;
+}
+
 .panel-tab {
     background-color: @bg-window;
     tab-width: 160px;
     bar-thickness: 30px;
     tab-corner-radius: 4px 4px 0px 0px;
-    tab-close-color: @text-4;
 }
 
 .workspace {
@@ -192,8 +203,6 @@ text-area {
     tab-spacing: 2px;
     tab-offset: 12px;
     tab-corner-radius: 0px;
-    tab-close-color: @text-4;
-
 }
 
 .workspace-tab#tab {
@@ -304,6 +313,12 @@ text-area {
 }
 
 .bottom-bar-button:hover {
+    background-transparency: 0.0;
+    text-color: @text-1;
+}
+
+.bottom-bar-button:active {
+    background-color: @bg-header;
     background-transparency: 0.0;
     text-color: @text-1;
 }
@@ -718,8 +733,99 @@ radio-button:active {
     border-color: @border-2;
 }
 
-.content-browser-section {
+.content-browser-floating {
     background-color: @bg-panel;
+    corner-radius: 6px;
+    border-pixel-size: 1px;
+    border-color: @border-4;
+}
+
+.content-browser-toolbar {
+    background-color: @bg-panel;
+}
+
+.content-browser-separator {
+    background-color: @bg-window;
+}
+
+.content-browser-nav-button {
+    background-color: @hover;
+    background-transparency: 1.0;
+    image-color: @text-2;
+    corner-radius: 4px;
+}
+
+.content-browser-nav-button:hover {
+    background-transparency: 0.0;
+    image-color: @text-1;
+}
+
+.content-browser-nav-button:disabled {
+    background-transparency: 1.0;
+    image-color: @text-4;
+}
+
+.content-browser-crumb {
+    background-color: @hover;
+    background-transparency: 1.0;
+    text-color: @text-2;
+    font-size: 13px;
+    text-truncate: ellipsis;
+    corner-radius: 4px;
+    text-x-alignment: left;
+    text-y-alignment: center;
+}
+
+.content-browser-crumb:hover {
+    background-transparency: 0.0;
+    text-color: @text-1;
+}
+
+.content-browser-crumb:active {
+    text-color: @text-1;
+}
+
+.content-browser-crumb-icon {
+    background-transparency: 1.0;
+    image-color: @type-folder;
+}
+
+.content-browser-crumb-separator {
+    background-transparency: 1.0;
+    image-color: @text-4;
+}
+
+.content-browser-sidebar {
+    background-color: @bg-panel;
+}
+
+.content-browser-section-chevron {
+    background-transparency: 1.0;
+    image-color: @text-3;
+}
+
+.content-browser-section-title {
+    background-transparency: 1.0;
+    font-size: 11px;
+    text-color: @text-3;
+    text-y-alignment: center;
+}
+
+.content-browser-section-line {
+    background-color: @border-4;
+}
+
+.content-browser-folder-tree {
+    row-background-color: @bg-panel;
+    row-alternate-color: @bg-panel;
+}
+
+.content-browser-folder-label {
+    background-transparency: 1.0;
+    font-size: 13px;
+    text-color: @text-2;
+    text-y-alignment: center;
+    text-truncate: ellipsis;
 }
 
 // stuff like a grid of cards needs a nice bg
@@ -728,41 +834,71 @@ radio-button:active {
     background-transparency: 0.0;
 }
 
-.status-bar {
+.content-browser-status {
+    background-color: @bg-panel;
     text-color: @text-3;
-    background-color: @bg-header;
+    font-size: 11px;
     text-x-alignment: left;
     text-y-alignment: center;
-    font-size: 11px;
 }
 
-.content-browser-card-well {
+.content-browser-card {
     background-color: @bg-panel;
-    corner-radius: 2px;
-    border-color: @border-4;
+    corner-radius: 4px;
     border-pixel-size: 1px;
+    border-color: @border-4;
 }
 
-.content-browser-card-well:active {
+.content-browser-card:hover {
+    border-color: #5A5A5A;
+}
+
+.content-browser-card:active {
     border-color: @accent;
 }
 
-.content-browser-card-thumb {
-    background-color: @bg-panel;
-    background-transparency: 0.0;
+.content-browser-card-icon {
+    background-transparency: 1.0;
+    image-color: @text-2;
+}
+
+.content-browser-card-icon-folder {
+    background-transparency: 1.0;
+    image-color: @type-folder;
 }
 
 .content-browser-card-footer {
     background-color: @bg-buttons;
-    text-color: @text-1;
-    text-x-alignment: center;
-    text-y-alignment: center;
-    text-truncate: at_end;
-    font-size: 12px;
+}
+
+.content-browser-card-footer:hover {
+    background-color: #404040;
 }
 
 .content-browser-card-footer:active {
     background-color: @accent;
+}
+
+.content-browser-card-name {
+    background-transparency: 1.0;
+    text-color: @text-1;
+    font-size: 12px;
+    text-x-alignment: center;
+    text-y-alignment: center;
+    text-truncate: ellipsis;
+}
+
+.content-browser-card-kind {
+    background-transparency: 1.0;
+    text-color: @text-2;
+    font-size: 10px;
+    text-x-alignment: center;
+    text-y-alignment: center;
+    text-truncate: ellipsis;
+}
+
+.content-browser-card-kind:active {
+    text-color: @text-1;
 }
 
 .content-browser-card-name-input {
@@ -771,15 +907,6 @@ radio-button:active {
     text-x-alignment: center;
     text-y-alignment: center;
     font-size: 12px;
-}
-
-.content-browser-card-footer-type {
-    background-transparency: 1.0;
-    text-color: @text-2;
-    text-x-alignment: center;
-    text-y-alignment: center;
-    text-truncate: at_end;
-    font-size: 10px;
 }
 
 .tooltip {
@@ -804,13 +931,59 @@ radio-button:active {
     text-y-alignment: center;
 }
 
-.tooltip-row {
+.asset-tooltip-preview {
+    background-color: @bg-panel;
+    corner-radius: 4px;
+    border-pixel-size: 1px;
+    border-color: @border-3;
+}
+
+.asset-tooltip-dot {
+    corner-radius: 2px;
+}
+
+.asset-tooltip-divider {
+    background-color: @border-4;
+}
+
+.asset-tooltip-title {
     background-transparency: 1.0;
-    text-color: @text-2;
-    text-x-alignment: left;
+    font-family: "Roboto Bold";
+    font-size: 13px;
+    text-color: @text-1;
     text-y-alignment: center;
-    text-truncate: at_end;
+    text-truncate: ellipsis;
+}
+
+.asset-tooltip-chip {
+    background-transparency: 1.0;
     font-size: 11px;
+    text-color: @text-2;
+    text-y-alignment: center;
+}
+
+.asset-tooltip-fact-key {
+    background-transparency: 1.0;
+    font-size: 12px;
+    text-color: @text-3;
+    text-y-alignment: center;
+}
+
+.asset-tooltip-fact-value {
+    background-transparency: 1.0;
+    font-size: 12px;
+    text-color: @text-1;
+    text-y-alignment: center;
+    text-truncate: ellipsis;
+}
+
+.asset-tooltip-fact-value-mono {
+    background-transparency: 1.0;
+    font-family: "IBM Plex Mono";
+    font-size: 11px;
+    text-color: @text-2;
+    text-y-alignment: center;
+    text-truncate: ellipsis;
 }
 
 .file-browser-sidebar {

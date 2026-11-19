@@ -12,11 +12,16 @@
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "panels/Panel.h"
+
+class IconButton;
+class IconLabelButton;
+class SearchField;
 
 class ContentBrowserPanel : public Panel {
   public:
@@ -41,7 +46,6 @@ class ContentBrowserPanel : public Panel {
     struct ContentItemComponents {
         Amethyst::Frame *container = nullptr;
         Amethyst::InvisibleButton *action = nullptr;
-        Amethyst::Frame *thumbWell = nullptr;
         Amethyst::ImageLabel *icon = nullptr;
         Amethyst::Frame *footer = nullptr;
         Amethyst::TextLabel *name = nullptr;
@@ -53,6 +57,15 @@ class ContentBrowserPanel : public Panel {
         Amethyst::EventConnection doubleClickConnection;
         Amethyst::EventConnection contextMenuConnection;
         bool attached = false;
+    };
+
+    /**
+     * @brief A titled section of the sidebar, folding away what sits under it
+     */
+    struct SidebarSection {
+        Amethyst::InvisibleButton *header = nullptr;
+        Amethyst::ImageLabel *chevron = nullptr;
+        bool expanded = true;
     };
 
     // what the name being typed into a tile will do once it is confirmed
@@ -75,10 +88,40 @@ class ContentBrowserPanel : public Panel {
 
   private:
     void setupTopBar(void);
+
+    /**
+     * @brief Adds an island to the end of the toolbar, as wide as what is placed in it
+     * @return The island
+     */
+    Amethyst::Frame *addToolbarIsland(void);
+
+    /**
+     * @brief Adds a full height line to the end of the toolbar, dividing the islands either side of it
+     * @return The line
+     */
+    Amethyst::Frame *addToolbarSeparator(void);
+
+    /**
+     * @brief Adds a button showing an icon and a label in an island of its own
+     * @param iconSvg The icon
+     * @param label The label
+     * @param styleClass Theme class the button is styled by
+     * @return The button
+     */
+    IconLabelButton *addToolbarButtonIsland(std::string_view iconSvg, std::string_view label, std::string_view styleClass);
+
     void setupSideBar(void);
 
     /**
-     * @brief Sizes the sidebar sections so that a collapsed one takes only its header and the ones below it move up
+     * @brief Fills a sidebar section's header with its chevron, title and the line running to the edge
+     * @param section The section the header belongs to
+     * @param title The section's title
+     * @param layoutOrder Where the section sits in the sidebar
+     */
+    void buildSidebarSection(SidebarSection &section, std::string_view title, uint32_t layoutOrder);
+
+    /**
+     * @brief Fits the folder tree to its shown rows, so Recent sits directly below it
      */
     void layoutSideBar(void);
 
@@ -159,11 +202,12 @@ class ContentBrowserPanel : public Panel {
                                                                                Rapture::AssetHandle handle);
 
     /**
-     * @brief Sizes a card's footer so that it takes the type bar's strip on a card that has no type bar
+     * @brief Lays out a card's footer: its name alone or over its kind, and the strip in its type's colour
      * @param item The card being laid out
-     * @param hasTypeBar Whether the card shows a type accent bar along its bottom edge
+     * @param kind What the card is, shown under its name, empty to show the name alone
+     * @param typeColor The colour of the strip along the footer's bottom edge, none for no strip
      */
-    void layoutCardFooter(ContentItemComponents &item, bool hasTypeBar);
+    void layoutCardFooter(ContentItemComponents &item, std::string_view kind, std::optional<Amethyst::Color3> typeColor);
 
     void refreshFileBrowser(void);
     void buildDirectoryTree(void);
@@ -173,6 +217,17 @@ class ContentBrowserPanel : public Panel {
     void navigateToDirectory(const std::filesystem::path &path);
     void navigateBack(void);
     void navigateForward(void);
+    void navigateUp(void);
+
+    /**
+     * @brief Greys out the back, forward and up buttons that have nowhere to go
+     */
+    void refreshNavigationButtons(void);
+
+    /**
+     * @brief Selects the folder tree row of the directory being shown
+     */
+    void selectCurrentDirectoryRow(void);
 
     void onSearchTextChanged(const std::string &text);
 
@@ -184,26 +239,34 @@ class ContentBrowserPanel : public Panel {
 
     void buildFilesSubtree(const std::filesystem::path &path, uint16_t depth);
 
+    /**
+     * @brief Adds a folder tree row naming a directory, which shows that directory when clicked
+     * @param path The directory
+     * @param depth The row's nesting depth
+     */
+    void addDirectoryRow(const std::filesystem::path &path, uint16_t depth);
+
   private:
     Amethyst::Frame *m_topBarPane = nullptr;
-    Amethyst::TextButton *m_addBtn = nullptr;
-    Amethyst::TextButton *m_importBtn = nullptr;
-    Amethyst::ImageButton *m_goBackBtn = nullptr;
-    Amethyst::ImageButton *m_goForwardBtn = nullptr;
-    Amethyst::ImageButton *m_settingsBtn = nullptr;
+    IconLabelButton *m_addBtn = nullptr;
+    IconLabelButton *m_importBtn = nullptr;
+    IconButton *m_goBackBtn = nullptr;
+    IconButton *m_goForwardBtn = nullptr;
+    IconButton *m_goUpBtn = nullptr;
+    IconButton *m_settingsBtn = nullptr;
+    SearchField *m_searchField = nullptr;
     Amethyst::Frame *m_breadcrumbBar = nullptr;
 
     Amethyst::ContextMenu *m_contextMenu = nullptr;
     Amethyst::ContextMenu *m_addMenu = nullptr;
 
     Amethyst::Frame *m_sideBarPane = nullptr;
-    Amethyst::CollapsibleHeader *m_projectSection = nullptr;
-    Amethyst::CollapsibleHeader *m_recentSection = nullptr;
+    SidebarSection m_projectSection;
+    SidebarSection m_recentSection;
     Amethyst::TreeView *m_directoryTree = nullptr;
+    Amethyst::UISizeConstraint *m_directoryTreeLimits = nullptr;
+    std::vector<std::filesystem::path> m_directoryRowPaths;
 
-    Amethyst::Frame *m_contentPane = nullptr;
-    Amethyst::Frame *m_searchBar = nullptr;
-    Amethyst::TextInput *m_searchInput = nullptr;
     Amethyst::ScrollingFrame *m_contentContainer = nullptr;
     Amethyst::TextLabel *m_statusLabel = nullptr;
 
