@@ -5,6 +5,7 @@
 #include "panels/SceneObjectTreePanel.h"
 #include "panels/TextEditorPanel.h"
 #include "panels/ViewportPanel.h"
+#include "ui/ControlTooltip.h"
 
 #include <rapture/app/Application.h>
 #include <rapture/assets/asset_manager/AssetManager.h>
@@ -18,6 +19,17 @@
 #include <rapture/scene/instances/DirectionalLight3D.h>
 #include <rapture/scene/instances/Node3D.h>
 #include <rapture/scene/systems/Transforms.h>
+
+#include <array>
+
+enum ModuleEditorTooltip {
+    MODULE_EDITOR_TOOLTIP_SAVE,
+    MODULE_EDITOR_TOOLTIP_COUNT
+};
+
+static constexpr std::array<ControlTooltip, MODULE_EDITOR_TOOLTIP_COUNT> MODULE_EDITOR_TOOLTIPS = {{
+    {.name = "Save", .description = "Writes this module to its asset file"},
+}};
 
 static constexpr std::string_view ROOT_NAME = "Scene Root";
 
@@ -137,7 +149,8 @@ void ModuleEditorWorkspace::build()
 
 void ModuleEditorWorkspace::buildHotbar()
 {
-    addHotbarButton("Save", [this]() { save(); });
+    Amethyst::TextButton *saveButton = addHotbarButton("Save", [this]() { save(); });
+    ControlTooltip_attach(*saveButton, MODULE_EDITOR_TOOLTIPS[MODULE_EDITOR_TOOLTIP_SAVE], m_editor);
 }
 
 void ModuleEditorWorkspace::save()

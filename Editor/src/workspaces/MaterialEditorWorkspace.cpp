@@ -3,6 +3,7 @@
 #include "Icons.h"
 #include "panels/NodeEditorPanel.h"
 #include "panels/ViewportPanel.h"
+#include "ui/ControlTooltip.h"
 
 #include <rapture/assets/asset_manager/AssetManager.h>
 #include <rapture/assets/asset_manager/ReservedAssets.h>
@@ -13,6 +14,17 @@
 #include <rapture/scene/instances/Environment.h>
 #include <rapture/scene/instances/SceneObject.h>
 #include <rapture/scene/instances/StaticMesh3D.h>
+
+#include <array>
+
+enum MaterialEditorTooltip {
+    MATERIAL_EDITOR_TOOLTIP_COMPILE,
+    MATERIAL_EDITOR_TOOLTIP_COUNT
+};
+
+static constexpr std::array<ControlTooltip, MATERIAL_EDITOR_TOOLTIP_COUNT> MATERIAL_EDITOR_TOOLTIPS = {{
+    {.name = "Compile", .description = "Builds the material's shader from its graph"},
+}};
 
 static constexpr std::string_view PREVIEW_SCENE_NAME = "MaterialPreview";
 
@@ -87,11 +99,12 @@ void MaterialEditorWorkspace::build()
 
 void MaterialEditorWorkspace::buildHotbar()
 {
-    addHotbarButton("Compile", [this]() {
+    Amethyst::TextButton *compileButton = addHotbarButton("Compile", [this]() {
         if (m_nodeEditor != nullptr) {
             m_nodeEditor->compileGraph();
         }
     });
+    ControlTooltip_attach(*compileButton, MATERIAL_EDITOR_TOOLTIPS[MATERIAL_EDITOR_TOOLTIP_COMPILE], m_editor);
 }
 
 void MaterialEditorWorkspace::showMaterialOnSphere(Rapture::AssetHandle handle)

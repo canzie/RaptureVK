@@ -2,6 +2,7 @@
 
 #include "panels/TextEditorPanel.h"
 #include "ui/AssetVisuals.h"
+#include "ui/ControlTooltip.h"
 
 #include <rapture/app/Application.h>
 #include <rapture/assets/asset_manager/AssetImportConfig.h>
@@ -10,7 +11,19 @@
 #include <rapture/core/utils/Log.h>
 #include <rapture/scene/Project.h>
 
+#include <array>
 #include <fstream>
+
+enum ScriptingTooltip {
+    SCRIPTING_TOOLTIP_NEW_SCRIPT,
+    SCRIPTING_TOOLTIP_SAVE,
+    SCRIPTING_TOOLTIP_COUNT
+};
+
+static constexpr std::array<ControlTooltip, SCRIPTING_TOOLTIP_COUNT> SCRIPTING_TOOLTIPS = {{
+    {.name = "New Script", .description = "Creates a script and opens it"},
+    {.name = "Save", .description = "Writes the script in front to its file", .command = EDITOR_COMMAND_SAVE},
+}};
 
 static constexpr std::string_view LUA_EXTENSION = ".lua";
 
@@ -50,12 +63,14 @@ void ScriptingWorkspace::build()
 
 void ScriptingWorkspace::buildHotbar()
 {
-    addHotbarButton("New Script", [this]() { createAndOpenScript(); });
-    addHotbarButton("Save", [this]() {
+    Amethyst::TextButton *newScriptButton = addHotbarButton("New Script", [this]() { createAndOpenScript(); });
+    ControlTooltip_attach(*newScriptButton, SCRIPTING_TOOLTIPS[SCRIPTING_TOOLTIP_NEW_SCRIPT], m_editor);
+    Amethyst::TextButton *saveButton = addHotbarButton("Save", [this]() {
         if (TextEditorPanel *editor = shownEditor()) {
             editor->save();
         }
     });
+    ControlTooltip_attach(*saveButton, SCRIPTING_TOOLTIPS[SCRIPTING_TOOLTIP_SAVE], m_editor);
 }
 
 Rapture::AssetHandle ScriptingWorkspace::createScript(const std::filesystem::path &folder, std::string_view name)

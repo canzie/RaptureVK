@@ -10,6 +10,7 @@
 #include "panels/WorldSettingsPanel.h"
 #include "scene/EditorCamera.h"
 #include "ui/AssetVisuals.h"
+#include "ui/ControlTooltip.h"
 #include "ui/controls/IconButton.h"
 #include "ui/controls/IconLabelButton.h"
 #include "ui/menus/ContextMenuItems.h"
@@ -22,6 +23,8 @@
 #include <rapture/scene/Scene.h>
 #include <rapture/scene/instances/Camera3D.h>
 #include <rapture/scene/instances/Instance.h>
+
+#include <array>
 
 static constexpr std::string_view ADD_BUTTON_CLASS = "hotbar-primary-button";
 
@@ -40,6 +43,27 @@ static constexpr float VIEWPORT_SPLIT = 0.65f;
 static constexpr uint32_t INITIAL_VIEWPORT_WIDTH = 1280;
 static constexpr uint32_t INITIAL_VIEWPORT_HEIGHT = 720;
 static constexpr std::string_view EDITOR_LAYER_NAME = "Editor Layer";
+
+enum WorldEditorTooltip {
+    WORLD_EDITOR_TOOLTIP_ADD,
+    WORLD_EDITOR_TOOLTIP_SAVE_WORLD,
+    WORLD_EDITOR_TOOLTIP_PLAY,
+    WORLD_EDITOR_TOOLTIP_STOP,
+    WORLD_EDITOR_TOOLTIP_PAUSE,
+    WORLD_EDITOR_TOOLTIP_RESUME,
+    WORLD_EDITOR_TOOLTIP_STEP,
+    WORLD_EDITOR_TOOLTIP_COUNT
+};
+
+static constexpr std::array<ControlTooltip, WORLD_EDITOR_TOOLTIP_COUNT> WORLD_EDITOR_TOOLTIPS = {{
+    {.name = "Add", .description = "Adds an object to the root of the world"},
+    {.name = "Save World", .description = "Writes this world and its objects to its asset file"},
+    {.name = "Play", .description = "Play the world"},
+    {.name = "Stop", .description = "Stop playing", .command = EDITOR_COMMAND_PLAY_MODE_STOP},
+    {.name = "Pause", .description = "Pause the world"},
+    {.name = "Resume", .description = "Resume the world"},
+    {.name = "Step", .description = "Advance one frame"},
+}};
 
 WorldEditorWorkspace::WorldEditorWorkspace(const EditorContext &context, Rapture::Ref<Rapture::AWorld> world)
     : AssetWorkspace(context, world.get()->handle()), m_world(std::move(world))
@@ -122,8 +146,10 @@ void WorldEditorWorkspace::build()
 void WorldEditorWorkspace::buildHotbar()
 {
     m_addButton = addHotbarButton("Add", Icons::SVG_PLUS, ADD_BUTTON_CLASS, [this]() { showAddMenu(*m_addButton); });
+    ControlTooltip_attach(*m_addButton, WORLD_EDITOR_TOOLTIPS[WORLD_EDITOR_TOOLTIP_ADD], m_editor);
     addHotbarSeparator();
-    addHotbarButton("Save World", Icons::SVG_SAVE, [this]() { saveWorld(); });
+    IconLabelButton *saveButton = addHotbarButton("Save World", Icons::SVG_SAVE, [this]() { saveWorld(); });
+    ControlTooltip_attach(*saveButton, WORLD_EDITOR_TOOLTIPS[WORLD_EDITOR_TOOLTIP_SAVE_WORLD], m_editor);
     addHotbarSeparator();
 
     const float groupInset = PLAY_GROUP_BORDER + PLAY_GROUP_PADDING;
@@ -203,6 +229,10 @@ void WorldEditorWorkspace::setupPlayControls(Amethyst::Frame &group)
 
     m_stepButton = group.add<IconButton>(Icons::SVG_FRAME_ADVANCE, PLAY_ICON_SIZE, buttonClasses);
     m_stepButton->setBaseProperties({.layoutOrder = 2, .size = buttonSize});
+
+    ControlTooltip_attach(*m_playButton, WORLD_EDITOR_TOOLTIPS[WORLD_EDITOR_TOOLTIP_PLAY], m_editor);
+    ControlTooltip_attach(*m_pauseButton, WORLD_EDITOR_TOOLTIPS[WORLD_EDITOR_TOOLTIP_PAUSE], m_editor);
+    ControlTooltip_attach(*m_stepButton, WORLD_EDITOR_TOOLTIPS[WORLD_EDITOR_TOOLTIP_STEP], m_editor);
 }
 
 void WorldEditorWorkspace::setupShortcuts()
@@ -238,10 +268,14 @@ void WorldEditorWorkspace::syncPlayButtons()
     const bool playing = isPlaying();
     m_playButton->setIcon(playing ? Icons::SVG_STOP : Icons::SVG_PLAY);
     m_playButton->setGuiStateFlag(Amethyst::GUI_STATE_ACTIVE, playing);
+    ControlTooltip_attach(*m_playButton, WORLD_EDITOR_TOOLTIPS[playing ? WORLD_EDITOR_TOOLTIP_STOP : WORLD_EDITOR_TOOLTIP_PLAY],
+                          m_editor);
 
     const bool paused = m_world->playState() == Rapture::PlayState::PAUSED;
     m_pauseButton->setIcon(paused ? Icons::SVG_PLAY : Icons::SVG_PAUSE);
     m_pauseButton->setGuiStateFlag(Amethyst::GUI_STATE_ACTIVE, paused);
+    ControlTooltip_attach(*m_pauseButton, WORLD_EDITOR_TOOLTIPS[paused ? WORLD_EDITOR_TOOLTIP_RESUME : WORLD_EDITOR_TOOLTIP_PAUSE],
+                          m_editor);
 }
 
 void WorldEditorWorkspace::startPlay()

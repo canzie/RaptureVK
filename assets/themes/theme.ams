@@ -783,10 +783,25 @@ radio-button:active {
 }
 
 .tooltip {
-    background-color: @bg-buttons;
-    corner-radius: 3px;
+    background-color: @bg-header;
+    corner-radius: 4px;
     border-pixel-size: 1px;
-    border-color: @border-1;
+    border-color: @border-4;
+}
+
+.tooltip-text {
+    background-transparency: 1.0;
+    font-size: 12px;
+    text-color: @text-2;
+    text-y-alignment: center;
+}
+
+.tooltip-shortcut {
+    background-transparency: 1.0;
+    font-family: "IBM Plex Mono";
+    font-size: 11px;
+    text-color: @text-3;
+    text-y-alignment: center;
 }
 
 .tooltip-row {

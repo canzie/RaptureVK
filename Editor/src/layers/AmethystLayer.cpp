@@ -36,6 +36,7 @@ static constexpr std::array<std::string_view, 3> FONT_FILES = {
     "IBMPlexMono-Regular.ttf",
 };
 
+static constexpr Amethyst::vec2 TOOLTIP_CURSOR_OFFSET = {14.0f, 22.0f};
 static constexpr float PROJECT_NAME_WIDTH = 180.0f;
 static constexpr float PROJECT_NAME_RIGHT_INSET = 140.0f;
 static constexpr float PROJECT_NAME_VERTICAL_INSET = 8.0f;
@@ -187,6 +188,7 @@ void AmethystLayer::onAttach()
         return;
     }
 
+    m_window.getTooltips().cursorOffset = TOOLTIP_CURSOR_OFFSET;
     setupEditorContext();
     setupMenuBar();
 
