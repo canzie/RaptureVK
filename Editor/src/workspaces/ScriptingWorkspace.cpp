@@ -37,6 +37,11 @@ std::string_view ScriptingWorkspace::tabIcon() const
     return Asset_iconForType(Rapture::ASSET_SCRIPT);
 }
 
+std::optional<Amethyst::Color4> ScriptingWorkspace::tabIconColor() const
+{
+    return Amethyst::Color4(Asset_colorForType(Rapture::ASSET_SCRIPT), 1.0f);
+}
+
 void ScriptingWorkspace::build()
 {
     Amethyst::DockScope(*m_contentDock).panel([&](Amethyst::TabBarScope &tb) { m_editorTabBar = &tb.component; });

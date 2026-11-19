@@ -13,6 +13,7 @@
 #include <memory>
 
 class EditorCamera;
+class IconButton;
 class PlayLayer;
 
 /**
@@ -80,12 +81,23 @@ class WorldEditorWorkspace : public AssetWorkspace {
      */
     void syncPlayButtons();
 
+    /**
+     * @brief Shows or hides the viewport outline and hotbar note that mark the world as playing
+     */
+    void syncPlayingIndicators();
+
+    /**
+     * @brief Adds the hotbar note shown while the world plays
+     */
+    void addPlayingNote();
+
   private:
     Amethyst::ContextMenu *m_addMenu = nullptr;
     Amethyst::TextButton *m_addButton = nullptr;
-    Amethyst::ImageButton *m_playButton = nullptr;
-    Amethyst::ImageButton *m_pauseButton = nullptr;
-    Amethyst::ImageButton *m_stepButton = nullptr;
+    IconButton *m_playButton = nullptr;
+    IconButton *m_pauseButton = nullptr;
+    IconButton *m_stepButton = nullptr;
+    Amethyst::Frame *m_playingNote = nullptr;
 
     Rapture::Ref<Rapture::AWorld> m_world;
     PlayLayer *m_playLayer = nullptr;

@@ -41,6 +41,11 @@
 @property input-border-hover #4A4A4A
 @property button-hover       #424242
 @property tab-hover          #222222
+@property playing            #F04848
+@property play-hover         #B9D3A2
+@property axis-x             #C25B5B
+@property axis-y             #6FA35B
+@property axis-z             #4F7FC9
 
 
 @property white #FFFFFF
@@ -202,6 +207,60 @@ text-area {
     background-color: @bg-window;
 }
 
+.hotbar-item {
+    background-transparency: 1.0;
+}
+
+.hotbar-button {
+    background-color: @hover;
+    background-transparency: 1.0;
+    text-color: @text-2;
+    image-color: @text-2;
+    font-size: 13px;
+    corner-radius: 4px;
+}
+
+.hotbar-button:hover {
+    background-transparency: 0.0;
+    text-color: @text-1;
+    image-color: @text-1;
+}
+
+.hotbar-primary-button {
+    background-color: @bg-buttons;
+    text-color: @text-1;
+    image-color: @status-success;
+    font-family: "Roboto Bold";
+    font-size: 13px;
+    corner-radius: 4px;
+    border-pixel-size: 1px;
+    border-color: @border-4;
+}
+
+.hotbar-primary-button:hover {
+    background-color: @button-hover;
+    border-color: @text-4;
+}
+
+.hotbar-play-group {
+    background-color: @bg-input;
+    corner-radius: 6px;
+    border-pixel-size: 1px;
+    border-color: @input-border;
+}
+
+.hotbar-play-button {
+    background-color: @hover;
+    background-transparency: 1.0;
+    image-color: @text-2;
+    corner-radius: 4px;
+}
+
+.hotbar-play-button:hover {
+    background-transparency: 0.0;
+    image-color: @text-1;
+}
+
 .bottom-bar {
     background-color: @bg-panel;
 }
@@ -310,6 +369,37 @@ text-area {
     border-color: @input-border-hover;
 }
 
+.property-dropdown {
+    padding: 0px 26px 0px 8px;
+    indicator-size: 10px;
+    indicator-padding: 8px;
+    indicator-color: @text-3;
+}
+
+.property-dropdown:hover {
+    indicator-color: @text-1;
+}
+
+.property-slider {
+    padding: 1px;
+    thumb-width: 0px;
+}
+
+.axis-bar-x {
+    background-color: @axis-x;
+    corner-radius: 3px 0px 0px 3px;
+}
+
+.axis-bar-y {
+    background-color: @axis-y;
+    corner-radius: 3px 0px 0px 3px;
+}
+
+.axis-bar-z {
+    background-color: @axis-z;
+    corner-radius: 3px 0px 0px 3px;
+}
+
 .searchbar {
     font-size: 13px;
     text-color: @text-1;
@@ -415,18 +505,6 @@ radio-button.viewport-context-menu:active {
     background-color: @text-1;
 }
 
-.viewport-overlay-button {
-    background-color: @bg-buttons;
-    text-color: @text-2;
-    font-size: 12px;
-    corner-radius: 4px;
-}
-
-.viewport-overlay-button:hover {
-    background-color: @button-hover;
-    text-color: @text-1;
-}
-
 .generic-text-button {
     background-color: @bg-buttons;
     background-transparency: 0.0;
@@ -434,7 +512,6 @@ radio-button.viewport-context-menu:active {
     image-color: @text-2;
     border-pixel-size: 1px;
     border-color: @border-1;
-    border-mode: outline;
     text-x-alignment: center;
     text-y-alignment: center;
     font-size: 13px;
@@ -454,7 +531,6 @@ radio-button.viewport-context-menu:active {
     image-color: @accent-contrast;
     border-pixel-size: 1px;
     border-color: @border-1;
-    border-mode: outline;
     text-x-alignment: center;
     text-y-alignment: center;
     font-size: 13px;
@@ -469,8 +545,55 @@ radio-button.viewport-context-menu:active {
     image-color: @status-success;
 }
 
+.play-button:hover {
+    image-color: @play-hover;
+}
+
 .play-button:active {
-    image-color: @status-error;
+    image-color: @playing;
+}
+
+.playing-note {
+    background-transparency: 1.0;
+    text-color: @playing;
+    font-size: 12px;
+    text-x-alignment: left;
+    text-y-alignment: center;
+}
+
+.playing-note-dot {
+    background-color: @playing;
+    corner-radius: 4px;
+}
+
+.viewport-image {
+    corner-radius: 3px;
+}
+
+.viewport-toolbar {
+    background-color: @bg-input;
+    background-transparency: 0.22;
+    corner-radius: 6px;
+}
+
+.viewport-toolbar-button {
+    background-color: @white;
+    background-transparency: 1.0;
+    text-color: @text-1;
+    image-color: @text-2;
+    font-size: 12px;
+    corner-radius: 4px;
+}
+
+.viewport-toolbar-button:hover {
+    background-transparency: 0.9;
+    image-color: @text-1;
+}
+
+.viewport-image-playing {
+    border-pixel-size: 2px;
+    border-color: @playing;
+    border-mode: outline;
 }
 
 
@@ -479,7 +602,6 @@ radio-button.viewport-context-menu:active {
     text-color: @text-2;
     border-pixel-size: 1px;
     border-color: @input-border;
-    border-mode: outline;
     text-x-alignment: center;
     text-y-alignment: center;
     font-size: 12px;
@@ -519,7 +641,6 @@ radio-button.viewport-context-menu:active {
     background-color: @bg-panel;
     corner-radius: 2px;
     border-color: @border-4;
-    border-mode: outline;
     border-pixel-size: 1px;
 }
 
@@ -567,7 +688,6 @@ radio-button.viewport-context-menu:active {
     corner-radius: 3px;
     border-pixel-size: 1px;
     border-color: @border-1;
-    border-mode: outline;
 }
 
 .tooltip-row {
@@ -667,7 +787,6 @@ radio-button.viewport-context-menu:active {
 .launcher-list {
     background-color: @bg-canvas;
     border-color: @border-2;
-    border-mode: outline;
     border-pixel-size: 1px;
     corner-radius: 2px;
     scrollbar-color: @bg-frame;
@@ -685,7 +804,6 @@ radio-button.viewport-context-menu:active {
 .launcher-project {
     background-color: @bg-panel;
     border-color: @border-2;
-    border-mode: outline;
     border-pixel-size: 1px;
     corner-radius: 2px;
 }
@@ -720,7 +838,6 @@ radio-button.viewport-context-menu:active {
 .launcher-name-field {
     background-color: @bg-input;
     border-color: @border-3;
-    border-mode: outline;
     border-pixel-size: 1px;
     corner-radius: 2px;
     text-color: @text-1;

@@ -4,6 +4,8 @@
 #include <functional>
 #include <string_view>
 
+#include <modules/color.h>
+
 namespace Amethyst {
 class Frame;
 struct FrameScope;
@@ -20,6 +22,17 @@ class EditorConfig;
  * @return Callback for TabBar::addTab
  */
 std::function<void(Amethyst::Frame &)> iconTabLabel(std::string_view label, std::string_view iconSvg, const EditorConfig &config);
+
+/**
+ * @brief The same label, its icon tinted with a given color
+ * @param label Text shown on the tab
+ * @param iconSvg SVG markup shown left of the text, empty to omit it
+ * @param iconColor Color the icon is tinted with
+ * @param config Where the label takes its sizes from
+ * @return Callback for TabBar::addTab
+ */
+std::function<void(Amethyst::Frame &)> iconTabLabel(std::string_view label, std::string_view iconSvg, Amethyst::Color4 iconColor,
+                                                    const EditorConfig &config);
 
 /**
  * @brief The same label, for a tab declared while its bar is being built

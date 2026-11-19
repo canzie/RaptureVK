@@ -1,7 +1,6 @@
 #include "WorldEditorWorkspace.h"
 
 #include "Icons.h"
-#include "app/EditorConfig.h"
 #include "layers/PlayLayer.h"
 #include "panels/AddSceneObjectMenu.h"
 #include "panels/ImagePreviewPanel.h"
@@ -11,9 +10,10 @@
 #include "panels/WorldSettingsPanel.h"
 #include "scene/EditorCamera.h"
 #include "ui/AssetVisuals.h"
+#include "ui/controls/IconButton.h"
+#include "ui/controls/IconLabelButton.h"
 #include "ui/menus/ContextMenuItems.h"
 
-#include <components/extensions/ui_aspect_ratio_constraint.h>
 #include <components/extensions/ui_list_layout.h>
 #include <components/ui_scope.h>
 #include <rapture/app/Application.h>
@@ -23,19 +23,23 @@
 #include <rapture/scene/instances/Camera3D.h>
 #include <rapture/scene/instances/Instance.h>
 
-static constexpr float PLAY_CONTROL_SCALE = 0.7f;
-static constexpr float PLAY_CONTROL_GAP = 6.0f;
+static constexpr std::string_view ADD_BUTTON_CLASS = "hotbar-primary-button";
+
+static constexpr float PLAY_BUTTON_WIDTH = 44.0f;
+static constexpr float PLAY_BUTTON_HEIGHT = 28.0f;
+static constexpr float PLAY_ICON_SIZE = 18.0f;
+static constexpr float PLAY_CONTROL_GAP = 2.0f;
+static constexpr float PLAY_GROUP_PADDING = 2.0f;
+static constexpr float PLAY_GROUP_BORDER = 1.0f;
+
+static constexpr float PLAYING_NOTE_WIDTH = 340.0f;
+static constexpr float PLAYING_NOTE_DOT_SIZE = 8.0f;
+static constexpr float PLAYING_NOTE_GAP = 8.0f;
 static constexpr float OUTLINER_SPLIT = 0.25f;
 static constexpr float VIEWPORT_SPLIT = 0.65f;
 static constexpr uint32_t INITIAL_VIEWPORT_WIDTH = 1280;
 static constexpr uint32_t INITIAL_VIEWPORT_HEIGHT = 720;
 static constexpr std::string_view EDITOR_LAYER_NAME = "Editor Layer";
-
-static void s_setButtonGuiState(Amethyst::ImageButton &button, uint16_t state, bool on)
-{
-    const uint16_t current = button.getGuiState();
-    button.setGuiState(static_cast<uint16_t>(on ? (current | state) : (current & ~state)));
-}
 
 WorldEditorWorkspace::WorldEditorWorkspace(const EditorContext &context, Rapture::Ref<Rapture::AWorld> world)
     : AssetWorkspace(context, world.get()->handle()), m_world(std::move(world))
@@ -117,66 +121,88 @@ void WorldEditorWorkspace::build()
 
 void WorldEditorWorkspace::buildHotbar()
 {
-    m_addButton = addHotbarButton("Add", [this]() { showAddMenu(*m_addButton); });
-
+    m_addButton = addHotbarButton("Add", Icons::SVG_PLUS, ADD_BUTTON_CLASS, [this]() { showAddMenu(*m_addButton); });
     addHotbarSeparator();
-    addHotbarButton("Save World", [this]() { saveWorld(); });
+    addHotbarButton("Save World", Icons::SVG_SAVE, [this]() { saveWorld(); });
     addHotbarSeparator();
 
-    const float buttonSize = config().getFloat(EDITOR_CONFIG_HOTBAR_HEIGHT) * PLAY_CONTROL_SCALE;
-    const float groupWidth = 3.0f * buttonSize + 2.0f * PLAY_CONTROL_GAP;
-    addHotbarItem(groupWidth, [this](Amethyst::UIScope &slot) { setupPlayControls(*slot.get().as<Amethyst::Frame>()); });
+    const float groupInset = PLAY_GROUP_BORDER + PLAY_GROUP_PADDING;
+    const Amethyst::vec2 groupSize(3.0f * PLAY_BUTTON_WIDTH + 2.0f * PLAY_CONTROL_GAP + 2.0f * groupInset,
+                                   PLAY_BUTTON_HEIGHT + 2.0f * groupInset);
+    addHotbarItem(groupSize, [this](Amethyst::UIScope &slot) { setupPlayControls(*slot.get().as<Amethyst::Frame>()); });
+    addHotbarSeparator();
+    addPlayingNote();
+}
+
+void WorldEditorWorkspace::addPlayingNote()
+{
+    m_playingNote = addHotbarItem(PLAYING_NOTE_WIDTH, [](Amethyst::UIScope &slot) {
+        slot.frame({
+            .classes = {"playing-note-dot"},
+            .base =
+                {
+                    .anchorPoint = Amethyst::vec2(0.0f, 0.5f),
+                    .interactable = false,
+                    .position = Amethyst::UDim2(0.0f, 0.0f, 0.5f, 0.0f),
+                    .size = Amethyst::UDim2::fromOffset(PLAYING_NOTE_DOT_SIZE, PLAYING_NOTE_DOT_SIZE),
+                },
+        });
+        slot.textLabel({
+            .classes = {"playing-note"},
+            .base =
+                {
+                    .interactable = false,
+                    .position = Amethyst::UDim2(0.0f, PLAYING_NOTE_DOT_SIZE + PLAYING_NOTE_GAP, 0.0f, 0.0f),
+                    .size = Amethyst::UDim2(1.0f, -(PLAYING_NOTE_DOT_SIZE + PLAYING_NOTE_GAP), 1.0f, 0.0f),
+                },
+            .label = "Playing, changes made now are undone when you stop",
+        });
+    });
+    m_playingNote->setBaseProperties({.visible = false});
+}
+
+void WorldEditorWorkspace::syncPlayingIndicators()
+{
+    const bool playing = isPlaying();
+    m_playingNote->setBaseProperties({.visible = playing});
+
+    for (const auto &panel : getPanels()) {
+        if (auto *viewportPanel = dynamic_cast<ViewportPanel *>(panel.get())) {
+            viewportPanel->setPlayingOutlineVisible(playing);
+        }
+    }
 }
 
 void WorldEditorWorkspace::setupPlayControls(Amethyst::Frame &group)
 {
-    Amethyst::UIScope controls(group);
+    group.setClasses({"hotbar-play-group"});
+    group.setBaseProperties({.padding = Amethyst::UDim4::fromOffset(PLAY_GROUP_PADDING)});
 
     auto *layout = group.addExtension<Amethyst::UIListLayout>();
     layout->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
     layout->verticalAlignment = Amethyst::VerticalAlignment::ALIGN_CENTER_V;
     layout->innerPadding = Amethyst::UDim::fromOffset(PLAY_CONTROL_GAP);
 
-    controls.imageButton(
-        {
-            .classes = {"generic-text-button", "play-button"},
-            .base = {.layoutOrder = 0, .size = Amethyst::UDim2(0.0f, 0.0f, PLAY_CONTROL_SCALE, 0.0f)},
-            .svg = Icons::SVG_PLAY,
-        },
-        [this](Amethyst::ImageButtonScope &b) {
-            m_playButton = &b.component;
-            b.component.addExtension<Amethyst::UIAspectRatioConstraint>()->dominantAxis = Amethyst::DominantAxis::HEIGHT;
-            b.component.track(b.component.onMouseButton1ClickCb.connect([this]() {
-                if (isPlaying()) {
-                    stopPlay();
-                } else {
-                    startPlay();
-                }
-            }));
-        });
+    const Amethyst::UDim2 buttonSize = Amethyst::UDim2::fromOffset(PLAY_BUTTON_WIDTH, PLAY_BUTTON_HEIGHT);
+    const std::vector<std::string> buttonClasses = {"hotbar-play-button"};
 
-    controls.imageButton(
-        {
-            .classes = {"generic-text-button"},
-            .base = {.layoutOrder = 1, .size = Amethyst::UDim2(0.0f, 0.0f, PLAY_CONTROL_SCALE, 0.0f)},
-            .svg = Icons::SVG_PAUSE,
-        },
-        [this](Amethyst::ImageButtonScope &b) {
-            m_pauseButton = &b.component;
-            b.component.addExtension<Amethyst::UIAspectRatioConstraint>()->dominantAxis = Amethyst::DominantAxis::HEIGHT;
-            b.component.track(b.component.onMouseButton1ClickCb.connect([this]() { togglePause(); }));
-        });
+    const std::vector<std::string> playButtonClasses = {"hotbar-play-button", "play-button"};
+    m_playButton = group.add<IconButton>(Icons::SVG_PLAY, PLAY_ICON_SIZE, playButtonClasses);
+    m_playButton->setBaseProperties({.layoutOrder = 0, .size = buttonSize});
+    m_playButton->track(m_playButton->onMouseButton1ClickCb.connect([this]() {
+        if (isPlaying()) {
+            stopPlay();
+        } else {
+            startPlay();
+        }
+    }));
 
-    controls.imageButton(
-        {
-            .classes = {"generic-text-button"},
-            .base = {.layoutOrder = 2, .size = Amethyst::UDim2(0.0f, 0.0f, PLAY_CONTROL_SCALE, 0.0f)},
-            .svg = Icons::SVG_FRAME_ADVANCE,
-        },
-        [this](Amethyst::ImageButtonScope &b) {
-            m_stepButton = &b.component;
-            b.component.addExtension<Amethyst::UIAspectRatioConstraint>()->dominantAxis = Amethyst::DominantAxis::HEIGHT;
-        });
+    m_pauseButton = group.add<IconButton>(Icons::SVG_PAUSE, PLAY_ICON_SIZE, buttonClasses);
+    m_pauseButton->setBaseProperties({.layoutOrder = 1, .size = buttonSize});
+    m_pauseButton->track(m_pauseButton->onMouseButton1ClickCb.connect([this]() { togglePause(); }));
+
+    m_stepButton = group.add<IconButton>(Icons::SVG_FRAME_ADVANCE, PLAY_ICON_SIZE, buttonClasses);
+    m_stepButton->setBaseProperties({.layoutOrder = 2, .size = buttonSize});
 }
 
 void WorldEditorWorkspace::setupShortcuts()
@@ -210,12 +236,12 @@ void WorldEditorWorkspace::togglePause()
 void WorldEditorWorkspace::syncPlayButtons()
 {
     const bool playing = isPlaying();
-    m_playButton->setSvg(playing ? Icons::SVG_STOP : Icons::SVG_PLAY);
-    s_setButtonGuiState(*m_playButton, Amethyst::GUI_STATE_ACTIVE, playing);
+    m_playButton->setIcon(playing ? Icons::SVG_STOP : Icons::SVG_PLAY);
+    m_playButton->setGuiStateFlag(Amethyst::GUI_STATE_ACTIVE, playing);
 
     const bool paused = m_world->playState() == Rapture::PlayState::PAUSED;
-    m_pauseButton->setSvg(paused ? Icons::SVG_PLAY : Icons::SVG_PAUSE);
-    s_setButtonGuiState(*m_pauseButton, Amethyst::GUI_STATE_ACTIVE, paused);
+    m_pauseButton->setIcon(paused ? Icons::SVG_PLAY : Icons::SVG_PAUSE);
+    m_pauseButton->setGuiStateFlag(Amethyst::GUI_STATE_ACTIVE, paused);
 }
 
 void WorldEditorWorkspace::startPlay()
@@ -237,6 +263,7 @@ void WorldEditorWorkspace::startPlay()
     }
 
     syncPlayButtons();
+    syncPlayingIndicators();
 }
 
 void WorldEditorWorkspace::stopPlay()
@@ -254,6 +281,7 @@ void WorldEditorWorkspace::stopPlay()
     }
 
     syncPlayButtons();
+    syncPlayingIndicators();
 }
 
 void WorldEditorWorkspace::showAddMenu(Amethyst::TextButton &button)

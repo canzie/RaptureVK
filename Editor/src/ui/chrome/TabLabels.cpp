@@ -26,8 +26,8 @@ static TabLabelSizes s_takeTabLabelSizes(const EditorConfig &config)
     };
 }
 
-static void s_buildTabLabel(const std::string &label, const std::string &iconSvg, const TabLabelSizes &sizes,
-                            Amethyst::FrameScope &scope)
+static void s_buildTabLabel(const std::string &label, const std::string &iconSvg, Amethyst::Color4 iconColor,
+                            const TabLabelSizes &sizes, Amethyst::FrameScope &scope)
 {
     float textOffset = sizes.padding;
 
@@ -40,7 +40,7 @@ static void s_buildTabLabel(const std::string &label, const std::string &iconSvg
                     .size = Amethyst::UDim2::fromOffset(sizes.iconSize, sizes.iconSize),
                 },
             .style = {.backgroundTransparency = 1.0f},
-            .image = {.imageColor = COL_TAB_ICON},
+            .image = {.imageColor = iconColor},
             .svg = iconSvg,
         });
         textOffset = sizes.padding + sizes.iconSize + sizes.iconGap;
@@ -65,16 +65,24 @@ static void s_buildTabLabel(const std::string &label, const std::string &iconSvg
 
 std::function<void(Amethyst::Frame &)> iconTabLabel(std::string_view label, std::string_view iconSvg, const EditorConfig &config)
 {
-    return
-        [label = std::string(label), iconSvg = std::string(iconSvg), sizes = s_takeTabLabelSizes(config)](Amethyst::Frame &frame) {
-            Amethyst::FrameScope scope(frame);
-            s_buildTabLabel(label, iconSvg, sizes, scope);
-        };
+    return iconTabLabel(label, iconSvg, COL_TAB_ICON, config);
+}
+
+std::function<void(Amethyst::Frame &)> iconTabLabel(std::string_view label, std::string_view iconSvg, Amethyst::Color4 iconColor,
+                                                    const EditorConfig &config)
+{
+    return [label = std::string(label), iconSvg = std::string(iconSvg), iconColor,
+            sizes = s_takeTabLabelSizes(config)](Amethyst::Frame &frame) {
+        Amethyst::FrameScope scope(frame);
+        s_buildTabLabel(label, iconSvg, iconColor, sizes, scope);
+    };
 }
 
 std::function<void(Amethyst::FrameScope &)> iconTabLabelScope(std::string_view label, std::string_view iconSvg,
                                                               const EditorConfig &config)
 {
     return [label = std::string(label), iconSvg = std::string(iconSvg),
-            sizes = s_takeTabLabelSizes(config)](Amethyst::FrameScope &scope) { s_buildTabLabel(label, iconSvg, sizes, scope); };
+            sizes = s_takeTabLabelSizes(config)](Amethyst::FrameScope &scope) {
+        s_buildTabLabel(label, iconSvg, COL_TAB_ICON, sizes, scope);
+    };
 }

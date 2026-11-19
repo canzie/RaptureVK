@@ -25,6 +25,12 @@ class ScriptingWorkspace : public Workspace {
     std::string_view tabIcon() const override;
 
     /**
+     * @brief The color of the script asset type
+     * @return The color
+     */
+    std::optional<Amethyst::Color4> tabIconColor() const override;
+
+    /**
      * @brief Opens a script in a tab of its own, focusing the tab it is already open in
      * @param handle The script to open
      */

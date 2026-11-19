@@ -2,19 +2,23 @@
 
 #include "app/EditorConfig.h"
 #include "ui/chrome/TabLabels.h"
+#include "ui/controls/IconLabelButton.h"
 
 #include <components/extensions/ui_list_layout.h>
 #include <components/ui_scope.h>
 #include <parsers/config/layout_config.h>
+#include <parsers/freetype/font_registry.h>
 #include <rapture/core/utils/rp_assert.h>
 
 static constexpr std::string_view WORKSPACE_CLASS = "workspace";
 static constexpr std::string_view PANEL_TAB_CLASS = "panel-tab";
 static constexpr std::string_view HOTBAR_CLASS = "workspace-hotbar";
 static constexpr std::string_view HOTBAR_SEPARATOR_CLASS = "hotbar-separator";
-static constexpr std::string_view HOTBAR_BUTTON_CLASS = "generic-text-button";
+static constexpr std::string_view HOTBAR_BUTTON_CLASS = "hotbar-button";
+static constexpr std::string_view HOTBAR_ITEM_CLASS = "hotbar-item";
 
-static constexpr float HOTBAR_LABEL_MARGIN = 12.0f;
+static constexpr float HOTBAR_LABEL_MARGIN = 10.0f;
+static constexpr float HOTBAR_CONTROL_HEIGHT = 28.0f;
 
 Workspace::Workspace(const EditorContext &context) : m_editor(context)
 {
@@ -45,7 +49,12 @@ void Workspace::attach(Amethyst::TabBar &tabBar)
 
     auto content = std::make_unique<Amethyst::Frame>();
     Amethyst::Frame *container = content.get();
-    tabBar.addTab(std::move(content), iconTabLabel(tabLabel(), tabIcon(), config()));
+    std::optional<Amethyst::Color4> iconColor = tabIconColor();
+    if (iconColor.has_value()) {
+        tabBar.addTab(std::move(content), iconTabLabel(tabLabel(), tabIcon(), *iconColor, config()));
+    } else {
+        tabBar.addTab(std::move(content), iconTabLabel(tabLabel(), tabIcon(), config()));
+    }
 
     buildContainer(*container);
     buildHotbar();
@@ -77,15 +86,11 @@ void Workspace::buildContainer(Amethyst::Frame &container)
 void Workspace::resolveLayout()
 {
     const float hotbarHeight = config().getFloat(EDITOR_CONFIG_HOTBAR_HEIGHT);
-    const float hotbarPadding = config().getFloat(EDITOR_CONFIG_HOTBAR_PADDING);
 
     m_hotbar->setBaseProperties({
-        .padding = Amethyst::UDim4::fromOffset(hotbarPadding),
         .position = Amethyst::UDim2::fromOffset(0.0f, 0.0f),
         .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, hotbarHeight),
     });
-
-    m_hotbarLayout->innerPadding = Amethyst::UDim::fromOffset(hotbarPadding);
 
     for (const HotbarItem &item : m_hotbarItems) {
         resolveHotbarItem(item);
@@ -186,38 +191,68 @@ void Workspace::setMode(EditorMode mode)
 
 void Workspace::resolveHotbarItem(const HotbarItem &item) const
 {
-    float width = 0.0f;
+    if (item.kind == HotbarItemKind::SEPARATOR) {
+        const float width = config().getFloat(EDITOR_CONFIG_HOTBAR_SEPARATOR_WIDTH);
+        item.island->setBaseProperties({.size = Amethyst::UDim2(0.0f, width, 1.0f, 0.0f)});
+        return;
+    }
+
+    float controlWidth = 0.0f;
     switch (item.kind) {
     case HotbarItemKind::FIXED:
-        width = item.width;
+        controlWidth = item.width;
         break;
-    case HotbarItemKind::LABELLED:
-        width = labelWidth(*item.object->as<Amethyst::TextButton>()) + 2.0f * HOTBAR_LABEL_MARGIN;
+    case HotbarItemKind::LABELLED: {
+        const auto *button = item.control->as<Amethyst::TextButton>();
+        controlWidth = measureTextWidth(button->getText(), button->getTextStyleProperties()) + 2.0f * HOTBAR_LABEL_MARGIN;
         break;
+    }
+    case HotbarItemKind::ICON_LABELLED: {
+        RP_ASSERT(m_editor.amethyst != nullptr, "a workspace was built without the ui context");
+        controlWidth = item.control->as<IconLabelButton>()->measureFittedWidth(m_editor.amethyst->getTextProcessor());
+        break;
+    }
     case HotbarItemKind::SEPARATOR:
-        width = config().getFloat(EDITOR_CONFIG_HOTBAR_SEPARATOR_WIDTH);
         break;
     }
 
-    // the bar's own padding is what keeps an item off its edges
-    item.object->setBaseProperties({.size = Amethyst::UDim2(0.0f, width, 1.0f, 0.0f)});
+    const float islandPadding = config().getFloat(EDITOR_CONFIG_HOTBAR_PADDING);
+    item.island->setBaseProperties({.size = Amethyst::UDim2(0.0f, controlWidth + 2.0f * islandPadding, 1.0f, 0.0f)});
+    item.control->setBaseProperties({
+        .anchorPoint = Amethyst::vec2(0.5f, 0.5f),
+        .position = Amethyst::UDim2::fromScale(0.5f, 0.5f),
+        .size = Amethyst::UDim2::fromOffset(controlWidth, item.kind == HotbarItemKind::FIXED ? item.height : HOTBAR_CONTROL_HEIGHT),
+    });
 }
 
-float Workspace::labelWidth(const Amethyst::TextButton &button) const
+float Workspace::measureTextWidth(const std::string &text, const Amethyst::TextStyleProperties &style) const
 {
     RP_ASSERT(m_editor.amethyst != nullptr, "a workspace was built without the ui context");
 
-    const uint32_t fontSize = static_cast<uint32_t>(button.getTextStyleProperties().fontSize);
-    return m_editor.amethyst->getTextProcessor().measureTextAtlas(button.getText(), {}, fontSize).x;
+    const Amethyst::FontId font = Amethyst::FontRegistry::instance().findFont(style.fontFamily);
+    return m_editor.amethyst->getTextProcessor().measureTextAtlas(text, font, static_cast<uint32_t>(style.fontSize)).x;
+}
+
+Amethyst::Frame *Workspace::addHotbarIsland()
+{
+    Amethyst::Frame *island = nullptr;
+    Amethyst::UIScope(*m_hotbar).frame(
+        {
+            .base = {.layoutOrder = static_cast<uint32_t>(m_hotbarItems.size())},
+            .style = {.backgroundTransparency = 1.0f},
+        },
+        [&](Amethyst::FrameScope &f) { island = &f.component; });
+    return island;
 }
 
 Amethyst::TextButton *Workspace::addHotbarButton(std::string_view label, std::function<void()> onClick)
 {
+    Amethyst::Frame *island = addHotbarIsland();
+
     Amethyst::TextButton *button = nullptr;
-    Amethyst::UIScope(*m_hotbar).textButton(
+    Amethyst::UIScope(*island).textButton(
         {
             .classes = {std::string(HOTBAR_BUTTON_CLASS)},
-            .base = {.layoutOrder = static_cast<uint32_t>(m_hotbarItems.size())},
             .text =
                 {
                     .textXAlignment = Amethyst::TextXAlignment::CENTER,
@@ -230,7 +265,26 @@ Amethyst::TextButton *Workspace::addHotbarButton(std::string_view label, std::fu
             b.component.track(b.component.onMouseButton1ClickCb.connect([onClick = std::move(onClick)]() { onClick(); }));
         });
 
-    const HotbarItem &item = m_hotbarItems.emplace_back(button, 0.0f, HotbarItemKind::LABELLED);
+    const HotbarItem &item = m_hotbarItems.emplace_back(island, button, 0.0f, HotbarItemKind::LABELLED);
+    resolveHotbarItem(item);
+
+    return button;
+}
+
+IconLabelButton *Workspace::addHotbarButton(std::string_view label, std::string_view iconSvg, std::function<void()> onClick)
+{
+    return addHotbarButton(label, iconSvg, HOTBAR_BUTTON_CLASS, std::move(onClick));
+}
+
+IconLabelButton *Workspace::addHotbarButton(std::string_view label, std::string_view iconSvg, std::string_view styleClass,
+                                            std::function<void()> onClick)
+{
+    Amethyst::Frame *island = addHotbarIsland();
+
+    auto *button = island->add<IconLabelButton>(iconSvg, label, std::vector<std::string>{std::string(styleClass)});
+    button->track(button->onMouseButton1ClickCb.connect([onClick = std::move(onClick)]() { onClick(); }));
+
+    const HotbarItem &item = m_hotbarItems.emplace_back(island, button, 0.0f, HotbarItemKind::ICON_LABELLED);
     resolveHotbarItem(item);
 
     return button;
@@ -246,24 +300,26 @@ void Workspace::addHotbarSeparator()
         },
         [&](Amethyst::FrameScope &f) { line = &f.component; });
 
-    const HotbarItem &item = m_hotbarItems.emplace_back(line, 0.0f, HotbarItemKind::SEPARATOR);
+    const HotbarItem &item = m_hotbarItems.emplace_back(line, nullptr, 0.0f, HotbarItemKind::SEPARATOR);
     resolveHotbarItem(item);
 }
 
 Amethyst::Frame *Workspace::addHotbarItem(float width, const std::function<void(Amethyst::UIScope &)> &build)
 {
-    Amethyst::Frame *slot = nullptr;
-    Amethyst::UIScope(*m_hotbar).frame(
-        {
-            .base = {.layoutOrder = static_cast<uint32_t>(m_hotbarItems.size())},
-            .style = {.backgroundTransparency = 1.0f},
-        },
-        [&](Amethyst::FrameScope &f) {
-            slot = &f.component;
-            build(f);
-        });
+    return addHotbarItem(Amethyst::vec2(width, HOTBAR_CONTROL_HEIGHT), build);
+}
 
-    const HotbarItem &item = m_hotbarItems.emplace_back(slot, width, HotbarItemKind::FIXED);
+Amethyst::Frame *Workspace::addHotbarItem(Amethyst::vec2 size, const std::function<void(Amethyst::UIScope &)> &build)
+{
+    Amethyst::Frame *island = addHotbarIsland();
+
+    Amethyst::Frame *slot = nullptr;
+    Amethyst::UIScope(*island).frame({.classes = {std::string(HOTBAR_ITEM_CLASS)}}, [&](Amethyst::FrameScope &f) {
+        slot = &f.component;
+        build(f);
+    });
+
+    const HotbarItem &item = m_hotbarItems.emplace_back(island, slot, size.x, HotbarItemKind::FIXED, size.y);
     resolveHotbarItem(item);
 
     return slot;

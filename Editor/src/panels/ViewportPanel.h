@@ -22,6 +22,8 @@ class Viewport;
 class Texture;
 } // namespace Rapture
 
+class IconLabelButton;
+
 enum ViewportLightingMode {
     VLM_LIT,
     VLM_RAW_IRRADIANCE,
@@ -47,6 +49,12 @@ class ViewportPanel : public Panel {
     ~ViewportPanel() override;
 
     void setViewportImage(Amethyst::AmTextureId imageId);
+
+    /**
+     * @brief Outlines the viewport image to show its world is playing
+     * @param visible Whether the outline shows
+     */
+    void setPlayingOutlineVisible(bool visible);
 
     /**
      * @brief Hands back every image this panel holds for its viewport's targets
@@ -116,6 +124,11 @@ class ViewportPanel : public Panel {
     bool toViewportPixel(const Amethyst::vec2 &windowPosition, glm::vec2 &pixel) const;
 
     void setupOverlayButtons(void);
+
+    /**
+     * @brief Sizes the toolbar floating over the image, and the buttons in it, to the labels they show
+     */
+    void fitViewportToolbar();
     void buildTransformMenu(void);
     void buildRenderMenu(void);
     void applyLightingMode(ViewportLightingMode mode);
@@ -133,8 +146,9 @@ class ViewportPanel : public Panel {
 
     Amethyst::EventConnection m_viewportImageDestroyConn;
 
-    Amethyst::TextButton *m_transformMenuBtn = nullptr;
-    Amethyst::TextButton *m_renderMenuBtn = nullptr;
+    Amethyst::Frame *m_viewportToolbar = nullptr;
+    IconLabelButton *m_transformMenuBtn = nullptr;
+    IconLabelButton *m_renderMenuBtn = nullptr;
     Amethyst::ContextMenu *m_transformMenu = nullptr;
     Amethyst::ContextMenu *m_renderMenu = nullptr;
 

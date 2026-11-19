@@ -29,6 +29,12 @@ class AssetWorkspace : public Workspace {
 
     std::string_view tabLabel() const override { return assetName(); }
 
+    /**
+     * @brief The color of the open asset's type
+     * @return The color
+     */
+    std::optional<Amethyst::Color4> tabIconColor() const override;
+
   protected:
     /**
      * @brief The stored name, which carries the asset so two workspaces of one kind stay apart

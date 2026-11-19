@@ -10,8 +10,11 @@
 #include <components/ui_scope.h>
 
 #include <memory>
+#include <optional>
 #include <string_view>
 #include <vector>
+
+class IconLabelButton;
 
 /**
  * @brief What an edit made in a viewport acts on
@@ -52,6 +55,12 @@ class Workspace {
      * @brief SVG markup shown left of the tab's label, empty to omit it
      */
     virtual std::string_view tabIcon() const { return {}; }
+
+    /**
+     * @brief Color the tab's icon is tinted with
+     * @return The color, empty to keep the color every tab icon has
+     */
+    virtual std::optional<Amethyst::Color4> tabIconColor() const { return std::nullopt; }
 
     /**
      * @brief The class this workspace is, which a command can find it by
@@ -184,18 +193,46 @@ class Workspace {
     Amethyst::TextButton *addHotbarButton(std::string_view label, std::function<void()> onClick);
 
     /**
-     * @brief Adds a full height hairline to the end of the hotbar, marking the boundary between two
-     *        groups of items
+     * @brief Adds a button showing an icon and a label to the end of the hotbar, as wide as both
+     * @param label Text on the button
+     * @param iconSvg Icon shown before the label
+     * @param onClick What to run when the button is pressed
+     * @return The button
+     */
+    IconLabelButton *addHotbarButton(std::string_view label, std::string_view iconSvg, std::function<void()> onClick);
+
+    /**
+     * @brief Adds a button showing an icon and a label to the end of the hotbar, as wide as both
+     * @param label Text on the button
+     * @param iconSvg Icon shown before the label
+     * @param styleClass Theme class the button is styled by, in place of the hotbar's own
+     * @param onClick What to run when the button is pressed
+     * @return The button
+     */
+    IconLabelButton *addHotbarButton(std::string_view label, std::string_view iconSvg, std::string_view styleClass,
+                                     std::function<void()> onClick);
+
+    /**
+     * @brief Adds a full height line to the end of the hotbar, dividing the items before it from the
+     *        items after it as separate islands
      */
     void addHotbarSeparator();
 
     /**
      * @brief Adds an item the hotbar has no ready made shape for
-     * @param width Width the item has at a UI scale of one
+     * @param width Width of the item's frame
      * @param build Fills the item's frame, called once
      * @return The item's frame
      */
     Amethyst::Frame *addHotbarItem(float width, const std::function<void(Amethyst::UIScope &)> &build);
+
+    /**
+     * @brief Adds an item the hotbar has no ready made shape for, at a height other than the hotbar's controls
+     * @param size Width and height of the item's frame
+     * @param build Fills the item's frame, called once
+     * @return The item's frame
+     */
+    Amethyst::Frame *addHotbarItem(Amethyst::vec2 size, const std::function<void(Amethyst::UIScope &)> &build);
 
     const EditorConfig &config() const;
 
@@ -203,18 +240,21 @@ class Workspace {
      * @brief What decides how wide a hotbar item is
      */
     enum class HotbarItemKind {
-        FIXED,     ///< as wide as it was asked to be
-        LABELLED,  ///< as wide as the text it holds
-        SEPARATOR, ///< a hairline
+        FIXED,         ///< as wide as it was asked to be
+        LABELLED,      ///< as wide as the text it holds
+        ICON_LABELLED, ///< as wide as the icon and text it holds
+        SEPARATOR,     ///< a full height line between islands
     };
 
     /**
-     * @brief One thing sitting in the hotbar, and the width it was authored at
+     * @brief One thing sitting in the hotbar: the island it fills and the control inside it
      */
     struct HotbarItem {
-        Amethyst::UIObject *object = nullptr;
+        Amethyst::UIObject *island = nullptr;
+        Amethyst::UIObject *control = nullptr;
         float width = 0.0f;
         HotbarItemKind kind = HotbarItemKind::FIXED;
+        float height = 0.0f;
     };
 
   protected:
@@ -262,11 +302,19 @@ class Workspace {
     void resolveHotbarItem(const HotbarItem &item) const;
 
     /**
-     * @brief How wide the text on a button is at the size the theme gives it
-     * @param button The button to measure
+     * @brief How wide a text is in the font and size of the style it is shown with
+     * @param text The text to measure
+     * @param style The style the text is shown with
      * @return The width in pixels
      */
-    float labelWidth(const Amethyst::TextButton &button) const;
+    float measureTextWidth(const std::string &text, const Amethyst::TextStyleProperties &style) const;
+
+    /**
+     * @brief Adds an island to the end of the hotbar for one control
+     * @return The island's frame
+     */
+    Amethyst::Frame *addHotbarIsland();
+
 
     std::vector<HotbarItem> m_hotbarItems;
     Amethyst::vec2 m_contentAreaPosition = {0.0f, 0.0f};

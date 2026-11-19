@@ -60,8 +60,8 @@ constexpr std::array<EditorConfigEntry, EDITOR_CONFIG_COUNT> EDITOR_CONFIG_TABLE
     {"bottomBarHeight", CONFIG_VALUE_FLOAT, 28.0},
 
     {"hotbarHeight", CONFIG_VALUE_FLOAT, 40.0},
-    {"hotbarPadding", CONFIG_VALUE_FLOAT, 8.0},
-    {"hotbarSeparatorWidth", CONFIG_VALUE_FLOAT, 1.0},
+    {"hotbarPadding", CONFIG_VALUE_FLOAT, 12.0},
+    {"hotbarSeparatorWidth", CONFIG_VALUE_FLOAT, 2.0},
 
     {"dockOuterSpacing", CONFIG_VALUE_FLOAT, 4.0},
     {"dockInnerSpacing", CONFIG_VALUE_FLOAT, 3.0},

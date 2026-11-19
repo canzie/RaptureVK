@@ -3,6 +3,7 @@
 #include "EntitySelection.h"
 #include "Icons.h"
 #include "scene/EditorCamera.h"
+#include "ui/controls/IconLabelButton.h"
 #include "ui/menus/ContextMenuItems.h"
 #include <rapture/gpu/render_targets/SceneRenderTarget.h>
 #include <rapture/renderer/viewport/Viewport.h>
@@ -20,6 +21,7 @@
 #include <rapture/renderer/RenderSettings.h>
 
 #include <algorithm>
+#include <array>
 #include <climits>
 #include <cmath>
 #include <cstdint>
@@ -31,6 +33,9 @@
 
 static constexpr float VIEWPORT_RESIZE_DEBOUNCE = 0.1f;
 static constexpr float VIEWPORT_PADDING = 6.0f;
+
+static constexpr std::string_view VIEWPORT_IMAGE_CLASS = "viewport-image";
+static constexpr std::string_view VIEWPORT_IMAGE_PLAYING_CLASS = "viewport-image-playing";
 
 // Odd so the cursor sits on a centre pixel. The aperture is the click tolerance, and it costs only
 // the pixels it covers, so widening it is cheap
@@ -77,11 +82,27 @@ static std::optional<uint64_t> s_nearestToCursor(const Rapture::SceneQueryResult
     return best;
 }
 
-static const Amethyst::UDim2 HEADER_BTN_SIZE = Amethyst::UDim2::fromOffset(80, 24);
-static const Amethyst::TextStylePropertiesArgs HEADER_BTN_TEXT{
-    .fontSize = 12.0f,
-    .textXAlignment = Amethyst::TextXAlignment::CENTER,
-    .textYAlignment = Amethyst::TextYAlignment::CENTER,
+static constexpr float VIEWPORT_TOOLBAR_HEIGHT = 30.0f;
+static constexpr float VIEWPORT_TOOLBAR_PADDING = 2.0f;
+static constexpr float VIEWPORT_TOOLBAR_GAP = 2.0f;
+static constexpr std::string_view VIEWPORT_TOOLBAR_CLASS = "viewport-toolbar";
+static constexpr std::string_view VIEWPORT_TOOLBAR_BUTTON_CLASS = "viewport-toolbar-button";
+
+static constexpr std::array<std::string_view, VLM_COUNT> VIEWPORT_LIGHTING_MODE_LABELS = {
+    "Lit",
+    "Raw Irradiance",
+    "Indirect Lighting",
+    "Direct Lighting",
+    "Shadow Cascades",
+    "Normals",
+    "Motion Vectors",
+    "Ambient Occlusion",
+    "Metallic",
+    "Roughness",
+    "AO",
+    "Albedo",
+    "Material Id",
+    "Depth",
 };
 
 static void s_showGrownMenu(Amethyst::ContextMenu *menu, Amethyst::UIObject *anchor, Amethyst::Frame *boundsRoot)
@@ -135,13 +156,13 @@ void ViewportPanel::build(Amethyst::UIScope &scope)
 
     scope.imageLabel(
         {
+            .classes = {std::string(VIEWPORT_IMAGE_CLASS)},
             .base =
                 {
                     .padding = Amethyst::UDim4::fromOffset(8.0f),
                     .size = Amethyst::UDim2::fromScale(1.0f, 1.0f),
                     .zIndex = 100,
                 },
-            .style = {.cornerRadius = 3.0f},
             .image = {.scaleType = Amethyst::ImageScaleType::STRETCH},
         },
         [this](Amethyst::ImageLabelScope &img) {
@@ -198,43 +219,54 @@ ViewportPanel::~ViewportPanel()
 
 void ViewportPanel::setupOverlayButtons()
 {
-    static const float BTN_GAP = 4.0f;
-
     Amethyst::UIScope(*m_viewportImage)
-        .textButton(
+        .frame(
             {
-                .classes = {"viewport-overlay-button"},
+                .classes = {std::string(VIEWPORT_TOOLBAR_CLASS)},
                 .base =
                     {
-                        .position = Amethyst::UDim2::fromScale(0.0f, 0.0f),
-                        .size = HEADER_BTN_SIZE,
+                        .padding = Amethyst::UDim4::fromOffset(VIEWPORT_TOOLBAR_PADDING),
                         .zIndex = 101,
                     },
-                .text = HEADER_BTN_TEXT,
-                .label = "Transform",
             },
-            [this](Amethyst::TextButtonScope &b) {
-                m_transformMenuBtn = &b.component;
-                b.component.track(b.component.onMouseButton1ClickCb.connect(
-                    [this]() { s_showGrownMenu(m_transformMenu, m_transformMenuBtn, m_root); }));
-            })
-        .textButton(
-            {
-                .classes = {"viewport-overlay-button"},
-                .base =
-                    {
-                        .position = Amethyst::UDim2::fromOffset(HEADER_BTN_SIZE.offset.x + BTN_GAP, 0.0f),
-                        .size = HEADER_BTN_SIZE,
-                        .zIndex = 101,
-                    },
-                .text = HEADER_BTN_TEXT,
-                .label = "Render",
-            },
-            [this](Amethyst::TextButtonScope &b) {
-                m_renderMenuBtn = &b.component;
-                b.component.track(b.component.onMouseButton1ClickCb.connect(
-                    [this]() { s_showGrownMenu(m_renderMenu, m_renderMenuBtn, m_root); }));
+            [this](Amethyst::FrameScope &toolbar) {
+                m_viewportToolbar = &toolbar.component;
+
+                auto *layout = m_viewportToolbar->addExtension<Amethyst::UIListLayout>();
+                layout->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
+                layout->verticalAlignment = Amethyst::VerticalAlignment::ALIGN_CENTER_V;
+                layout->innerPadding = Amethyst::UDim::fromOffset(VIEWPORT_TOOLBAR_GAP);
             });
+
+    const std::vector<std::string> buttonClasses = {std::string(VIEWPORT_TOOLBAR_BUTTON_CLASS)};
+
+    m_transformMenuBtn = m_viewportToolbar->add<IconLabelButton>(Icons::SVG_TRANSFORM, "Transform", buttonClasses);
+    m_transformMenuBtn->setBaseProperties({.layoutOrder = 0});
+    m_transformMenuBtn->track(m_transformMenuBtn->onMouseButton1ClickCb.connect(
+        [this]() { s_showGrownMenu(m_transformMenu, m_transformMenuBtn, m_root); }));
+
+    m_renderMenuBtn = m_viewportToolbar->add<IconLabelButton>(Icons::SVG_PERSPECTIVE, VIEWPORT_LIGHTING_MODE_LABELS[VLM_LIT],
+                                                              buttonClasses);
+    m_renderMenuBtn->setBaseProperties({.layoutOrder = 1});
+    m_renderMenuBtn->track(
+        m_renderMenuBtn->onMouseButton1ClickCb.connect([this]() { s_showGrownMenu(m_renderMenu, m_renderMenuBtn, m_root); }));
+
+    fitViewportToolbar();
+}
+
+void ViewportPanel::fitViewportToolbar()
+{
+    const Amethyst::TextProcessor &textProcessor = m_context.editor->amethyst->getTextProcessor();
+    const float buttonHeight = VIEWPORT_TOOLBAR_HEIGHT - 2.0f * VIEWPORT_TOOLBAR_PADDING;
+
+    const float transformWidth = m_transformMenuBtn->measureFittedWidth(textProcessor);
+    const float renderWidth = m_renderMenuBtn->measureFittedWidth(textProcessor);
+
+    m_transformMenuBtn->setBaseProperties({.size = Amethyst::UDim2::fromOffset(transformWidth, buttonHeight)});
+    m_renderMenuBtn->setBaseProperties({.size = Amethyst::UDim2::fromOffset(renderWidth, buttonHeight)});
+
+    const float toolbarWidth = transformWidth + renderWidth + VIEWPORT_TOOLBAR_GAP + 2.0f * VIEWPORT_TOOLBAR_PADDING;
+    m_viewportToolbar->setBaseProperties({.size = Amethyst::UDim2::fromOffset(toolbarWidth, VIEWPORT_TOOLBAR_HEIGHT)});
 }
 
 void ViewportPanel::buildTransformMenu()
@@ -283,10 +315,15 @@ void ViewportPanel::buildRenderMenu()
     m_renderMenu->popupWidth *= 1.3f;
     m_renderMenu->maxVisibleItems = INT_MAX;
     m_renderMenu->setRowFactories({.toggle = [] { return std::make_unique<ToggleMenuItemView>(); },
+                                   .separator = [] { return std::make_unique<SeparatorMenuItemView>(); },
                                    .radio = [] { return std::make_unique<RadioMenuItemView>(); }});
 
-    m_lightingModeGroupConn = m_lightingModeGroup.onChanged.connect(
-        [this]() { applyLightingMode(static_cast<ViewportLightingMode>(m_lightingModeGroup.value)); });
+    m_lightingModeGroupConn = m_lightingModeGroup.onChanged.connect([this]() {
+        const auto mode = static_cast<ViewportLightingMode>(m_lightingModeGroup.value);
+        applyLightingMode(mode);
+        m_renderMenuBtn->getLabel().setText(std::string(VIEWPORT_LIGHTING_MODE_LABELS[mode]));
+        fitViewportToolbar();
+    });
 
     m_probeDebugModeGroupConn = m_probeDebugModeGroup.onChanged.connect([this]() {
         if (m_viewport != nullptr) {
@@ -295,13 +332,13 @@ void ViewportPanel::buildRenderMenu()
     });
 
     std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
-    items.push_back(RadioMenuItem::create("Lit", &m_lightingModeGroup, VLM_LIT));
-    items.push_back(RadioMenuItem::create("Direct Lighting", &m_lightingModeGroup, VLM_DIRECT_LIGHTING));
-    items.push_back(RadioMenuItem::create("Indirect Lighting", &m_lightingModeGroup, VLM_INDIRECT_LIGHTING));
-    items.push_back(RadioMenuItem::create("Raw Irradiance(no albedo)", &m_lightingModeGroup, VLM_RAW_IRRADIANCE));
-    items.push_back(RadioMenuItem::create("Show Normals", &m_lightingModeGroup, VLM_NORMALS));
-    items.push_back(RadioMenuItem::create("Show Motion Vectors", &m_lightingModeGroup, VLM_MOTION));
-    items.push_back(RadioMenuItem::create("Show Ambient Occlusion", &m_lightingModeGroup, VLM_AMBIENT_OCCLUSION));
+    items.push_back(SeparatorMenuItem::create("View mode"));
+    for (ViewportLightingMode mode : {VLM_LIT, VLM_DIRECT_LIGHTING, VLM_INDIRECT_LIGHTING, VLM_RAW_IRRADIANCE, VLM_NORMALS, VLM_MOTION,
+                                      VLM_AMBIENT_OCCLUSION}) {
+        items.push_back(RadioMenuItem::create(std::string(VIEWPORT_LIGHTING_MODE_LABELS[mode]), &m_lightingModeGroup, mode));
+    }
+
+    items.push_back(SeparatorMenuItem::create("Features"));
 
     auto occlusionToggle = ToggleMenuItem::create("Ambient Occlusion", [this](bool on) {
         if (m_viewport != nullptr) {
@@ -311,18 +348,17 @@ void ViewportPanel::buildRenderMenu()
     occlusionToggle->as<ToggleMenuItem>().value = true;
     items.push_back(std::move(occlusionToggle));
 
-    items.push_back(SeparatorMenuItem::create("DDGI Probes"));
-
     items.push_back(ToggleMenuItem::create("Show Probes", [this](bool on) {
         if (m_viewport != nullptr) {
             m_viewport->renderSettings().setFlag(Rapture::RENDER_SHOW_DDGI_PROBES, on);
         }
     }));
 
-    items.push_back(RadioMenuItem::create("Probe Classification", &m_probeDebugModeGroup, Rapture::PDM_CLASSIFICATION));
-    items.push_back(RadioMenuItem::create("Probe Irradiance", &m_probeDebugModeGroup, Rapture::PDM_IRRADIANCE));
-    items.push_back(RadioMenuItem::create("Probe Distance", &m_probeDebugModeGroup, Rapture::PDM_DISTANCE));
-    items.push_back(RadioMenuItem::create("Probe Relocation", &m_probeDebugModeGroup, Rapture::PDM_RELOCATION));
+    items.push_back(SeparatorMenuItem::create("Probe debug"));
+    items.push_back(RadioMenuItem::create("Classification", &m_probeDebugModeGroup, Rapture::PDM_CLASSIFICATION));
+    items.push_back(RadioMenuItem::create("Irradiance", &m_probeDebugModeGroup, Rapture::PDM_IRRADIANCE));
+    items.push_back(RadioMenuItem::create("Distance", &m_probeDebugModeGroup, Rapture::PDM_DISTANCE));
+    items.push_back(RadioMenuItem::create("Relocation", &m_probeDebugModeGroup, Rapture::PDM_RELOCATION));
 
     m_renderMenu->setItems(std::move(items));
 }
@@ -404,6 +440,19 @@ void ViewportPanel::setViewportImage(Amethyst::AmTextureId imageId)
 {
     if (m_viewportImage != nullptr) {
         m_viewportImage->setImage(imageId);
+    }
+}
+
+void ViewportPanel::setPlayingOutlineVisible(bool visible)
+{
+    if (m_viewportImage == nullptr) {
+        return;
+    }
+
+    if (visible) {
+        m_viewportImage->addClass(VIEWPORT_IMAGE_PLAYING_CLASS);
+    } else {
+        m_viewportImage->removeClass(VIEWPORT_IMAGE_PLAYING_CLASS);
     }
 }
 
