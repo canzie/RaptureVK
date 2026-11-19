@@ -2,6 +2,7 @@
 
 #include "EntitySelection.h"
 #include "Icons.h"
+#include "gizmos/OrientationGizmo.h"
 #include "scene/EditorCamera.h"
 #include "ui/controls/IconLabelButton.h"
 #include "ui/menus/ContextMenuItems.h"
@@ -9,6 +10,7 @@
 #include <rapture/renderer/viewport/Viewport.h>
 #include <rapture/scene/World.h>
 #include <rapture/scene/components/Components.h>
+#include <rapture/scene/instances/Camera3D.h>
 #include <rapture/scene/instances/Node3D.h>
 #include <rapture/scene/instances/controllers/CameraController.h>
 
@@ -169,7 +171,10 @@ void ViewportPanel::build(Amethyst::UIScope &scope)
             m_viewportImage = &img.component;
             m_viewportImage->propagate(Amethyst::INTERACTION_CATEGORY_ALL);
             m_viewportImageDestroyConn =
-                m_viewportImage->onDestroy.connect([this](Amethyst::Instance *) { m_viewportImage = nullptr; });
+                m_viewportImage->onDestroy.connect([this](Amethyst::Instance *) {
+                    m_viewportImage = nullptr;
+                    m_orientationGizmo = nullptr;
+                });
             m_viewportImage->track(m_viewportImage->onHoverChanged.connect([this](bool hovered) { m_viewportHovered = hovered; }));
             m_viewportImage->track(
                 m_viewportImage->onInputBeganCb.connect([this](const Amethyst::InputObject &input) { onViewportPressed(input); }));
@@ -184,6 +189,7 @@ void ViewportPanel::build(Amethyst::UIScope &scope)
     m_transformGizmo = std::make_unique<gizmo::TransformGizmo>(gizmoContainer);
 
     setupOverlayButtons();
+    setupOrientationGizmo();
     buildTransformMenu();
     buildRenderMenu();
 
@@ -252,6 +258,25 @@ void ViewportPanel::setupOverlayButtons()
         m_renderMenuBtn->onMouseButton1ClickCb.connect([this]() { s_showGrownMenu(m_renderMenu, m_renderMenuBtn, m_root); }));
 
     fitViewportToolbar();
+}
+
+void ViewportPanel::setupOrientationGizmo()
+{
+    if (m_context.editorCamera == nullptr) {
+        return;
+    }
+
+    m_orientationGizmo = m_viewportImage->add<OrientationGizmo>();
+    m_orientationGizmo->setBaseProperties({
+        .anchorPoint = Amethyst::vec2(1.0f, 0.0f),
+        .position = Amethyst::UDim2::fromScale(1.0f, 0.0f),
+        .zIndex = 101,
+    });
+    m_orientationGizmo->onAxisEndClicked = [this](const glm::vec3 &direction) {
+        if (Rapture::CameraController *controller = cameraController(); controller != nullptr) {
+            controller->lookAlong(direction);
+        }
+    };
 }
 
 void ViewportPanel::fitViewportToolbar()
@@ -502,6 +527,10 @@ void ViewportPanel::onUpdate(float dt)
     updateGizmo();
 
     updateEditorCamera(dt);
+
+    if (m_orientationGizmo != nullptr) {
+        m_orientationGizmo->setViewRotation(m_context.editorCamera->camera().rotationQuat());
+    }
 
     auto *controller = cameraController();
     if (controller != nullptr) {

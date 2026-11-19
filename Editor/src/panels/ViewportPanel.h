@@ -23,6 +23,7 @@ class Texture;
 } // namespace Rapture
 
 class IconLabelButton;
+class OrientationGizmo;
 
 enum ViewportLightingMode {
     VLM_LIT,
@@ -126,6 +127,11 @@ class ViewportPanel : public Panel {
     void setupOverlayButtons(void);
 
     /**
+     * @brief Shows the world axes over the image, clicking one turns the editor camera to look along it
+     */
+    void setupOrientationGizmo(void);
+
+    /**
      * @brief Sizes the toolbar floating over the image, and the buttons in it, to the labels they show
      */
     void fitViewportToolbar();
@@ -151,6 +157,7 @@ class ViewportPanel : public Panel {
     IconLabelButton *m_renderMenuBtn = nullptr;
     Amethyst::ContextMenu *m_transformMenu = nullptr;
     Amethyst::ContextMenu *m_renderMenu = nullptr;
+    OrientationGizmo *m_orientationGizmo = nullptr;
 
     Amethyst::RadioGroup m_gizmoOpGroup;
     Amethyst::RadioGroup m_gizmoSpaceGroup;

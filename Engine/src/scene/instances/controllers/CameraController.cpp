@@ -19,6 +19,8 @@ static constexpr float FOCUS_FILL = 0.87f;
 // what a sphere with no size is framed as, so focusing a point still yields a usable distance
 static constexpr float FOCUS_MIN_RADIUS = 0.01f;
 
+static constexpr float VERTICAL_EPSILON = 1e-6f;
+
 static constexpr std::string_view KEY_MOUSE_SENSITIVITY = "mouseSensitivity";
 static constexpr std::string_view KEY_MOVEMENT_SPEED = "movementSpeed";
 static constexpr std::string_view KEY_ORBIT_SENSITIVITY = "orbitSensitivity";
@@ -170,12 +172,36 @@ void CameraController::deserialize(ReadNode node)
 void CameraController::focusOn(const glm::vec3 &center, float radius, const glm::vec3 &direction)
 {
     if (glm::length(direction) > 0.0f) {
-        glm::vec3 forward = glm::normalize(direction);
-        setControlRotation(glm::degrees(std::atan2(forward.z, forward.x)), glm::degrees(std::asin(forward.y)));
-        recalcForward();
+        setControlRotationToFace(direction);
     }
 
     focusOn(center, radius);
+}
+
+void CameraController::lookAlong(const glm::vec3 &direction)
+{
+    if (m_viewCamera == nullptr || glm::length(direction) <= 0.0f) {
+        return;
+    }
+
+    if (m_mode == CameraControlMode::FLY || m_recenterFocus) {
+        m_focusPoint = m_viewCamera->position() + m_forward * m_focusDistance;
+        m_recenterFocus = false;
+    }
+
+    setControlRotationToFace(direction);
+    turnViewCameraToForward();
+    m_viewCamera->setPosition(m_focusPoint - m_forward * m_focusDistance);
+}
+
+void CameraController::setControlRotationToFace(const glm::vec3 &direction)
+{
+    glm::vec3 forward = glm::normalize(direction);
+    // straight up or down has no yaw of its own, so the current one is kept
+    bool hasYaw = forward.x * forward.x + forward.z * forward.z > VERTICAL_EPSILON;
+    float yawDegrees = hasYaw ? glm::degrees(std::atan2(forward.z, forward.x)) : yaw();
+    setControlRotation(yawDegrees, glm::degrees(std::asin(forward.y)));
+    recalcForward();
 }
 
 void CameraController::focusOn(const glm::vec3 &center, float radius)

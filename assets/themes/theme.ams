@@ -649,6 +649,11 @@ radio-button:active {
     corner-radius: 3px;
 }
 
+.orientation-gizmo {
+    background-transparency: 1.0;
+    border-pixel-size: 0px;
+}
+
 .viewport-toolbar {
     background-color: @bg-input;
     background-transparency: 0.22;

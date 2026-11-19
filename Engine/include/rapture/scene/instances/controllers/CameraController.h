@@ -68,6 +68,12 @@ class CameraController : public Controller {
      */
     void focusOn(const glm::vec3 &center, float radius, const glm::vec3 &direction);
 
+    /**
+     * @brief Turns the camera to look along a direction, around the point it is looking at and at the same distance
+     * @param direction Direction to look along, which need not be normalized
+     */
+    void lookAlong(const glm::vec3 &direction);
+
     void serialize(WriteNode node) const override;
     void deserialize(ReadNode node) override;
 
@@ -82,6 +88,7 @@ class CameraController : public Controller {
     void updateFly(float dt, Node3D &node);
     void updateOrbit(Node3D &node);
     void recalcForward();
+    void setControlRotationToFace(const glm::vec3 &direction);
     void turnViewCameraToForward();
 
   private:
