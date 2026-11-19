@@ -7,6 +7,7 @@
 #include "workspaces/SkeletalMeshWorkspace.h"
 #include "workspaces/SkeletonWorkspace.h"
 #include "workspaces/StaticMeshWorkspace.h"
+#include "workspaces/TextureWorkspace.h"
 #include "workspaces/WorldEditorWorkspace.h"
 
 #include <rapture/assets/asset_manager/AssetManager.h>
@@ -176,6 +177,8 @@ std::unique_ptr<Workspace> WorkspaceManager::createAssetWorkspace(Rapture::Asset
         return std::make_unique<SkeletalMeshWorkspace>(*m_editor, handle);
     case Rapture::ASSET_SKELETON:
         return std::make_unique<SkeletonWorkspace>(*m_editor, handle);
+    case Rapture::ASSET_TEXTURE:
+        return std::make_unique<TextureWorkspace>(*m_editor, handle);
     case Rapture::ASSET_WORLD: {
         Rapture::Ref<Rapture::AWorld> world = Rapture::AssetManager::getAsset<Rapture::AWorld>(handle);
         if (!world) {

@@ -35,6 +35,8 @@
 @property type-folder #EBCB8B
 
 @property selection          #3D5F99
+@property checkerboard-dark  #1F1F1F
+@property checkerboard-light #2A2A2A
 @property hover              #333333
 @property row-hover          #2B2B2B
 @property input-border       #2C2C2C
@@ -882,6 +884,101 @@ radio-button:active {
     corner-radius: 3px;
 }
 
+.texture-canvas {
+    background-color: @bg-canvas;
+    corner-radius: 3px;
+}
+
+.texture-checkerboard {
+    background-color: @checkerboard-dark;
+    border-pixel-size: 1px;
+    border-color: @border-3;
+    border-mode: outline;
+}
+
+.texture-channel-button {
+    background-color: @white;
+    background-transparency: 1.0;
+    text-color: @text-4;
+    font-size: 12px;
+    corner-radius: 4px;
+}
+
+.texture-channel-button:hover {
+    background-color: @row-hover;
+    background-transparency: 0.0;
+}
+
+.texture-channel-button:active {
+    background-color: @border-3;
+    background-transparency: 0.0;
+}
+
+.texture-channel-red:active {
+    text-color: @axis-x;
+}
+
+.texture-channel-green:active {
+    text-color: @axis-y;
+}
+
+.texture-channel-blue:active {
+    text-color: @axis-z;
+}
+
+.texture-channel-alpha:active {
+    text-color: @text-1;
+}
+
+.texture-mip-thumbnail {
+    background-transparency: 1.0;
+    border-pixel-size: 1px;
+    border-color: @border-2;
+    border-mode: outline;
+    corner-radius: 2px;
+}
+
+.texture-mip-thumbnail:active {
+    border-pixel-size: 2px;
+    border-color: @accent;
+}
+
+.texture-mip-label {
+    background-transparency: 1.0;
+    font-family: "IBM Plex Mono";
+    font-size: 10px;
+    text-color: @text-3;
+    text-x-alignment: center;
+    text-y-alignment: center;
+}
+
+.texture-mip-label:active {
+    text-color: @text-1;
+}
+
+.texture-texel-readout {
+    background-transparency: 1.0;
+    font-family: "IBM Plex Mono";
+    font-size: 11px;
+    text-color: @text-2;
+    text-y-alignment: center;
+}
+
+.texture-checkerboard-squares {
+    background-color: @checkerboard-light;
+    background-repeat: repeat;
+    background-size: 12px 12px;
+    background-step: 24px;
+}
+
+.texture-checkerboard-offset-squares {
+    background-color: @checkerboard-light;
+    background-repeat: repeat;
+    background-size: 12px 12px;
+    background-step: 24px;
+    background-position: 12px 12px;
+}
+
 .orientation-gizmo {
     background-transparency: 1.0;
     border-pixel-size: 0px;
@@ -903,8 +1000,18 @@ radio-button:active {
 }
 
 .viewport-toolbar-button:hover {
-    background-transparency: 0.9;
+    background-color: @row-hover;
+    background-transparency: 0.0;
     image-color: @text-1;
+}
+
+.viewport-toolbar-button:active {
+    background-color: @border-3;
+    background-transparency: 0.0;
+}
+
+.viewport-toolbar-divider {
+    background-color: @bg-header;
 }
 
 .viewport-image-playing {

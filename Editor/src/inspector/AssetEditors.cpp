@@ -5,6 +5,7 @@
 #include <rapture/assets/meshes/ASkeletalMesh.h>
 #include <rapture/assets/meshes/AStaticMesh.h>
 #include <rapture/assets/skeletons/ASkeleton.h>
+#include <rapture/assets/textures/ATexture.h>
 #include <rapture/core/utils/Log.h>
 
 #include <cstdio>
@@ -241,5 +242,111 @@ void SkeletonAssetEditor::sync(Rapture::AssetHandle handle)
     }
     if (m_rootCount != nullptr) {
         m_rootCount->setText(std::to_string(roots));
+    }
+}
+
+static std::string_view s_textureFormatName(Rapture::TextureFormat format)
+{
+    switch (format) {
+    case Rapture::TextureFormat::RGBA8:
+        return "RGBA8";
+    case Rapture::TextureFormat::RGB8:
+        return "RGB8";
+    case Rapture::TextureFormat::BGRA8:
+        return "BGRA8";
+    case Rapture::TextureFormat::RGBA16F:
+        return "RGBA16F";
+    case Rapture::TextureFormat::RGB16F:
+        return "RGB16F";
+    case Rapture::TextureFormat::RGBA32F:
+        return "RGBA32F";
+    case Rapture::TextureFormat::RGB32F:
+        return "RGB32F";
+    case Rapture::TextureFormat::R11G11B10F:
+        return "R11G11B10F";
+    case Rapture::TextureFormat::RG16F:
+        return "RG16F";
+    case Rapture::TextureFormat::R16F:
+        return "R16F";
+    case Rapture::TextureFormat::R32F:
+        return "R32F";
+    case Rapture::TextureFormat::R32UI:
+        return "R32UI";
+    case Rapture::TextureFormat::R8UI:
+        return "R8UI";
+    case Rapture::TextureFormat::R8U:
+        return "R8U";
+    case Rapture::TextureFormat::BC1_RGB:
+        return "BC1 RGB";
+    case Rapture::TextureFormat::BC1_RGBA:
+        return "BC1 RGBA";
+    case Rapture::TextureFormat::BC3:
+        return "BC3";
+    case Rapture::TextureFormat::BC4:
+        return "BC4";
+    case Rapture::TextureFormat::BC5:
+        return "BC5";
+    case Rapture::TextureFormat::BC7:
+        return "BC7";
+    case Rapture::TextureFormat::BC6H:
+        return "BC6H";
+    case Rapture::TextureFormat::D32F:
+        return "D32F";
+    case Rapture::TextureFormat::D24S8:
+        return "D24S8";
+    }
+    return "Unknown";
+}
+
+static std::string s_formatTextureFormat(const Rapture::TextureSpecification &spec)
+{
+    std::string name(s_textureFormatName(spec.format));
+    const bool hasSrgbForm = Rapture::toVkFormat(spec.format, true) != Rapture::toVkFormat(spec.format, false);
+    if (spec.srgb && hasSrgbForm) {
+        name += ", sRGB";
+    }
+    return name;
+}
+
+static std::string s_formatMegabytes(uint64_t bytes)
+{
+    char buffer[32];
+    std::snprintf(buffer, sizeof(buffer), "%.1f MB", static_cast<double>(bytes) / (1024.0 * 1024.0));
+    return buffer;
+}
+
+void TextureAssetEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+{
+    fieldTable(ch, [this](Amethyst::TableScope &t) {
+        m_resolution = rowText(t, "Resolution", "");
+        m_format = rowText(t, "Format", "");
+        m_mipCount = rowText(t, "Mips", "");
+        m_gpuMemory = rowText(t, "GPU memory", "");
+    });
+}
+
+void TextureAssetEditor::sync(Rapture::AssetHandle handle)
+{
+    if (!subjectChanged()) {
+        return;
+    }
+
+    auto *texture = s_assetAs<Rapture::ATexture>(handle);
+    if (texture == nullptr) {
+        return;
+    }
+
+    const Rapture::TextureSpecification &spec = texture->texture().getSpecification();
+    if (m_resolution != nullptr) {
+        m_resolution->setText(std::to_string(spec.width) + " x " + std::to_string(spec.height));
+    }
+    if (m_format != nullptr) {
+        m_format->setText(s_formatTextureFormat(spec));
+    }
+    if (m_mipCount != nullptr) {
+        m_mipCount->setText(std::to_string(spec.mipLevels));
+    }
+    if (m_gpuMemory != nullptr) {
+        m_gpuMemory->setText(s_formatMegabytes(texture->texture().getSizeBytes()));
     }
 }

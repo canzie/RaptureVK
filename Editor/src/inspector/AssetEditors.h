@@ -96,4 +96,43 @@ class SkeletonPreviewAssetEditor : public AssetEditorBase {
     std::optional<AssetPicker> m_meshPicker;
 };
 
+/**
+ * @brief The image an open texture asset holds
+ */
+class TextureAssetEditor : public AssetEditorBase {
+  public:
+    const char *title() const override { return "Texture"; }
+    const char *icon() const override { return Icons::SVG_LAYERS; }
+    void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
+    void sync(Rapture::AssetHandle handle) override;
+
+  private:
+    Amethyst::TextLabel *m_resolution = nullptr;
+    Amethyst::TextLabel *m_format = nullptr;
+    Amethyst::TextLabel *m_mipCount = nullptr;
+    Amethyst::TextLabel *m_gpuMemory = nullptr;
+};
+
+/**
+ * @brief How an open texture asset is sampled
+ */
+class TextureSamplingAssetEditor : public AssetEditorBase {
+  public:
+    const char *title() const override { return "Sampling"; }
+    const char *icon() const override { return Icons::SVG_GRID; }
+    void buildBody(Amethyst::CollapsibleHeaderScope &ch) override { (void)ch; }
+    void sync(Rapture::AssetHandle handle) override { (void)handle; }
+};
+
+/**
+ * @brief How an open texture asset is imported from its source
+ */
+class TextureImportAssetEditor : public AssetEditorBase {
+  public:
+    const char *title() const override { return "Import"; }
+    const char *icon() const override { return Icons::SVG_FOLDER_PLUS; }
+    void buildBody(Amethyst::CollapsibleHeaderScope &ch) override { (void)ch; }
+    void sync(Rapture::AssetHandle handle) override { (void)handle; }
+};
+
 #endif // RAPTURE__ASSET_EDITORS_H

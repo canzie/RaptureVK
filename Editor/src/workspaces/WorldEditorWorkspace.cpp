@@ -3,7 +3,6 @@
 #include "Icons.h"
 #include "layers/PlayLayer.h"
 #include "panels/AddSceneObjectMenu.h"
-#include "panels/ImagePreviewPanel.h"
 #include "panels/OutlinerPanel.h"
 #include "panels/PropertiesPanel.h"
 #include "panels/ViewportPanel.h"
@@ -135,7 +134,6 @@ void WorldEditorWorkspace::build()
     addPanel(std::make_unique<OutlinerPanel>(m_context), outlinerTabBar);
     addPanel(std::make_unique<PropertiesPanel>(m_context), propertiesTabBar);
     addPanel(std::make_unique<WorldSettingsPanel>(m_context), propertiesTabBar);
-    addPanel(std::make_unique<ImagePreviewPanel>(m_context, "Texture Viewer", ImagePreviewMode::ASSET_PICKER), propertiesTabBar);
 
     m_addMenu = m_container->add<Amethyst::ContextMenu>();
     m_addMenu->setRowFactories({.separator = [] { return std::make_unique<SeparatorMenuItemView>(); }});

@@ -47,6 +47,9 @@ void AssetDetailsPanel::refresh()
         ensure<MeshSkeletonAssetEditor>(type == Rapture::ASSET_SKELETAL_MESH);
         ensure<SkeletonAssetEditor>(type == Rapture::ASSET_SKELETON);
         ensure<SkeletonPreviewAssetEditor>(type == Rapture::ASSET_SKELETON);
+        ensure<TextureAssetEditor>(type == Rapture::ASSET_TEXTURE);
+        ensure<TextureSamplingAssetEditor>(type == Rapture::ASSET_TEXTURE);
+        ensure<TextureImportAssetEditor>(type == Rapture::ASSET_TEXTURE);
     });
 }
 

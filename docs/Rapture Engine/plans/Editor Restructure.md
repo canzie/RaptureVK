@@ -143,7 +143,7 @@ Ticking has the same shape: `AmethystLayer::onUpdate` loops every workspace, and
 
 Both mechanisms are already there and simply unwired, so the fix is to wire them from `Panel::onShown`/`onHidden` rather than to add a third flag. `displayed` should then be deleted or become the thing `setActive` is driven from, not left as a third parallel notion.
 
-**TextureGeneratorWorkspace is being deleted**, which takes its texture leak, its `dynamic_cast` panel scans and its shader force-load with it. `ShaderInputsPanel` goes too — it has no other user. `ImagePreviewPanel` stays, since the world editor uses it in `ASSET_PICKER` mode.
+**TextureGeneratorWorkspace is being deleted**, which takes its texture leak, its `dynamic_cast` panel scans and its shader force-load with it. `ShaderInputsPanel` goes too — it has no other user.
 
 **MaterialEditorWorkspace**
 

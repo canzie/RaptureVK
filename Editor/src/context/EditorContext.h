@@ -18,8 +18,10 @@ class AmVulkanBackend;
 
 namespace Rapture {
 class Project;
+class Sampler;
 class Scene;
 class Texture;
+class TextureView;
 class Viewport;
 class World;
 } // namespace Rapture
@@ -44,6 +46,14 @@ class UiTextures {
      * @return The id the UI draws it by, invalid for a null texture
      */
     Amethyst::AmTextureId registerTexture(Rapture::Texture *texture);
+
+    /**
+     * @brief Makes a view onto a texture drawable by the UI, sampled through a given sampler
+     * @param view The view to register
+     * @param sampler The sampler the UI reads it through
+     * @return The id the UI draws it by, invalid if the view failed to create
+     */
+    Amethyst::AmTextureId registerTextureView(const Rapture::TextureView &view, const Rapture::Sampler &sampler);
 
     /**
      * @brief Hands a registered texture back
