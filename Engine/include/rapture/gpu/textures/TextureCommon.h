@@ -61,14 +61,6 @@ enum class TextureType : uint8_t {
     TEXTURECUBE
 };
 
-enum class TextureViewType : uint8_t {
-    DEFAULT,
-    STENCIL,
-    DEPTH,
-    COLOR,
-    STORAGE
-};
-
 enum class TextureStatus {
     NOT_LOADED,
     LOADING,

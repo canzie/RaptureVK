@@ -87,11 +87,10 @@ uint32_t DescriptorBindingUniformBuffer::add(UniformBuffer &resource)
     return index;
 }
 
-DescriptorBindingTexture::DescriptorBindingTexture(DescriptorSet *set, uint32_t binding, TextureViewType viewType,
-                                                   bool isStorageImage, uint32_t size)
+DescriptorBindingTexture::DescriptorBindingTexture(DescriptorSet *set, uint32_t binding, bool isStorageImage, uint32_t size)
     : DescriptorBinding<Texture>(
           set, binding, isStorageImage ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, size),
-      m_viewType(viewType), m_isStorageImage(isStorageImage)
+      m_isStorageImage(isStorageImage)
 {
     if (m_isArray && !m_isStorageImage) {
         fillAllSlotsWithPlaceholder();
@@ -106,7 +105,7 @@ void DescriptorBindingTexture::fillAllSlotsWithPlaceholder()
         return;
     }
 
-    VkDescriptorImageInfo imageInfo = defaultAsset->getDescriptorImageInfo(m_viewType);
+    VkDescriptorImageInfo imageInfo = defaultAsset->getSampledDescriptorInfo();
 
     auto &app = Application::getInstance();
     auto device = app.getVulkanContext().getLogicalDevice();
@@ -142,7 +141,7 @@ uint32_t DescriptorBindingTexture::add(Texture &resource)
         m_isAllocated[index] = true;
     }
 
-    VkDescriptorImageInfo imageInfo = resource.getDescriptorImageInfo(m_isStorageImage ? TextureViewType::STORAGE : m_viewType);
+    VkDescriptorImageInfo imageInfo = m_isStorageImage ? resource.getStorageDescriptorInfo() : resource.getSampledDescriptorInfo();
 
     VkWriteDescriptorSet descriptorWrite{};
     descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -299,7 +298,7 @@ void DescriptorBindingTexture::update(Texture &resource, uint32_t index)
         return;
     }
 
-    VkDescriptorImageInfo imageInfo = resource.getDescriptorImageInfo(m_isStorageImage ? TextureViewType::STORAGE : m_viewType);
+    VkDescriptorImageInfo imageInfo = m_isStorageImage ? resource.getStorageDescriptorInfo() : resource.getSampledDescriptorInfo();
 
     VkWriteDescriptorSet descriptorWrite{};
     descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;

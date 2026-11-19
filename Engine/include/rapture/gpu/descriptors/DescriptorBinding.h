@@ -25,7 +25,6 @@ class UniformBuffer;
 class Buffer;
 class Texture;
 class TLAS;
-enum class TextureViewType : uint8_t;
 
 // TODO Add some sort of checking/verification for making sure that when adding a ubo to an array it is the same type
 //      as the current one
@@ -73,8 +72,7 @@ class DescriptorBindingUniformBuffer : public DescriptorBinding<UniformBuffer> {
 
 class DescriptorBindingTexture : public DescriptorBinding<Texture> {
   public:
-    DescriptorBindingTexture(DescriptorSet *set, uint32_t binding, TextureViewType viewType, bool isStorageImage,
-                             uint32_t size = 1);
+    DescriptorBindingTexture(DescriptorSet *set, uint32_t binding, bool isStorageImage, uint32_t size = 1);
     virtual uint32_t add(Texture &resource) override;
     virtual void update(Texture &resource, uint32_t index = 0) override;
 
@@ -91,7 +89,6 @@ class DescriptorBindingTexture : public DescriptorBinding<Texture> {
   private:
     void fillAllSlotsWithPlaceholder();
 
-    TextureViewType m_viewType;
     bool m_isStorageImage;
 };
 

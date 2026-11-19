@@ -88,9 +88,6 @@ class Texture {
         return m_imageViewAttachment != VK_NULL_HANDLE ? m_imageViewAttachment : m_imageView;
     }
 
-    VkImageView getDepthOnlyImageView() const { return m_imageViewDepthOnly; }
-    VkImageView getStencilOnlyImageView() const { return m_imageViewStencilOnly; }
-
     const Sampler &getSampler() const { return *m_sampler; }
     const TextureSpecification &getSpecification() const { return m_spec; }
     VkFormat getFormat() const { return toVkFormat(m_spec.format, m_spec.srgb); }
@@ -136,7 +133,17 @@ class Texture {
      */
     static std::unique_ptr<Texture> deserialize(std::span<const uint8_t> blob);
 
-    VkDescriptorImageInfo getDescriptorImageInfo(TextureViewType viewType = TextureViewType::DEFAULT) const;
+    /**
+     * @brief Get a descriptor that samples the whole texture through its sampler
+     * @return Descriptor image info in shader read only layout
+     */
+    VkDescriptorImageInfo getSampledDescriptorInfo() const;
+
+    /**
+     * @brief Get a storage-image descriptor bound to mip 0
+     * @return Descriptor image info in GENERAL layout with no sampler
+     */
+    VkDescriptorImageInfo getStorageDescriptorInfo() const;
 
     /**
      * @brief Get a storage-image descriptor bound to a single mip of a cubemap
@@ -256,9 +263,6 @@ class Texture {
     TextureState m_state;
     VkImageView m_imageView = VK_NULL_HANDLE;
     VkImageView m_imageViewAttachment = VK_NULL_HANDLE;
-    VkImageView m_imageViewStencilOnly = VK_NULL_HANDLE;
-    VkImageView m_imageViewDepthOnly = VK_NULL_HANDLE;
-    VkImageView m_imageViewStorage = VK_NULL_HANDLE;
     std::vector<VkImageView> m_imageViewStorageMips;
 
     VmaAllocation m_allocation = VK_NULL_HANDLE;

@@ -1,3 +1,5 @@
+#include <rapture/gpu/textures/Texture.h>
+
 #include "core/jobs/Counter.h"
 #include "core/jobs/Job.h"
 #include "core/jobs/JobSystem.h"
@@ -8,7 +10,6 @@
 #include <rapture/gpu/command_buffers/CommandBuffer.h>
 #include <rapture/gpu/command_buffers/CommandPool.h>
 #include <rapture/gpu/descriptors/DescriptorSet.h>
-#include <rapture/gpu/textures/Texture.h>
 
 #include <algorithm>
 #include <cstring>
@@ -248,21 +249,10 @@ Texture::~Texture()
         vkDestroyImageView(device, m_imageViewAttachment, nullptr);
     }
 
-    if (m_imageViewDepthOnly != VK_NULL_HANDLE) {
-        vkDestroyImageView(device, m_imageViewDepthOnly, nullptr);
-    }
-
-    if (m_imageViewStencilOnly != VK_NULL_HANDLE) {
-        vkDestroyImageView(device, m_imageViewStencilOnly, nullptr);
-    }
-
     for (VkImageView mipView : m_imageViewStorageMips) {
         if (mipView != VK_NULL_HANDLE) {
             vkDestroyImageView(device, mipView, nullptr);
         }
-    }
-    if (m_imageViewStorage != VK_NULL_HANDLE && m_imageViewStorageMips.empty()) {
-        vkDestroyImageView(device, m_imageViewStorage, nullptr);
     }
 
     if (m_image != VK_NULL_HANDLE && m_allocation != VK_NULL_HANDLE) {
@@ -345,7 +335,8 @@ void Texture::uploadDataAsync(std::vector<uint8_t> data, Counter *completionCoun
             if (texturePtr->m_spec.mipLevels > 1) {
                 texturePtr->recordGenerateMipmaps(finishCommandBuffer->getCommandBufferVk());
             } else {
-                texturePtr->recordTransitionImageLayout(finishCommandBuffer->getCommandBufferVk(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                texturePtr->recordTransitionImageLayout(finishCommandBuffer->getCommandBufferVk(),
+                                                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                                                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
             }
 
@@ -432,7 +423,7 @@ void Texture::copyFromImage(VkImage image, VkImageLayout otherLayout, VkImageLay
 
     if (m_image == VK_NULL_HANDLE || image == VK_NULL_HANDLE) {
         RP_CORE_ERROR("Cannot copy image: One or both VkImages are VK_NULL_HANDLE");
-        throw std::runtime_error("Cannot copy image: One or both VkImages are VK_NULL_HANDLE");
+        return;
     }
 
     auto &app = Application::getInstance();
@@ -1011,7 +1002,8 @@ void Texture::createImage()
 
     if (vmaCreateImage(allocator, &imageInfo, &allocInfo, &m_image, &m_allocation, nullptr) != VK_SUCCESS) {
         RP_CORE_ERROR("Failed to create image!");
-        throw std::runtime_error("Failed to create image!");
+        RP_ASSERT(m_image != VK_NULL_HANDLE, "Failed to create image");
+        return;
     }
 }
 
@@ -1041,7 +1033,8 @@ void Texture::createImageView()
 
     if (vkCreateImageView(device, &viewInfo, nullptr, &m_imageView) != VK_SUCCESS) {
         RP_CORE_ERROR("Failed to create texture image view!");
-        throw std::runtime_error("Failed to create texture image view!");
+        RP_ASSERT(m_imageView != VK_NULL_HANDLE, "Failed to create texture image view");
+        return;
     }
 
     // A rendering attachment must reference exactly one mip, so a mipped render target needs a
@@ -1072,69 +1065,24 @@ void Texture::createImageView()
                 return;
             }
         }
-        m_imageViewStorage = m_imageViewStorageMips[0];
-    }
-
-    // Create additional views for depth-stencil formats
-    if (isDepthFormat(m_spec.format)) {
-
-        // Create depth-only view
-        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-        viewInfo.components.r = VK_COMPONENT_SWIZZLE_R;
-        viewInfo.components.g = VK_COMPONENT_SWIZZLE_R;
-        viewInfo.components.b = VK_COMPONENT_SWIZZLE_R;
-        viewInfo.components.a = VK_COMPONENT_SWIZZLE_ONE;
-        if (vkCreateImageView(device, &viewInfo, nullptr, &m_imageViewDepthOnly) != VK_SUCCESS) {
-            RP_CORE_ERROR("Failed to create depth-only image view!");
-            throw std::runtime_error("Failed to create depth-only image view!");
-        }
-    }
-    if (hasStencilComponent(m_spec.format)) {
-        // Create stencil-only view
-        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
-        // Force R,G,B to stencil value (usually read into R), and Alpha to ONE for stencil view.
-        viewInfo.components.r = VK_COMPONENT_SWIZZLE_R;
-        viewInfo.components.g = VK_COMPONENT_SWIZZLE_G;
-        viewInfo.components.b = VK_COMPONENT_SWIZZLE_B;
-        viewInfo.components.a = VK_COMPONENT_SWIZZLE_A;
-        if (vkCreateImageView(device, &viewInfo, nullptr, &m_imageViewStencilOnly) != VK_SUCCESS) {
-            RP_CORE_ERROR("Failed to create stencil-only image view!");
-            throw std::runtime_error("Failed to create stencil-only image view!");
-        }
     }
 }
 
-VkDescriptorImageInfo Texture::getDescriptorImageInfo(TextureViewType viewType) const
+VkDescriptorImageInfo Texture::getSampledDescriptorInfo() const
 {
     VkDescriptorImageInfo imageInfo{};
     imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     imageInfo.sampler = m_sampler->getSamplerVk();
-    switch (viewType) {
-    case TextureViewType::DEFAULT:
-    case TextureViewType::COLOR:
-        imageInfo.imageView = m_imageView;
-        break;
-    case TextureViewType::STENCIL:
-        imageInfo.imageView = m_imageViewStencilOnly;
-        break;
-    case TextureViewType::DEPTH:
-        imageInfo.imageView = m_imageViewDepthOnly;
-        break;
-    case TextureViewType::STORAGE:
-        imageInfo.imageView = m_imageViewStorage != VK_NULL_HANDLE ? m_imageViewStorage : m_imageView;
-        imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-        imageInfo.sampler = VK_NULL_HANDLE;
-        break;
-    default:
-        RP_CORE_WARN("Invalid texture view type! Using default view.");
-        imageInfo.imageView = m_imageView;
-        break;
-    }
-    if (imageInfo.imageView == VK_NULL_HANDLE) {
-        RP_CORE_WARN("Invalid texture view type! Using default view.");
-        imageInfo.imageView = m_imageView;
-    }
+    imageInfo.imageView = m_imageView;
+    return imageInfo;
+}
 
+VkDescriptorImageInfo Texture::getStorageDescriptorInfo() const
+{
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    imageInfo.sampler = VK_NULL_HANDLE;
+    imageInfo.imageView = m_imageViewStorageMips.empty() ? m_imageView : m_imageViewStorageMips[0];
     return imageInfo;
 }
 
@@ -1180,7 +1128,7 @@ std::unique_ptr<Texture> Texture::createDefaultWhiteTexture()
     uint32_t whitePixel = 0xFFFFFFFF; // RGBA white
     VkDeviceSize imageSize = sizeof(uint32_t);
 
-    VkBuffer stagingBuffer;
+    VkBuffer stagingBuffer = VK_NULL_HANDLE;
     VmaAllocation stagingAllocation;
 
     VkBufferCreateInfo bufferInfo{};
@@ -1194,7 +1142,8 @@ std::unique_ptr<Texture> Texture::createDefaultWhiteTexture()
 
     if (vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &stagingBuffer, &stagingAllocation, nullptr) != VK_SUCCESS) {
         RP_CORE_ERROR("Failed to create staging buffer for default white texture!");
-        throw std::runtime_error("Failed to create staging buffer for default white texture!");
+        RP_ASSERT(stagingBuffer != VK_NULL_HANDLE, "Failed to create staging buffer for default white texture");
+        return nullptr;
     }
 
     // Copy white pixel data to staging buffer
@@ -1302,7 +1251,7 @@ std::unique_ptr<Texture> Texture::createDefaultWhiteCubemapTexture()
     VkDeviceSize faceSize = sizeof(uint32_t);
     VkDeviceSize imageSize = faceSize * 6;
 
-    VkBuffer stagingBuffer;
+    VkBuffer stagingBuffer = VK_NULL_HANDLE;
     VmaAllocation stagingAllocation;
 
     VkBufferCreateInfo bufferInfo{};
@@ -1315,7 +1264,8 @@ std::unique_ptr<Texture> Texture::createDefaultWhiteCubemapTexture()
 
     if (vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &stagingBuffer, &stagingAllocation, nullptr) != VK_SUCCESS) {
         RP_CORE_ERROR("Failed to create staging buffer for default white cubemap!");
-        throw std::runtime_error("Failed to create staging buffer for default white cubemap!");
+        RP_ASSERT(stagingBuffer != VK_NULL_HANDLE, "Failed to create staging buffer for default white cubemap");
+        return nullptr;
     }
 
     void *data;

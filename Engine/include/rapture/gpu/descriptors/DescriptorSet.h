@@ -91,7 +91,6 @@ inline uint32_t getBindingBindNumber(DescriptorSetBindingLocation location)
 struct DescriptorSetBinding {
     VkDescriptorType type;
     uint32_t count = 1;
-    TextureViewType viewType = TextureViewType::DEFAULT;
     // Use variant to hold different resource types
     bool useStorageImageInfo = false; // Flag to use storage image descriptor info
     DescriptorSetBindingLocation location = DescriptorSetBindingLocation::NONE;

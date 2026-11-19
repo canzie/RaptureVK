@@ -123,7 +123,7 @@ void DescriptorSet::createBinding(const DescriptorSetBinding &binding)
     case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
     case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
         m_textureBindings[binding.location] = std::make_shared<DescriptorBindingTexture>(
-            this, bindNumber, binding.viewType, binding.useStorageImageInfo, binding.count);
+            this, bindNumber, binding.useStorageImageInfo, binding.count);
         break;
     case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR:
         m_tlasBindings[binding.location] = std::make_shared<DescriptorBindingTLAS>(this, bindNumber, binding.count);

@@ -50,18 +50,18 @@ void DescriptorManager::initializeSet0()
     // SCUFFED TEMP: per-scene arrays bumped 3 -> 24 to fit 8 active scenes.
     // Not a real fix - these should be sized per number of active scenes.
     bindings.bindings.push_back(
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 24, TextureViewType::DEFAULT, false, DescriptorSetBindingLocation::CAMERA_DATA_SSBO});
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 24, false, DescriptorSetBindingLocation::CAMERA_DATA_SSBO});
     bindings.bindings.push_back(
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 24, TextureViewType::DEFAULT, false, DescriptorSetBindingLocation::LIGHT_DATA_SSBO});
-    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 48, TextureViewType::DEFAULT, false,
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 24, false, DescriptorSetBindingLocation::LIGHT_DATA_SSBO});
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 48, false,
                                  DescriptorSetBindingLocation::SHADOW_MATRICES_UBO});
-    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 16, TextureViewType::DEFAULT, false,
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 16, false,
                                  DescriptorSetBindingLocation::CASCADE_MATRICES_UBO});
     bindings.bindings.push_back(
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 24, TextureViewType::DEFAULT, false, DescriptorSetBindingLocation::SHADOW_DATA_SSBO});
-    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 24, TextureViewType::DEFAULT, false,
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 24, false, DescriptorSetBindingLocation::SHADOW_DATA_SSBO});
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 24, false,
                                  DescriptorSetBindingLocation::PROBE_VOLUME_DATA_UBO});
-    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2048, TextureViewType::DEFAULT, false,
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2048, false,
                                  DescriptorSetBindingLocation::MDI_INDEXED_INFO_SSBOS});
 
     bindings.setNumber = 0;
@@ -80,10 +80,10 @@ void DescriptorManager::initializeSet1()
 
     // Single SSBO arena holding all MaterialData, indexed by material id
     bindings.bindings.push_back(
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, TextureViewType::DEFAULT, false, DescriptorSetBindingLocation::MATERIAL_DATA_SSBO});
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, false, DescriptorSetBindingLocation::MATERIAL_DATA_SSBO});
     // Single SSBO arena holding all GraphInstanceData, indexed by graphInstanceIndex
     bindings.bindings.push_back(
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, TextureViewType::DEFAULT, false, DescriptorSetBindingLocation::GRAPH_DATA_SSBO});
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, false, DescriptorSetBindingLocation::GRAPH_DATA_SSBO});
     bindings.setNumber = 1;
 
     // Create the descriptor set
@@ -100,8 +100,8 @@ void DescriptorManager::initializeSet2()
 
     // SCUFFED TEMP: bumped 3 -> 24 to fit 8 active scenes, see initializeSet0.
     bindings.bindings.push_back(
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 24, TextureViewType::DEFAULT, false, DescriptorSetBindingLocation::MESH_DATA_SSBO});
-    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 24, TextureViewType::DEFAULT, false,
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 24, false, DescriptorSetBindingLocation::MESH_DATA_SSBO});
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 24, false,
                                  DescriptorSetBindingLocation::SKELETON_MATRICES_SSBO});
     bindings.setNumber = 2;
 
@@ -118,23 +118,23 @@ void DescriptorManager::initializeSet3()
     DescriptorSetBindings bindings;
 
     //  Bindless textures
-    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4096, TextureViewType::DEFAULT, false,
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4096, false,
                                  DescriptorSetBindingLocation::BINDLESS_TEXTURES});
 
     //  Bindless SSBOs
     bindings.bindings.push_back(
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2048, TextureViewType::DEFAULT, false, DescriptorSetBindingLocation::BINDLESS_SSBOS});
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2048, false, DescriptorSetBindingLocation::BINDLESS_SSBOS});
 
     // DDGI scene info SSBO
     bindings.bindings.push_back(
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, TextureViewType::DEFAULT, false, DescriptorSetBindingLocation::RT_SCENE_INFO_SSBOS});
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, false, DescriptorSetBindingLocation::RT_SCENE_INFO_SSBOS});
 
     // one entry per run of every traced mesh, reached by the geometry index of a hit
-    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, TextureViewType::DEFAULT, false,
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, false,
                                  DescriptorSetBindingLocation::RT_GEOMETRY_INFO_SSBOS});
 
     // General purpose bindless storage textures
-    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 8, TextureViewType::DEFAULT, false,
+    bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 8, false,
                                  DescriptorSetBindingLocation::BINDLESS_ACCELERATION_STRUCTURES});
 
     bindings.setNumber = 3;

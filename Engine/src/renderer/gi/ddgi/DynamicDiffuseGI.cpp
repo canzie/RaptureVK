@@ -668,7 +668,7 @@ void DynamicDiffuseGI::initTextures()
     {
         DescriptorSetBindings bindings;
         bindings.setNumber = 4;
-        bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, true,
+        bindings.bindings.push_back({VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, true,
                                      (DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::RAY_DATA});
         m_probeTraceDescriptorSet = std::make_shared<DescriptorSet>(bindings);
         m_probeTraceDescriptorSet->getTextureBinding((DescriptorSetBindingLocation)DDGIDescriptorSetBindingLocation::RAY_DATA)
@@ -684,7 +684,7 @@ static std::unique_ptr<DescriptorSet> s_createProbeStorageImageDescriptorSet(DDG
     DescriptorSetBindings bindings;
     bindings.setNumber = 4;
     bindings.bindings.push_back(
-        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, TextureViewType::DEFAULT, true, (DescriptorSetBindingLocation)location});
+        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, true, (DescriptorSetBindingLocation)location});
 
     auto descriptorSet = std::make_unique<DescriptorSet>(bindings);
     descriptorSet->getTextureBinding((DescriptorSetBindingLocation)location)->add(texture);
