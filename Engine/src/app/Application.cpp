@@ -234,8 +234,11 @@ void Application::runFrame()
     waitForFrameSlotToFinish();
 
     m_telemetryPollAccum += Timestep::deltaTime();
+    ++m_telemetryPollFrames;
     if (m_telemetryPollAccum >= 1.0f) {
+        m_telemetry.frameTimeMs = m_telemetryPollAccum * 1000.0f / static_cast<float>(m_telemetryPollFrames);
         m_telemetryPollAccum = 0.0f;
+        m_telemetryPollFrames = 0;
         pollTelemetry();
     }
 

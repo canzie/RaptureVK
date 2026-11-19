@@ -7,7 +7,7 @@
 namespace Rapture {
 
 /**
- * @brief A snapshot of hardware readings
+ * @brief A snapshot of hardware and frame timing readings
  */
 struct Telemetry {
     uint64_t vramUsedBytes = 0;   ///< device-local heap usage, other processes included
@@ -19,6 +19,8 @@ struct Telemetry {
     std::vector<float> cpuUsagePerCore; ///< percent per logical core
     float gpuTemperatureC = 0.0f;
     float cpuTemperatureC = 0.0f;
+
+    float frameTimeMs = 0.0f; ///< mean over the last sampling interval
 };
 
 } // namespace Rapture

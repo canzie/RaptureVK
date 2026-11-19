@@ -216,6 +216,7 @@ class Application {
 
     Telemetry m_telemetry;
     float m_telemetryPollAccum = 0.0f;
+    uint32_t m_telemetryPollFrames = 0;
 
     static Application *s_instance;
 };
