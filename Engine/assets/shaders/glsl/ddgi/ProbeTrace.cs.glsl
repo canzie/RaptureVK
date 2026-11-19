@@ -418,7 +418,7 @@ void main() {
             // Store the final ray radiance and hit distance
             vec3 radiance = emissiveColor + diffuse + ((min(albedo, vec3(maxAlbedo)) / PI) * irradiance);
 
-            DDGIStoreProbeRayFrontfaceHit(ivec3(outputCoords), clamp(radiance, vec3(0.0), vec3(1.0)), hitT);
+            DDGIStoreProbeRayFrontfaceHit(ivec3(outputCoords), radiance, hitT);
         } else {
             // Back face hit - store negative distance
             DDGIStoreProbeRayBackfaceHit(ivec3(outputCoords), hitT);
