@@ -215,17 +215,6 @@ class PropertySection {
                       const std::function<void(Amethyst::UIScope &)> &fillField);
 
     /**
-     * @brief Adds a row holding a name field in the label column and a dropdown in the value column.
-     * @param t Scope of the table the row is added to.
-     * @param placeholder Text the name field shows while empty.
-     * @param dropdownLabel Text the dropdown shows.
-     * @param options The selectable entries, in order.
-     * @param onSelect Called with the name field's text and the index of the picked entry.
-     */
-    void rowNameFieldWithDropdown(Amethyst::TableScope &t, std::string_view placeholder, std::string_view dropdownLabel,
-                                  const std::vector<std::string> &options, const std::function<void(std::string_view, int)> &onSelect);
-
-    /**
      * @brief Fills a value column with a single drag field.
      * @param cell Scope of the value column.
      * @param value The value the field is bound to.

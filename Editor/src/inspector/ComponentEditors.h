@@ -401,12 +401,6 @@ class AttributesEditor : public ComponentEditorBase {
      */
     void readAttributeRow(AttributeRow &row) const;
 
-    /**
-     * @brief Puts a new attribute on the selected object, starting at its type's zero
-     * @param name The name it goes by, which has to be free
-     * @param typeIndex Index into the add row's type options
-     */
-    void addAttribute(std::string_view name, int typeIndex);
 
   private:
     std::vector<AttributeRow> m_rows;

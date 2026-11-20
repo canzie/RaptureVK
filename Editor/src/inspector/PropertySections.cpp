@@ -7,10 +7,8 @@
 #include <components/checkbox.h>
 #include <components/context_menu_item.h>
 #include <components/common.h>
-#include <components/text_input.h>
 
 #include <array>
-#include <memory>
 #include <span>
 #include <string_view>
 
@@ -368,46 +366,6 @@ void PropertySection::rowRemovable(Amethyst::TableScope &t, std::string_view lab
             remove->track(remove->onMouseButton1ClickCb.connect([onRemove]() { onRemove(); }));
         });
         tr.cell([fillField](Amethyst::UIScope &cell) { fillField(cell); });
-    });
-}
-
-void PropertySection::rowNameFieldWithDropdown(Amethyst::TableScope &t, std::string_view placeholder, std::string_view dropdownLabel,
-                                               const std::vector<std::string> &options,
-                                               const std::function<void(std::string_view, int)> &onSelect)
-{
-    t.row([&](Amethyst::TableRowScope &tr) {
-        auto nameInput = std::make_shared<Amethyst::TextInput *>(nullptr);
-        tr.cell([placeholder, nameInput](Amethyst::UIScope &cell) {
-            cell.textInput(
-                {
-                    .classes = {"property-input-field"},
-                    .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
-                             .position = Amethyst::UDim2(0.0f, LABEL_PAD, 0.5f, 0.0f),
-                             .size = Amethyst::UDim2(1.0f, -(LABEL_PAD + CONTROL_HPAD), 1.0f, -2.0f * CONTROL_VPAD)},
-                    .placeholder = std::string(placeholder),
-                },
-                [nameInput](Amethyst::TextInputScope &ti) { *nameInput = &ti.component; });
-        });
-        tr.cell([&](Amethyst::UIScope &cell) {
-            cell.dropdown(
-                {
-                    .classes = {"property-input-field", "property-dropdown"},
-                    .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
-                             .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
-                             .size = Amethyst::UDim2(0.0f, SINGLE_FIELD_WIDTH, 1.0f, -2.0f * CONTROL_VPAD)},
-                    .text = {.textXAlignment = Amethyst::TextXAlignment::LEFT, .textYAlignment = Amethyst::TextYAlignment::CENTER},
-                    .label = std::string(dropdownLabel),
-                },
-                [&](Amethyst::DropdownScope &d) {
-                    for (size_t i = 0; i < options.size(); ++i) {
-                        d.action(options[i], [onSelect, nameInput, i]() {
-                            if (*nameInput != nullptr && onSelect) {
-                                onSelect((*nameInput)->getText(), static_cast<int>(i));
-                            }
-                        });
-                    }
-                });
-        });
     });
 }
 

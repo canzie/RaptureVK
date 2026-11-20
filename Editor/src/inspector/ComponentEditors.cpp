@@ -1062,9 +1062,6 @@ static constexpr double ATTRIBUTE_DRAG_SPEED = 0.05;
 static constexpr double ATTRIBUTE_INT_DRAG_SPEED = 0.2;
 static constexpr double ATTRIBUTE_LIMIT = 1.0e9;
 
-static const std::vector<std::string> ATTRIBUTE_TYPE_OPTIONS = {"Float", "Bool", "Int", "Vector"};
-static constexpr Rapture::ValueType ATTRIBUTE_TYPES[] = {Rapture::ValueType::FLOAT, Rapture::ValueType::BOOL, Rapture::ValueType::INT,
-                                                         Rapture::ValueType::VEC3};
 
 void AttributesEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
@@ -1084,8 +1081,6 @@ void AttributesEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
         for (AttributeRow &row : m_rows) {
             buildAttributeRow(t, row);
         }
-        rowNameFieldWithDropdown(t, "New attribute", "Add", ATTRIBUTE_TYPE_OPTIONS,
-                                 [this](std::string_view name, int typeIndex) { addAttribute(name, typeIndex); });
     });
 }
 
@@ -1184,35 +1179,6 @@ void AttributesEditor::readAttributeRow(AttributeRow &row) const
     }
     case Rapture::ValueType::NONE:
         break;
-    }
-}
-
-void AttributesEditor::addAttribute(std::string_view name, int typeIndex)
-{
-    if (m_object == nullptr || name.empty() || m_object->attributes().has(name)) {
-        return;
-    }
-
-    Rapture::Attributes &attributes = m_object->attributes();
-    switch (ATTRIBUTE_TYPES[typeIndex]) {
-    case Rapture::ValueType::FLOAT:
-        attributes.setFloat(name, 0.0f);
-        break;
-    case Rapture::ValueType::INT:
-        attributes.setInt(name, 0);
-        break;
-    case Rapture::ValueType::BOOL:
-        attributes.setBool(name, false);
-        break;
-    case Rapture::ValueType::VEC3:
-        attributes.setVec3(name, glm::vec3(0.0f));
-        break;
-    case Rapture::ValueType::NONE:
-        break;
-    }
-
-    if (requestRefresh != nullptr) {
-        requestRefresh();
     }
 }
 
