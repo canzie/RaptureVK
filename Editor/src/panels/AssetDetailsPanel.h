@@ -5,6 +5,7 @@
 #include <components/ui_scope.h>
 
 #include "inspector/AssetEditorBase.h"
+#include "inspector/AssetEditors.h"
 #include "inspector/PropertySections.h"
 #include "panels/Panel.h"
 
@@ -24,6 +25,14 @@ class AssetDetailsPanel : public Panel {
     std::string_view typeName() const override { return "AssetDetailsPanel"; }
     AssetDetailsPanel(const WorkspaceContext &context, Rapture::AssetHandle handle);
 
+    /**
+     * @brief Builds the panel for a mesh whose scale and up axis can be edited for baking
+     * @param context The workspace the panel is built against
+     * @param handle The asset shown
+     * @param bakeTransform The transform the Transform section edits, which outlives the panel
+     */
+    AssetDetailsPanel(const WorkspaceContext &context, Rapture::AssetHandle handle, MeshBakeTransform &bakeTransform);
+
     void onUpdate(float dt) override;
 
   protected:
@@ -40,9 +49,7 @@ class AssetDetailsPanel : public Panel {
     template <std::derived_from<AssetEditorBase> T>
     void ensure(bool present)
     {
-        if (T *editor = m_sections->ensure<T>(present)) {
-            editor->setSubject(m_handle);
-        }
+        m_sections->ensurePrepared<T>(present, [this](T &editor) { editor.setSubject(m_handle); });
     }
 
     void refresh();
@@ -50,6 +57,7 @@ class AssetDetailsPanel : public Panel {
   private:
     std::optional<PropertySectionList> m_sections;
     Rapture::AssetHandle m_handle = Rapture::INVALID_ASSET_HANDLE;
+    MeshBakeTransform *m_bakeTransform = nullptr;
 };
 
 #endif // RAPTURE__ASSET_DETAILS_PANEL_H

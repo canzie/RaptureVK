@@ -1,7 +1,6 @@
 #include "AssetDetailsPanel.h"
 
 #include "Icons.h"
-#include "inspector/AssetEditors.h"
 
 #include <rapture/assets/asset_manager/AssetManager.h>
 
@@ -9,6 +8,12 @@ AssetDetailsPanel::AssetDetailsPanel(const WorkspaceContext &context, Rapture::A
     : Panel("Details", context), m_handle(handle)
 {
     m_icon = Icons::SVG_PROPERTIES;
+}
+
+AssetDetailsPanel::AssetDetailsPanel(const WorkspaceContext &context, Rapture::AssetHandle handle, MeshBakeTransform &bakeTransform)
+    : AssetDetailsPanel(context, handle)
+{
+    m_bakeTransform = &bakeTransform;
 }
 
 void AssetDetailsPanel::build(Amethyst::UIScope &scope)
@@ -43,6 +48,11 @@ void AssetDetailsPanel::refresh()
         const bool isMesh = type == Rapture::ASSET_STATIC_MESH || type == Rapture::ASSET_SKELETAL_MESH;
 
         ensure<MeshAssetEditor>(isMesh);
+        if (m_bakeTransform != nullptr) {
+            m_sections->ensurePrepared<MeshTransformAssetEditor>(
+                isMesh, [this](MeshTransformAssetEditor &editor) { editor.setSubject(m_handle); }, *m_bakeTransform);
+        }
+        ensure<MeshImportAssetEditor>(isMesh);
         ensure<MeshMaterialAssetEditor>(isMesh);
         ensure<MeshSkeletonAssetEditor>(type == Rapture::ASSET_SKELETAL_MESH);
         ensure<SkeletonAssetEditor>(type == Rapture::ASSET_SKELETON);

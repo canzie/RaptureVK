@@ -4,30 +4,33 @@
 #include "Icons.h"
 #include "inspector/AssetEditorBase.h"
 
+#include <functional>
 #include <optional>
+#include <string_view>
 
 /**
  * @brief The geometry an open mesh asset holds
  */
 class MeshAssetEditor : public AssetEditorBase {
   public:
-    const char *title() const override { return "Mesh"; }
+    const char *title() const override { return "Geometry"; }
     const char *icon() const override { return Icons::SVG_MESH; }
     void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
     void sync(Rapture::AssetHandle handle) override;
 
   private:
-    Amethyst::TextLabel *m_indexCount = nullptr;
-    Amethyst::TextLabel *m_boundsMin = nullptr;
-    Amethyst::TextLabel *m_boundsMax = nullptr;
+    Amethyst::TextLabel *m_triangleCount = nullptr;
+    Amethyst::TextLabel *m_vertexCount = nullptr;
+    Amethyst::TextLabel *m_bounds = nullptr;
+    bool m_rayTraced = true;
 };
 
 /**
- * @brief The material an open mesh asset is drawn with where nothing else is chosen
+ * @brief The material each section of an open mesh asset is drawn with where nothing else is chosen
  */
 class MeshMaterialAssetEditor : public AssetEditorBase {
   public:
-    const char *title() const override { return "Material"; }
+    const char *title() const override { return "Material Slots"; }
     const char *icon() const override { return Icons::SVG_MATERIAL; }
     void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
     void sync(Rapture::AssetHandle handle) override;
@@ -41,8 +44,61 @@ class MeshMaterialAssetEditor : public AssetEditorBase {
     void applyMaterialSlot(uint32_t slot, Rapture::AssetHandle material);
 
   private:
-    /// one per run of the mesh, so a mesh drawn with several materials can default each of them
     std::vector<std::optional<AssetPicker>> m_materialPickers;
+};
+
+/**
+ * @brief Which axis of a mesh's geometry points up
+ */
+enum MeshUpAxis {
+    MESH_UP_AXIS_Y,
+    MESH_UP_AXIS_Z,
+    MESH_UP_AXIS_COUNT
+};
+
+constexpr std::string_view MESH_UP_AXIS_LABELS[MESH_UP_AXIS_COUNT] = {"Y up", "Z up"};
+
+/**
+ * @brief A scale and up axis to bake into an open mesh asset's geometry, shown on the mesh before it is saved
+ */
+struct MeshBakeTransform {
+    float scale = 1.0f;
+    MeshUpAxis upAxis = MESH_UP_AXIS_Y;
+    std::function<void()> onChanged;
+};
+
+/**
+ * @brief The scale and up axis an open mesh asset is to be baked with
+ */
+class MeshTransformAssetEditor : public AssetEditorBase {
+  public:
+    /**
+     * @param bakeTransform The transform the rows edit, which outlives this editor
+     */
+    explicit MeshTransformAssetEditor(MeshBakeTransform &bakeTransform);
+
+    const char *title() const override { return "Transform"; }
+    const char *icon() const override { return Icons::SVG_TRANSFORM; }
+    void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
+    void sync(Rapture::AssetHandle handle) override { (void)handle; }
+
+  private:
+    MeshBakeTransform &m_bakeTransform;
+};
+
+/**
+ * @brief Where an open mesh asset was imported from and what it was imported with
+ */
+class MeshImportAssetEditor : public AssetEditorBase {
+  public:
+    const char *title() const override { return "Import"; }
+    const char *icon() const override { return Icons::SVG_FOLDER_PLUS; }
+    void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
+    void sync(Rapture::AssetHandle handle) override;
+
+  private:
+    Amethyst::TextLabel *m_sourcePath = nullptr;
+    Amethyst::TextLabel *m_meshInFile = nullptr;
 };
 
 /**

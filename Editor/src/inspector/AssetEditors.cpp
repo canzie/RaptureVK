@@ -9,6 +9,7 @@
 #include <rapture/core/utils/Log.h>
 
 #include <cstdio>
+#include <iterator>
 #include <span>
 #include <vector>
 
@@ -48,38 +49,54 @@ static const Rapture::Mesh *s_meshGeometry(Rapture::AssetHandle handle)
     return nullptr;
 }
 
-static std::string s_formatVec3(const glm::vec3 &value)
+static constexpr float MESH_BAKE_SCALE_MIN = 0.001f;
+static constexpr float MESH_BAKE_SCALE_MAX = 10.0f;
+
+static std::string s_formatCount(uint64_t count)
+{
+    std::string digits = std::to_string(count);
+    std::string grouped;
+    for (size_t i = 0; i < digits.size(); ++i) {
+        if (i > 0 && (digits.size() - i) % 3 == 0) {
+            grouped += ',';
+        }
+        grouped += digits[i];
+    }
+    return grouped;
+}
+
+static std::string s_formatExtent(const glm::vec3 &extent)
 {
     char buffer[64];
-    std::snprintf(buffer, sizeof(buffer), "%.3f, %.3f, %.3f", value.x, value.y, value.z);
+    std::snprintf(buffer, sizeof(buffer), "%.2f x %.2f x %.2f m", extent.x, extent.y, extent.z);
     return buffer;
 }
 
 void MeshAssetEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
     fieldTable(ch, [this](Amethyst::TableScope &t) {
-        m_indexCount = rowText(t, "Indices", "0");
-        m_boundsMin = rowText(t, "Bounds Min", "");
-        m_boundsMax = rowText(t, "Bounds Max", "");
+        m_triangleCount = rowText(t, "Triangles", "");
+        m_vertexCount = rowText(t, "Vertices", "");
+        m_bounds = rowText(t, "Bounds", "");
+        // TODO: whether the mesh takes part in ray tracing
+        rowCheckbox(t, "Ray tracing", &m_rayTraced, [](bool rayTraced) { (void)rayTraced; });
     });
 }
 
 void MeshAssetEditor::sync(Rapture::AssetHandle handle)
 {
+    if (!subjectChanged()) {
+        return;
+    }
+
     const Rapture::Mesh *mesh = s_meshGeometry(handle);
     if (mesh == nullptr) {
         return;
     }
 
-    if (m_indexCount != nullptr) {
-        m_indexCount->setText(std::to_string(mesh->getIndexCount()));
-    }
-    if (m_boundsMin != nullptr) {
-        m_boundsMin->setText(s_formatVec3(mesh->getBoundsMin()));
-    }
-    if (m_boundsMax != nullptr) {
-        m_boundsMax->setText(s_formatVec3(mesh->getBoundsMax()));
-    }
+    m_triangleCount->setText(s_formatCount(mesh->getIndexCount() / 3));
+    m_vertexCount->setText(s_formatCount(mesh->getVertexCount()));
+    m_bounds->setText(s_formatExtent(mesh->getBoundsMax() - mesh->getBoundsMin()));
 }
 
 void MeshMaterialAssetEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
@@ -91,8 +108,7 @@ void MeshMaterialAssetEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 
     fieldTable(ch, [this](Amethyst::TableScope &t) {
         for (uint32_t slot = 0; slot < m_materialPickers.size(); slot++) {
-            std::string label = m_materialPickers.size() > 1 ? "Default " + std::to_string(slot) : "Default";
-            rowAssetPicker(t, label, m_materialPickers[slot], {.types = {Rapture::ASSET_MATERIAL_INSTANCE}},
+            rowAssetPicker(t, "Slot " + std::to_string(slot), m_materialPickers[slot], {.types = {Rapture::ASSET_MATERIAL_INSTANCE}},
                            [this, slot](Rapture::AssetHandle material) { applyMaterialSlot(slot, material); });
         }
     });
@@ -132,6 +148,60 @@ void MeshMaterialAssetEditor::sync(Rapture::AssetHandle handle)
             m_materialPickers[slot]->setAsset(mesh->materialSlot(slot));
         }
     }
+}
+
+MeshTransformAssetEditor::MeshTransformAssetEditor(MeshBakeTransform &bakeTransform) : m_bakeTransform(bakeTransform) {}
+
+void MeshTransformAssetEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+{
+    std::vector<std::string> upAxisOptions(std::begin(MESH_UP_AXIS_LABELS), std::end(MESH_UP_AXIS_LABELS));
+
+    fieldTable(ch, [this, &upAxisOptions](Amethyst::TableScope &t) {
+        rowSlider(
+            t, "Scale", &m_bakeTransform.scale, MESH_BAKE_SCALE_MIN, MESH_BAKE_SCALE_MAX,
+            [this](float scale) {
+                (void)scale;
+                if (m_bakeTransform.onChanged) {
+                    m_bakeTransform.onChanged();
+                }
+            },
+            "%.3f");
+        rowDropdown(t, "Up axis", MESH_UP_AXIS_LABELS[m_bakeTransform.upAxis], upAxisOptions, [this](int axis) {
+            m_bakeTransform.upAxis = static_cast<MeshUpAxis>(axis);
+            if (m_bakeTransform.onChanged) {
+                m_bakeTransform.onChanged();
+            }
+        });
+    });
+}
+
+void MeshImportAssetEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+{
+    fieldTable(ch, [this](Amethyst::TableScope &t) {
+        m_sourcePath = rowText(t, "Source", "");
+        m_meshInFile = rowText(t, "Mesh in file", "");
+        // TODO: read both from the mesh's import config once mesh imports record one
+        rowText(t, "Scale", "1.000");
+        rowText(t, "Up axis", MESH_UP_AXIS_LABELS[MESH_UP_AXIS_Y]);
+    });
+}
+
+void MeshImportAssetEditor::sync(Rapture::AssetHandle handle)
+{
+    if (!subjectChanged()) {
+        return;
+    }
+
+    const Rapture::AssetMetadata &metadata = Rapture::AssetManager::getAssetMetadata(handle);
+    if (!metadata.provenance.has_value()) {
+        m_sourcePath->setText("Generated");
+        m_meshInFile->setText("");
+        return;
+    }
+
+    const Rapture::AssetProvenance &provenance = *metadata.provenance;
+    m_sourcePath->setText(provenance.sourcePath.generic_string());
+    m_meshInFile->setText(provenance.sourceSubIndex.has_value() ? std::to_string(*provenance.sourceSubIndex) : "");
 }
 
 void MeshSkeletonAssetEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)

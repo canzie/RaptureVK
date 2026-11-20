@@ -13,6 +13,8 @@
 #include <rapture/scene/instances/StaticMesh3D.h>
 #include <rapture/scene/instances/controllers/CameraController.h>
 
+#include <algorithm>
+
 // the panel showing it resizes it to its pane, so this only has to be a sane first frame
 static constexpr uint32_t PREVIEW_WIDTH = 1280;
 static constexpr uint32_t PREVIEW_HEIGHT = 720;
@@ -23,6 +25,11 @@ static constexpr float SUN_PITCH = -1.874f;
 static constexpr float SUN_INTENSITY = 3.14f;
 static constexpr float SKY_INTENSITY = 0.1f;
 static constexpr float GROUND_SIZE = 20.0f;
+
+static constexpr float NEAR_PLANE_PER_RADIUS = 0.01f;
+static constexpr float FAR_PLANE_PER_RADIUS = 100.0f;
+static constexpr float SHADOW_DISTANCE_PER_RADIUS = 4.0f;
+static constexpr float SMALLEST_FRAMED_RADIUS = 0.01f;
 
 PreviewScene::PreviewScene(std::string_view name) : m_name(name)
 {
@@ -40,17 +47,22 @@ PreviewScene::~PreviewScene()
 
 void PreviewScene::addGroundAndSky()
 {
-    auto *sun = m_scene->root()->add<Rapture::DirectionalLight3D>("Sun");
-    sun->setRotation(glm::vec3(SUN_PITCH, 0.0f, 0.0f));
-    sun->setColor(glm::vec3(1.0f));
-    sun->setIntensity(SUN_INTENSITY);
-    sun->setAtmosphereSun(true);
-    sun->setCastsShadow(true);
+    addSky();
 
     auto *ground = m_scene->root()->add<Rapture::StaticMesh3D>("Ground");
     ground->setMesh(Rapture::RE_PRIMITIVE_PLANE_MESH);
     ground->setMaterial(0, Rapture::RE_GRID_MATERIAL_INSTANCE);
     ground->setScale(glm::vec3(GROUND_SIZE, 1.0f, GROUND_SIZE));
+}
+
+void PreviewScene::addSky()
+{
+    m_sun = m_scene->root()->add<Rapture::DirectionalLight3D>("Sun");
+    m_sun->setRotation(glm::vec3(SUN_PITCH, 0.0f, 0.0f));
+    m_sun->setColor(glm::vec3(1.0f));
+    m_sun->setIntensity(SUN_INTENSITY);
+    m_sun->setAtmosphereSun(true);
+    m_sun->setCastsShadow(true);
 
     Rapture::Environment *environment = m_scene->environment();
     if (environment != nullptr) {
@@ -85,14 +97,36 @@ Rapture::Viewport *PreviewScene::createViewport(Rapture::ecs::EntityAccessor cam
     return m_viewport.viewport;
 }
 
+static float s_framedRadius(const glm::vec3 &min, const glm::vec3 &max)
+{
+    return std::max(glm::length(max - min) * 0.5f, SMALLEST_FRAMED_RADIUS);
+}
+
+void PreviewScene::fitViewRangeTo(const glm::vec3 &min, const glm::vec3 &max)
+{
+    if (m_editorCamera == nullptr) {
+        return;
+    }
+
+    const float radius = s_framedRadius(min, max);
+
+    Rapture::Camera3D &camera = m_editorCamera->camera();
+    camera.setNearPlane(radius * NEAR_PLANE_PER_RADIUS);
+    camera.setFarPlane(radius * FAR_PLANE_PER_RADIUS);
+
+    if (m_sun != nullptr) {
+        m_sun->setShadowDistance(radius * SHADOW_DISTANCE_PER_RADIUS);
+    }
+}
+
 void PreviewScene::focusOn(const glm::vec3 &min, const glm::vec3 &max)
 {
     if (m_editorCamera == nullptr) {
         return;
     }
 
-    const glm::vec3 center = (min + max) * 0.5f;
-    m_editorCamera->controller().focusOn(center, glm::length(max - min) * 0.5f, FOCUS_DIRECTION);
+    fitViewRangeTo(min, max);
+    m_editorCamera->controller().focusOn((min + max) * 0.5f, s_framedRadius(min, max), FOCUS_DIRECTION);
 }
 
 glm::vec3 PreviewScene::centreMeshOnOrigin(std::span<Rapture::Mesh3D *const> meshes)

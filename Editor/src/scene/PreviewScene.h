@@ -12,6 +12,7 @@
 #include <string_view>
 
 namespace Rapture {
+class DirectionalLight3D;
 class Mesh3D;
 class Scene;
 } // namespace Rapture
@@ -41,6 +42,11 @@ class PreviewScene {
     void addGroundAndSky();
 
     /**
+     * @brief Adds a sun and an atmosphere sky for the previewed thing to be lit by
+     */
+    void addSky();
+
+    /**
      * @brief Creates the viewport this scene is drawn through
      * @param camera Camera to draw from, invalid to draw from an editor camera this scene creates
      * @return The viewport
@@ -48,7 +54,14 @@ class PreviewScene {
     Rapture::Viewport *createViewport(Rapture::ecs::EntityAccessor camera = {});
 
     /**
-     * @brief Frames the camera on a box, so what it holds fills the view
+     * @brief Fits the camera's clip planes and the sun's shadow reach to a box, leaving where the camera looks alone
+     * @param min Corner of the world space box to fit to
+     * @param max Opposite corner of the world space box to fit to
+     */
+    void fitViewRangeTo(const glm::vec3 &min, const glm::vec3 &max);
+
+    /**
+     * @brief Frames the camera on a box, so what it holds fills the view, with its view range fitted to the box
      * @param min Corner of the world space box to frame
      * @param max Opposite corner of the world space box to frame
      */
@@ -77,6 +90,7 @@ class PreviewScene {
     std::unique_ptr<Rapture::Scene> m_scene;
     std::unique_ptr<EditorCamera> m_editorCamera;
     Rapture::ViewportContext m_viewport;
+    Rapture::DirectionalLight3D *m_sun = nullptr;
 };
 
 #endif // RAPTURE__PREVIEW_SCENE_H
