@@ -14,6 +14,8 @@
 #include <string>
 #include <vector>
 
+class SearchField;
+
 /**
  * @brief File open/save dialog laid out in Amethyst.
  */
@@ -91,7 +93,7 @@ class FileBrowser {
     Amethyst::EventConnection m_rootDestroyConn;
 
     Amethyst::TextInput *m_pathInput = nullptr;
-    Amethyst::TextInput *m_searchInput = nullptr;
+    SearchField *m_searchField = nullptr;
 
     Amethyst::Table *m_table = nullptr;
     Amethyst::TextLabel *m_statusLabel = nullptr;

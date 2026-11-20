@@ -1,5 +1,6 @@
 #include "FileBrowser.h"
 #include "Icons.h"
+#include "ui/controls/SearchField.h"
 
 #include <rapture/core/utils/StringFormat.h>
 
@@ -281,48 +282,16 @@ void FileBrowser::setupTopBar()
                 });
 
             // right-aligned search / filter box
-            top.frame(
-                {
-                    .classes = {"searchbar"},
-                    .base =
-                        {
-                            .anchorPoint = Amethyst::vec2(1.0f, 0.5f),
-                            .position = Amethyst::UDim2(1.0f, -CONTENT_PADDING, 0.5f, 0.0f),
-                            .size = Amethyst::UDim2(0.0f, searchWidth, 0.0f, 28.0f),
-                        },
-                    .style = {.cornerRadius = 2.0f},
-                },
-                [this](Amethyst::FrameScope &field) {
-                    field.imageLabel({
-                        .base =
-                            {
-                                .anchorPoint = Amethyst::vec2(0.0f, 0.5f),
-                                .position = Amethyst::UDim2(0.0f, 8.0f, 0.5f, 0.0f),
-                                .size = Amethyst::UDim2::fromOffset(14.0f, 14.0f),
-                            },
-                        .style = {.backgroundTransparency = 1.0f},
-                        .image = {.imageColor = COL_TEXT_DIM},
-                        .svg = Icons::SVG_SEARCH,
-                    });
-                    field.textInput(
-                        {
-                            .base =
-                                {
-                                    .position = Amethyst::UDim2(0.0f, 28.0f, 0.0f, 0.0f),
-                                    .size = Amethyst::UDim2(1.0f, -34.0f, 1.0f, 0.0f),
-                                },
-                            .style = {.backgroundTransparency = 1.0f},
-                            .textInput = {.text = {.textColor = COL_TEXT, .textYAlignment = Amethyst::TextYAlignment::CENTER}},
-                            .placeholder = "Search",
-                        },
-                        [this](Amethyst::TextInputScope &ti) {
-                            m_searchInput = &ti.component;
-                            m_searchInput->onTextChanged = [this](const std::string &text) {
-                                m_searchText = s_toLower(text);
-                                populate();
-                            };
-                        });
-                });
+            m_searchField = top.component.add<SearchField>("Search");
+            m_searchField->setBaseProperties({
+                .anchorPoint = Amethyst::vec2(1.0f, 0.5f),
+                .position = Amethyst::UDim2(1.0f, -CONTENT_PADDING, 0.5f, 0.0f),
+                .size = Amethyst::UDim2(0.0f, searchWidth, 0.0f, 28.0f),
+            });
+            m_searchField->setOnTextChanged([this](const std::string &text) {
+                m_searchText = s_toLower(text);
+                populate();
+            });
         });
 }
 
