@@ -87,6 +87,7 @@ class Mesh {
     std::shared_ptr<IndexBuffer> getIndexBuffer() const { return m_indexBuffer; }
 
     uint32_t getIndexCount() const { return m_indexCount; }
+    uint32_t getVertexCount() const { return m_vertexCount; }
 
     /**
      * @brief The runs this mesh is drawn in
@@ -139,6 +140,7 @@ class Mesh {
 
   private:
     uint32_t m_indexCount;
+    uint32_t m_vertexCount = 0;
     glm::vec3 m_boundsMin = glm::vec3(0.0f);
     glm::vec3 m_boundsMax = glm::vec3(0.0f);
     std::shared_ptr<VertexBuffer> m_vertexBuffer;

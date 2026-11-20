@@ -114,6 +114,8 @@ void Mesh::setMeshData(MeshAllocatorParams &params)
     auto &vulkanContext = app.getVulkanContext();
 
     m_indexCount = params.indexCount;
+    const uint32_t vertexSize = params.bufferLayout.calculateVertexSize();
+    m_vertexCount = vertexSize > 0 ? params.vertexDataSize / vertexSize : 0;
     m_boundsMin = params.boundsMin;
     m_boundsMax = params.boundsMax;
 
