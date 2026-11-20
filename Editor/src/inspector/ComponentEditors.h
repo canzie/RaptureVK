@@ -23,6 +23,9 @@
 
 #include <glm/glm.hpp>
 #include <optional>
+#include <string>
+#include <string_view>
+#include <vector>
 
 class Node3DEditor : public ComponentEditorBase {
   public:
@@ -341,6 +344,73 @@ class PlayerControllerEditor : public ComponentEditorBase {
     float m_maxPitch = 89.0f;
 
     Rapture::PlayerController *m_controller = nullptr;
+};
+
+/**
+ * @brief Where the selected object is shown
+ */
+class VisibilityEditor : public ComponentEditorBase {
+  public:
+    const char *title() const override { return "Visibility"; }
+    const char *icon() const override { return Icons::SVG_EYE; }
+    void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
+    void sync(const Rapture::ecs::EntityAccessor &entity) override;
+
+  private:
+    bool m_inOutliner = true;
+};
+
+/**
+ * @brief The named values put on the selected object
+ */
+class AttributesEditor : public ComponentEditorBase {
+  public:
+    const char *title() const override { return "Attributes"; }
+    const char *icon() const override { return Icons::SVG_TAG; }
+    void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
+    void sync(const Rapture::ecs::EntityAccessor &entity) override;
+
+  private:
+    /**
+     * @brief One attribute's row and the buffer its fields are bound to
+     */
+    struct AttributeRow {
+        std::string name;
+        Rapture::ValueType type = Rapture::ValueType::NONE;
+        double number = 0.0;
+        bool flag = false;
+        double vector[3] = {};
+    };
+
+    /**
+     * @brief Builds the row editing one attribute of the selected object
+     * @param t Scope of the table the row is added to
+     * @param row The attribute and its buffer
+     */
+    void buildAttributeRow(Amethyst::TableScope &t, AttributeRow &row);
+
+    /**
+     * @brief Writes an attribute row's buffer back to the selected object
+     * @param row The attribute and its buffer
+     */
+    void applyAttributeRow(const AttributeRow &row);
+
+    /**
+     * @brief Copies the selected object's value into an attribute row's buffer where it differs from it
+     * @param row The attribute and its buffer
+     */
+    void readAttributeRow(AttributeRow &row) const;
+
+    /**
+     * @brief Puts a new attribute on the selected object, starting at its type's zero
+     * @param name The name it goes by, which has to be free
+     * @param typeIndex Index into the add row's type options
+     */
+    void addAttribute(std::string_view name, int typeIndex);
+
+  private:
+    std::vector<AttributeRow> m_rows;
+    Rapture::SceneObject *m_object = nullptr;
 };
 
 #endif // RAPTURE__COMPONENT_EDITORS_H

@@ -175,6 +175,9 @@ void PropertiesPanel::refresh()
 
         ensure<ShadowEditor>(e.has<Rapture::ShadowComponent>());
         ensure<CascadedShadowEditor>(e.has<Rapture::CascadedShadowComponent>());
+
+        ensure<VisibilityEditor>(true);
+        ensure<AttributesEditor>(true);
     });
 }
 

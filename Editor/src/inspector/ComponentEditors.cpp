@@ -8,6 +8,7 @@
 #include <rapture/scene/render_data/SceneRenderData.h>
 
 #include <algorithm>
+#include <cmath>
 
 #include <components/checkbox.h>
 #include <components/common.h>
@@ -1037,4 +1038,208 @@ void PlayerControllerEditor::sync(const Rapture::ecs::EntityAccessor &entity)
     m_movementSpeed = m_controller->movementSpeed;
     m_mouseSensitivity = m_controller->mouseSensitivity;
     m_maxPitch = m_controller->maxPitch();
+}
+
+void VisibilityEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+{
+    fieldTable(ch, [this](Amethyst::TableScope &t) {
+        rowCheckbox(t, "In Outliner", &m_inOutliner, [this](bool inOutliner) {
+            if (Rapture::SceneObject *object = s_instanceAs<Rapture::SceneObject>(m_scene, m_entity)) {
+                object->visibility().inOutliner = inOutliner;
+            }
+        });
+    });
+}
+
+void VisibilityEditor::sync(const Rapture::ecs::EntityAccessor &entity)
+{
+    if (const Rapture::SceneObject *object = s_instanceAs<Rapture::SceneObject>(m_scene, entity)) {
+        m_inOutliner = object->visibility().inOutliner;
+    }
+}
+
+static constexpr double ATTRIBUTE_DRAG_SPEED = 0.05;
+static constexpr double ATTRIBUTE_INT_DRAG_SPEED = 0.2;
+static constexpr double ATTRIBUTE_LIMIT = 1.0e9;
+
+static const std::vector<std::string> ATTRIBUTE_TYPE_OPTIONS = {"Float", "Bool", "Int", "Vector"};
+static constexpr Rapture::ValueType ATTRIBUTE_TYPES[] = {Rapture::ValueType::FLOAT, Rapture::ValueType::BOOL, Rapture::ValueType::INT,
+                                                         Rapture::ValueType::VEC3};
+
+void AttributesEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+{
+    // which attributes there are decides the rows, so they are built against the selected object
+    m_object = s_instanceAs<Rapture::SceneObject>(m_scene, m_entity);
+    m_rows.clear();
+    if (m_object != nullptr) {
+        for (const Rapture::NamedValues::Entry &entry : m_object->attributes().values().entries()) {
+            AttributeRow &row = m_rows.emplace_back();
+            row.name = entry.name;
+            row.type = entry.type;
+            readAttributeRow(row);
+        }
+    }
+
+    fieldTable(ch, [this](Amethyst::TableScope &t) {
+        for (AttributeRow &row : m_rows) {
+            buildAttributeRow(t, row);
+        }
+        rowNameFieldWithDropdown(t, "New attribute", "Add", ATTRIBUTE_TYPE_OPTIONS,
+                                 [this](std::string_view name, int typeIndex) { addAttribute(name, typeIndex); });
+    });
+}
+
+void AttributesEditor::buildAttributeRow(Amethyst::TableScope &t, AttributeRow &row)
+{
+    const std::string name = row.name;
+    auto remove = [this, name]() {
+        if (m_object != nullptr) {
+            m_object->attributes().remove(name);
+        }
+        if (requestRefresh != nullptr) {
+            requestRefresh();
+        }
+    };
+
+    rowRemovable(t, row.name, remove, [this, &row](Amethyst::UIScope &cell) {
+        switch (row.type) {
+        case Rapture::ValueType::FLOAT:
+            fieldDragFloat(cell, &row.number, ATTRIBUTE_DRAG_SPEED, -ATTRIBUTE_LIMIT, ATTRIBUTE_LIMIT, "%.3f",
+                           [this, &row](double) { applyAttributeRow(row); });
+            break;
+        case Rapture::ValueType::INT:
+            fieldDragFloat(cell, &row.number, ATTRIBUTE_INT_DRAG_SPEED, -ATTRIBUTE_LIMIT, ATTRIBUTE_LIMIT, "%.0f",
+                           [this, &row](double) { applyAttributeRow(row); });
+            break;
+        case Rapture::ValueType::BOOL:
+            fieldCheckbox(cell, &row.flag, [this, &row](bool) { applyAttributeRow(row); });
+            break;
+        case Rapture::ValueType::VEC3:
+            fieldVec3(cell, row.vector, ATTRIBUTE_DRAG_SPEED, -ATTRIBUTE_LIMIT, ATTRIBUTE_LIMIT, [this, &row]() { applyAttributeRow(row); });
+            break;
+        case Rapture::ValueType::NONE:
+            break;
+        }
+    });
+}
+
+void AttributesEditor::applyAttributeRow(const AttributeRow &row)
+{
+    if (m_object == nullptr) {
+        return;
+    }
+
+    Rapture::Attributes &attributes = m_object->attributes();
+    switch (row.type) {
+    case Rapture::ValueType::FLOAT:
+        attributes.setFloat(row.name, static_cast<float>(row.number));
+        break;
+    case Rapture::ValueType::INT:
+        attributes.setInt(row.name, static_cast<int32_t>(std::lround(row.number)));
+        break;
+    case Rapture::ValueType::BOOL:
+        attributes.setBool(row.name, row.flag);
+        break;
+    case Rapture::ValueType::VEC3:
+        attributes.setVec3(row.name, glm::vec3(static_cast<float>(row.vector[0]), static_cast<float>(row.vector[1]),
+                                               static_cast<float>(row.vector[2])));
+        break;
+    case Rapture::ValueType::NONE:
+        break;
+    }
+}
+
+void AttributesEditor::readAttributeRow(AttributeRow &row) const
+{
+    if (m_object == nullptr) {
+        return;
+    }
+
+    const Rapture::Attributes &attributes = m_object->attributes();
+    switch (row.type) {
+    case Rapture::ValueType::FLOAT: {
+        const float value = attributes.getFloat(row.name);
+        if (static_cast<float>(row.number) != value) {
+            row.number = value;
+        }
+        break;
+    }
+    case Rapture::ValueType::INT: {
+        // a drag moves the buffer by fractions, so it is only overwritten once it no longer rounds to the stored value
+        const int32_t value = attributes.getInt(row.name);
+        if (std::lround(row.number) != value) {
+            row.number = value;
+        }
+        break;
+    }
+    case Rapture::ValueType::BOOL:
+        row.flag = attributes.getBool(row.name);
+        break;
+    case Rapture::ValueType::VEC3: {
+        const glm::vec3 value = attributes.getVec3(row.name);
+        row.vector[0] = value.x;
+        row.vector[1] = value.y;
+        row.vector[2] = value.z;
+        break;
+    }
+    case Rapture::ValueType::NONE:
+        break;
+    }
+}
+
+void AttributesEditor::addAttribute(std::string_view name, int typeIndex)
+{
+    if (m_object == nullptr || name.empty() || m_object->attributes().has(name)) {
+        return;
+    }
+
+    Rapture::Attributes &attributes = m_object->attributes();
+    switch (ATTRIBUTE_TYPES[typeIndex]) {
+    case Rapture::ValueType::FLOAT:
+        attributes.setFloat(name, 0.0f);
+        break;
+    case Rapture::ValueType::INT:
+        attributes.setInt(name, 0);
+        break;
+    case Rapture::ValueType::BOOL:
+        attributes.setBool(name, false);
+        break;
+    case Rapture::ValueType::VEC3:
+        attributes.setVec3(name, glm::vec3(0.0f));
+        break;
+    case Rapture::ValueType::NONE:
+        break;
+    }
+
+    if (requestRefresh != nullptr) {
+        requestRefresh();
+    }
+}
+
+void AttributesEditor::sync(const Rapture::ecs::EntityAccessor &entity)
+{
+    Rapture::SceneObject *object = s_instanceAs<Rapture::SceneObject>(m_scene, entity);
+    if (object == nullptr && m_object == nullptr) {
+        return;
+    }
+
+    bool sameRows = object == m_object;
+    if (sameRows) {
+        const std::vector<Rapture::NamedValues::Entry> &entries = object->attributes().values().entries();
+        sameRows = entries.size() == m_rows.size();
+        for (size_t i = 0; sameRows && i < entries.size(); ++i) {
+            sameRows = entries[i].name == m_rows[i].name && entries[i].type == m_rows[i].type;
+        }
+    }
+
+    if (!sameRows) {
+        if (requestRefresh != nullptr) {
+            requestRefresh();
+        }
+        return;
+    }
+
+    for (AttributeRow &row : m_rows) {
+        readAttributeRow(row);
+    }
 }
