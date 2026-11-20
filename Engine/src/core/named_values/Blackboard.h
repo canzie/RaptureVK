@@ -1,7 +1,7 @@
 #ifndef RAPTURE__BLACKBOARD_H
 #define RAPTURE__BLACKBOARD_H
 
-#include "core/named_values/NamedValues.h"
+#include <rapture/core/named_values/NamedValues.h>
 #include <rapture/core/serialization/SerialDocument.h>
 
 #include <cstdint>

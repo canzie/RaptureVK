@@ -1,7 +1,7 @@
 #ifndef RAPTURE__ATTRIBUTES_H
 #define RAPTURE__ATTRIBUTES_H
 
-#include "core/named_values/NamedValues.h"
+#include <rapture/core/named_values/NamedValues.h>
 #include <rapture/core/events/EventSignal.h>
 #include <rapture/core/serialization/SerialDocument.h>
 
