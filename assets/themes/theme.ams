@@ -357,6 +357,10 @@ text-area {
     border-color: @input-border-hover;
 }
 
+.search-field:focused {
+    border-color: @accent;
+}
+
 .search-field-icon {
     background-transparency: 1.0;
     image-color: @text-3;
@@ -458,6 +462,10 @@ text-area {
 
 .property-input-field:hover {
     border-color: @input-border-hover;
+}
+
+.property-input-field:focused {
+    border-color: @accent;
 }
 
 .property-dropdown {
@@ -663,6 +671,10 @@ text-area {
 .add-component-expand:hover {
     background-transparency: 0.0;
     image-color: @text-1;
+}
+
+.add-component-details-line {
+    background-color: @border-4;
 }
 
 .add-component-details {

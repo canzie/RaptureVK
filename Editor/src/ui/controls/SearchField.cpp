@@ -2,6 +2,7 @@
 
 #include "Icons.h"
 
+#include <components/common.h>
 #include <components/image_label.h>
 #include <components/input_events.h>
 #include <components/text_input.h>
@@ -41,6 +42,10 @@ SearchField::SearchField(std::string_view placeholder)
             .placeholder = std::string(placeholder),
         },
         [this](Amethyst::TextInputScope &ti) { m_input = &ti.component; });
+
+    // the field draws the border, so it shows the focus its input holds
+    m_input->onFocusGained = [this]() { setGuiState(static_cast<uint16_t>(getGuiState() | Amethyst::GUI_STATE_FOCUSED)); };
+    m_input->onFocusLost = [this]() { setGuiState(static_cast<uint16_t>(getGuiState() & ~Amethyst::GUI_STATE_FOCUSED)); };
 }
 
 void SearchField::setOnTextChanged(std::function<void(const std::string &)> callback)

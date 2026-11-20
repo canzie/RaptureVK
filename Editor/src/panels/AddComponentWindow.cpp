@@ -37,6 +37,7 @@ static constexpr float EXPAND_BUTTON_SIZE = 22.0f;
 static constexpr float EXPAND_ICON_SIZE = 11.0f;
 static constexpr float DETAILS_INDENT = 32.0f;
 static constexpr float DETAILS_PADDING = 8.0f;
+static constexpr float DETAILS_PADDING_TOP = 4.0f;
 static constexpr float DIVIDER_THICKNESS = 1.0f;
 
 static constexpr std::string_view WINDOW_CLASS = "add-component-window";
@@ -51,6 +52,7 @@ static constexpr std::string_view ROW_SUMMARY_CLASS = "add-component-row-summary
 static constexpr std::string_view ATTACHED_SUFFIX = "-attached";
 static constexpr std::string_view EXPAND_BUTTON_CLASS = "add-component-expand";
 static constexpr std::string_view DETAILS_CLASS = "add-component-details";
+static constexpr std::string_view DETAILS_LINE_CLASS = "add-component-details-line";
 
 static std::string s_toLowercase(std::string_view text)
 {
@@ -109,6 +111,7 @@ void AddComponentWindow::buildTitleBar(Amethyst::UIScope &window)
         {
             .base =
                 {
+                    .interactable = false,
                     .layoutOrder = 0,
                     .padding = Amethyst::UDim4{.right = Amethyst::UDim::fromOffset(BODY_PADDING),
                                                .left = Amethyst::UDim::fromOffset(TITLE_PADDING)},
@@ -253,7 +256,7 @@ void AddComponentWindow::buildRow(Amethyst::UIScope &rows, const Rapture::TypeIn
 
     const std::string name(description != nullptr ? description->name : type.name);
     const std::string summary(attached ? std::string_view("Already attached") : (description != nullptr ? description->summary : std::string_view{}));
-    const std::string_view details = description != nullptr ? description->details : std::string_view{};
+    const std::string_view detailsText = description != nullptr ? description->details : std::string_view{};
     const char *svg = description != nullptr ? description->svg : Icons::SVG_CUBE;
     const std::string_view className = type.name;
 
@@ -270,7 +273,6 @@ void AddComponentWindow::buildRow(Amethyst::UIScope &rows, const Rapture::TypeIn
             auto *stack = entry.component.addExtension<Amethyst::UIListLayout>();
             stack->fillDirection = Amethyst::FillDirection::FILL_VERTICAL;
 
-            Amethyst::TextLabel *detailsLabel = nullptr;
             IconButton *expandButton = nullptr;
 
             entry.textButton(
@@ -308,7 +310,7 @@ void AddComponentWindow::buildRow(Amethyst::UIScope &rows, const Rapture::TypeIn
                         [](Amethyst::TextLabelScope &label) { label.component.addExtension<Amethyst::UIFlexItem>(); });
                     s_ignoreChildInput(row.component);
 
-                    if (!details.empty()) {
+                    if (!detailsText.empty()) {
                         expandButton = row.component.add<IconButton>(Icons::SVG_CARET_RIGHT, EXPAND_ICON_SIZE,
                                                                      std::vector<std::string>{std::string(EXPAND_BUTTON_CLASS)});
                         expandButton->setBaseProperties({.layoutOrder = 3, .size = Amethyst::UDim2::fromOffset(EXPAND_BUTTON_SIZE, EXPAND_BUTTON_SIZE)});
@@ -319,30 +321,45 @@ void AddComponentWindow::buildRow(Amethyst::UIScope &rows, const Rapture::TypeIn
                     }
                 });
 
-            if (details.empty()) {
+            if (detailsText.empty()) {
                 return;
             }
 
-            entry.textLabel(
+            Amethyst::Frame *details = nullptr;
+            entry.frame(
                 {
-                    .classes = {std::string(DETAILS_CLASS)},
                     .base = {.automaticSize = Amethyst::AutomaticSize::Y,
                              .interactable = false,
                              .layoutOrder = 1,
-                             .padding = Amethyst::UDim4{.top = Amethyst::UDim::fromOffset(DETAILS_PADDING * 0.5f),
+                             .padding = Amethyst::UDim4{.top = Amethyst::UDim::fromOffset(DETAILS_PADDING_TOP),
                                                         .right = Amethyst::UDim::fromOffset(DETAILS_PADDING),
                                                         .bottom = Amethyst::UDim::fromOffset(DETAILS_PADDING),
-                                                        .left = Amethyst::UDim::fromOffset(DETAILS_INDENT)},
+                                                        .left = Amethyst::UDim::fromOffset(DETAILS_INDENT + DETAILS_PADDING)},
                              .size = Amethyst::UDim2::fromScale(1.0f, 0.0f),
                              .visible = false},
-                    .text = {.textWrapped = true},
-                    .label = std::string(details),
+                    .style = {.backgroundTransparency = 1.0f},
                 },
-                [&](Amethyst::TextLabelScope &label) { detailsLabel = &label.component; });
+                [&](Amethyst::FrameScope &block) {
+                    details = &block.component;
+                    block.frame({
+                        .classes = {std::string(DETAILS_LINE_CLASS)},
+                        .base = {.interactable = false,
+                                 .position = Amethyst::UDim2::fromOffset(-DETAILS_PADDING, -DETAILS_PADDING_TOP),
+                                 .size = Amethyst::UDim2(0.0f, DIVIDER_THICKNESS, 1.0f, DETAILS_PADDING_TOP + DETAILS_PADDING)},
+                    });
+                    block.textLabel({
+                        .classes = {std::string(DETAILS_CLASS)},
+                        .base = {.automaticSize = Amethyst::AutomaticSize::Y,
+                                 .interactable = false,
+                                 .size = Amethyst::UDim2::fromScale(1.0f, 0.0f)},
+                        .text = {.textWrapped = true},
+                        .label = std::string(detailsText),
+                    });
+                });
 
-            expandButton->track(expandButton->onMouseButton1ClickCb.connect([expandButton, detailsLabel]() {
-                const bool open = !static_cast<bool>(detailsLabel->getBaseProperties().visible);
-                detailsLabel->setBaseProperties({.visible = open});
+            expandButton->track(expandButton->onMouseButton1ClickCb.connect([expandButton, details]() {
+                const bool open = !static_cast<bool>(details->getBaseProperties().visible);
+                details->setBaseProperties({.visible = open});
                 expandButton->setIcon(open ? Icons::SVG_CHEVRON_DOWN : Icons::SVG_CARET_RIGHT);
             }));
         });
