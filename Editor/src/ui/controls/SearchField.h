@@ -32,6 +32,12 @@ class SearchField : public Amethyst::Frame {
     void setOnEnterPressed(std::function<void()> callback);
 
     /**
+     * @brief Sets what runs when Escape is pressed in the field
+     * @param callback Called on Escape
+     */
+    void setOnEscapePressed(std::function<void()> callback);
+
+    /**
      * @brief Empties the field
      */
     void clear(void);

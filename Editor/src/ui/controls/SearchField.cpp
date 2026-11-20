@@ -3,6 +3,7 @@
 #include "Icons.h"
 
 #include <components/image_label.h>
+#include <components/input_events.h>
 #include <components/text_input.h>
 #include <components/ui_scope.h>
 
@@ -50,6 +51,17 @@ void SearchField::setOnTextChanged(std::function<void(const std::string &)> call
 void SearchField::setOnEnterPressed(std::function<void()> callback)
 {
     m_input->onEnterPressed = std::move(callback);
+}
+
+void SearchField::setOnEscapePressed(std::function<void()> callback)
+{
+    m_input->interceptKey = [callback = std::move(callback)](const Amethyst::KeyEvent &event) {
+        if (event.action == Amethyst::KEY_ACTION_RELEASE || event.key != Amethyst::KEY_ESCAPE) {
+            return false;
+        }
+        callback();
+        return true;
+    };
 }
 
 void SearchField::clear()
