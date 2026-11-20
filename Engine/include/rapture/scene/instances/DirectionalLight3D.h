@@ -17,6 +17,12 @@ class DirectionalLight3D : public Light3D {
 
     void setCastsShadow(bool castsShadow) override;
 
+    /**
+     * @brief Sets how far from the viewer this light's shadows reach
+     * @param distance World units, used while the light casts shadows
+     */
+    void setShadowDistance(float distance);
+
     void serialize(WriteNode node) const override;
     void deserialize(ReadNode node) override;
 

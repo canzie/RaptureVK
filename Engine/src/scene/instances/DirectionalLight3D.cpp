@@ -70,6 +70,16 @@ void DirectionalLight3D::setCastsShadow(bool castsShadow)
     }
 }
 
+void DirectionalLight3D::setShadowDistance(float distance)
+{
+    if (!m_entity.has<CascadedShadowComponent>()) {
+        return;
+    }
+    auto shadow = m_entity.write<CascadedShadowComponent>();
+
+    shadow->shadowDistance = distance;
+}
+
 void DirectionalLight3D::serialize(WriteNode node) const
 {
     Light3D::serialize(node);
