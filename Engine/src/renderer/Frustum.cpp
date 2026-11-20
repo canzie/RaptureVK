@@ -8,6 +8,8 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <limits>
+
 namespace Rapture {
 
 Frustum::~Frustum()
@@ -78,7 +80,8 @@ void Frustum::update(const glm::mat4 &projection, const glm::mat4 &view)
 
     for (auto &plane : m_planes) {
         float length = sqrtf(plane.x * plane.x + plane.y * plane.y + plane.z * plane.z);
-        if (length > 0.0001f) {
+        // a far plane's normal is near / (far - near) long, so only a length of zero is degenerate
+        if (length > std::numeric_limits<float>::min()) {
             plane /= length;
         } else {
             RP_CORE_WARN("Plane normalization failed: near-zero length");
