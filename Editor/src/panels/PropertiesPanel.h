@@ -14,6 +14,9 @@
 #include <concepts>
 #include <optional>
 
+class IconLabelButton;
+class SearchField;
+
 class PropertiesPanel : public Panel {
   public:
     std::string_view typeName() const override { return "PropertiesPanel"; }
@@ -39,10 +42,10 @@ class PropertiesPanel : public Panel {
     template <std::derived_from<ComponentEditorBase> T>
     void ensure(bool present)
     {
-        if (T *editor = m_sections->ensure<T>(present)) {
-            editor->setSelection(m_selection);
-            editor->setSubject(m_scene, m_selectedEntity);
-        }
+        m_sections->ensurePrepared<T>(present, [this](T &editor) {
+            editor.setSelection(m_selection);
+            editor.setSubject(m_scene, m_selectedEntity);
+        });
     }
 
     void refresh(void);
@@ -52,7 +55,8 @@ class PropertiesPanel : public Panel {
 
   private:
     Amethyst::TextLabel *m_placeholderText = nullptr;
-    Amethyst::TextInput *m_searchInput = nullptr;
+    SearchField *m_searchField = nullptr;
+    IconLabelButton *m_addComponentButton = nullptr;
     std::optional<PropertySectionList> m_sections;
 
     Rapture::Scene *m_scene = nullptr;

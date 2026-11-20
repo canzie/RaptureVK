@@ -2,17 +2,27 @@
 #include "EntitySelection.h"
 #include "Icons.h"
 #include "inspector/ComponentEditors.h"
+#include "ui/controls/IconLabelButton.h"
+#include "ui/controls/SearchField.h"
 
 #include <rapture/scene/World.h>
 #include <rapture/scene/components/Components.h>
 #include <rapture/scene/instances/SceneObject.h>
 
 #include <components/common.h>
+#include <components/extensions/ui_flex_item.h>
+#include <components/extensions/ui_list_layout.h>
 #include <components/ui_scope.h>
 #include <modules/color.h>
 
+#include <string>
+#include <vector>
+
 static constexpr float SEARCH_BAR_HEIGHT = 26.0f;
 static constexpr float SEARCH_BAR_TOP_PAD = 8.0f;
+static constexpr float SEARCH_BAR_SIDE_PAD = 8.0f;
+static constexpr float SEARCH_BAR_GAP = 6.0f;
+static constexpr std::string_view ADD_COMPONENT_BUTTON_CLASS = "generic-text-button";
 static constexpr float CONTENT_OFFSET = SEARCH_BAR_TOP_PAD + SEARCH_BAR_HEIGHT + 8.0f;
 
 PropertiesPanel::PropertiesPanel(const WorkspaceContext &context) : Panel("Properties", context)
@@ -42,7 +52,8 @@ void PropertiesPanel::build(Amethyst::UIScope &scope)
 void PropertiesPanel::onRootDestroyed()
 {
     m_placeholderText = nullptr;
-    m_searchInput = nullptr;
+    m_searchField = nullptr;
+    m_addComponentButton = nullptr;
 }
 
 void PropertiesPanel::setupSearchBar(Amethyst::UIScope &scope)
@@ -51,89 +62,26 @@ void PropertiesPanel::setupSearchBar(Amethyst::UIScope &scope)
         {
             .base =
                 {
-                    .position = Amethyst::UDim2(0.02f, 0.0f, 0.0f, SEARCH_BAR_TOP_PAD),
-                    .size = Amethyst::UDim2(0.96f, 0.0f, 0.0f, SEARCH_BAR_HEIGHT),
+                    .position = Amethyst::UDim2::fromOffset(SEARCH_BAR_SIDE_PAD, SEARCH_BAR_TOP_PAD),
+                    .size = Amethyst::UDim2(1.0f, -2.0f * SEARCH_BAR_SIDE_PAD, 0.0f, SEARCH_BAR_HEIGHT),
                 },
             .style = {.backgroundTransparency = 1.0f},
         },
         [this](Amethyst::FrameScope &bar) {
-            bar.frame(
-                {
-                    .classes = {"property-input-field"},
-                    .base =
-                        {
-                            .position = Amethyst::UDim2::fromOffset(0.0f, 0.0f),
-                            .size = Amethyst::UDim2(0.82f, -3.0f, 1.0f, 0.0f),
-                        },
-                },
-                [this](Amethyst::FrameScope &sf) {
-                    sf.imageLabel({
-                        .base =
-                            {
-                                .anchorPoint = glm::vec2(0.0f, 0.5f),
-                                .position = Amethyst::UDim2(0.0f, 7.0f, 0.5f, 0.0f),
-                                .size = Amethyst::UDim2::fromOffset(14.0f, 14.0f),
-                            },
-                        .style = {.backgroundTransparency = 1.0f},
-                        .image = {.imageColor = Amethyst::Color4(0.5f, 0.5f, 0.5f, 1.0f)},
-                        .svg = Icons::SVG_SEARCH,
-                    });
-                    sf.textInput(
-                        {
-                            .base =
-                                {
-                                    .position = Amethyst::UDim2::fromOffset(26.0f, 0.0f),
-                                    .size = Amethyst::UDim2(1.0f, -28.0f, 1.0f, 0.0f),
-                                },
-                            .style = {.backgroundTransparency = 1.0f},
-                            .textInput = {.text =
-                                              {
-                                                  .textColor = Amethyst::Color4::fromHex(0xEEEEEE),
-                                                  .textYAlignment = Amethyst::TextYAlignment::CENTER,
-                                              },
-                                          .cursorColor = Amethyst::Color4(0.9f, 0.9f, 0.9f, 1.0f)},
-                            .placeholder = "Search Properties...",
-                        },
-                        [this](Amethyst::TextInputScope &ti) { m_searchInput = &ti.component; });
-                });
-            bar.imageButton(
-                {
-                    .base =
-                        {
-                            .position = Amethyst::UDim2(0.82f, 3.0f, 0.0f, 3.0f),
-                            .size = Amethyst::UDim2(0.09f, -2.0f, 1.0f, -6.0f),
-                        },
-                    .style = {.backgroundTransparency = 1.0f},
-                    .image = {.imageColor = Amethyst::Color4(0.6f, 0.6f, 0.6f, 1.0f)},
-                    .svg = Icons::SVG_FILTER,
-                },
-                [](Amethyst::ImageButtonScope &btn) {
-                    btn.component.addExtension<Amethyst::UIAspectRatioConstraint>()->dominantAxis = Amethyst::DominantAxis::HEIGHT;
-                    auto *b = &btn.component;
-                    b->track(b->onHoverChanged.connect([b](bool hovered) {
-                        b->setImageStyleProperties({.imageColor = hovered ? Amethyst::Color4{0.85f, 0.85f, 0.85f, 1.0f}
-                                                                          : Amethyst::Color4{0.6f, 0.6f, 0.6f, 1.0f}});
-                    }));
-                });
-            bar.imageButton(
-                {
-                    .base =
-                        {
-                            .position = Amethyst::UDim2(0.91f, 1.0f, 0.0f, 3.0f),
-                            .size = Amethyst::UDim2(0.09f, 0.0f, 1.0f, -6.0f),
-                        },
-                    .style = {.backgroundTransparency = 1.0f},
-                    .image = {.imageColor = Amethyst::Color4(0.6f, 0.6f, 0.6f, 1.0f)},
-                    .svg = Icons::SVG_MORE,
-                },
-                [](Amethyst::ImageButtonScope &btn) {
-                    btn.component.addExtension<Amethyst::UIAspectRatioConstraint>()->dominantAxis = Amethyst::DominantAxis::HEIGHT;
-                    auto *b = &btn.component;
-                    b->track(b->onHoverChanged.connect([b](bool hovered) {
-                        b->setImageStyleProperties({.imageColor = hovered ? Amethyst::Color4{0.85f, 0.85f, 0.85f, 1.0f}
-                                                                          : Amethyst::Color4{0.6f, 0.6f, 0.6f, 1.0f}});
-                    }));
-                });
+            auto *row = bar.component.addExtension<Amethyst::UIListLayout>();
+            row->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
+            row->horizontalFlex = Amethyst::UiFlexAlignment::FILL;
+            row->verticalAlignment = Amethyst::VerticalAlignment::ALIGN_CENTER_V;
+            row->innerPadding = Amethyst::UDim::fromOffset(SEARCH_BAR_GAP);
+
+            m_searchField = bar.component.add<SearchField>("Search properties");
+            m_searchField->setBaseProperties({.layoutOrder = 0, .size = Amethyst::UDim2::fromScale(0.0f, 1.0f)});
+            m_searchField->addExtension<Amethyst::UIFlexItem>();
+
+            m_addComponentButton = bar.component.add<IconLabelButton>(Icons::SVG_PLUS, "Add Component",
+                                                                      std::vector<std::string>{std::string(ADD_COMPONENT_BUTTON_CLASS)});
+            m_addComponentButton->setBaseProperties({.layoutOrder = 1, .size = Amethyst::UDim2::fromScale(0.0f, 1.0f)});
+            // TODO: open the list of scene components the selected object can take on
         });
 }
 
