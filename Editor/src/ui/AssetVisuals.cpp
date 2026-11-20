@@ -37,6 +37,27 @@ static const AuthoredIcon AUTHORED_ICONS[] = {
     {&Rapture::Node3D::staticType(), Icons::SVG_TRANSFORM},
 };
 
+static constexpr SceneComponentDescription SCENE_COMPONENT_DESCRIPTIONS[] = {
+    {"RigidBody3D", "Rigid Body", Icons::SVG_CUBE, "Moved by physics, pushed by forces and collisions",
+     "The object is simulated: gravity, forces and collisions move it, and the simulation writes its transform back."},
+    {"CharacterBody3D", "Character Body", Icons::SVG_CONTROLLER, "Walks, jumps and collides, moved by a controller",
+     "The object walks, jumps and collides under a controller instead of being pushed around by the simulation."},
+    {"ScriptComponent", "Script", Icons::SVG_SCRIPT, "Runs a Lua script with this object as its owner",
+     "Runs a Lua script with this object as its owner, connected to its events while the world plays."},
+    {"VisibilityComponent", "Visibility", Icons::SVG_EYE, "Where this object is shown",
+     "Where this object is shown, such as whether the outliner lists it."},
+};
+
+const SceneComponentDescription *SceneComponent_describeClass(std::string_view className)
+{
+    for (const SceneComponentDescription &description : SCENE_COMPONENT_DESCRIPTIONS) {
+        if (description.className == className) {
+            return &description;
+        }
+    }
+    return nullptr;
+}
+
 Amethyst::Color3 Asset_colorForType(Rapture::AssetType type)
 {
     switch (type) {

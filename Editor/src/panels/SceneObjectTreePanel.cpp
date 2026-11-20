@@ -17,7 +17,6 @@
 #include <components/ui_scope.h>
 
 #include <algorithm>
-#include <array>
 #include <cctype>
 #include <memory>
 #include <string>
@@ -49,28 +48,6 @@ static bool s_subtreeMatchesFilter(const Rapture::SceneObject *object, std::stri
         }
     }
     return false;
-}
-
-struct SceneComponentIcon {
-    std::string_view className;
-    const char *svg;
-};
-
-static constexpr std::array<SceneComponentIcon, 4> SCENE_COMPONENT_ICONS = {{
-    {"RigidBody3D", Icons::SVG_CUBE},
-    {"CharacterBody3D", Icons::SVG_CONTROLLER},
-    {"ScriptComponent", Icons::SVG_SCRIPT},
-    {"VisibilityComponent", Icons::SVG_EYE},
-}};
-
-static const char *s_iconForSceneComponent(const Rapture::SceneComponent &component)
-{
-    for (const SceneComponentIcon &entry : SCENE_COMPONENT_ICONS) {
-        if (component.type().name == entry.className) {
-            return entry.svg;
-        }
-    }
-    return nullptr;
 }
 
 static constexpr float SEARCH_FIELD_MARGIN = 8.0f;
@@ -314,8 +291,8 @@ void SceneObjectTreePanel::buildNameCell(Amethyst::UIScope &cell, const Rapture:
 
                     uint32_t componentOrder = 0;
                     for (const auto &component : instance->components()) {
-                        const char *svg = s_iconForSceneComponent(*component);
-                        if (svg == nullptr) {
+                        const SceneComponentDescription *description = SceneComponent_describeClass(component->type().name);
+                        if (description == nullptr) {
                             continue;
                         }
                         components.imageLabel({
@@ -323,7 +300,7 @@ void SceneObjectTreePanel::buildNameCell(Amethyst::UIScope &cell, const Rapture:
                             .base = {.interactable = false,
                                      .layoutOrder = componentOrder++,
                                      .size = Amethyst::UDim2::fromOffset(COMPONENT_ICON_SIZE, COMPONENT_ICON_SIZE)},
-                            .svg = svg,
+                            .svg = description->svg,
                         });
                     }
                 });
