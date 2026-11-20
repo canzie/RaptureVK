@@ -161,14 +161,14 @@ void MeshTransformAssetEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
             t, "Scale", &m_bakeTransform.scale, MESH_BAKE_SCALE_MIN, MESH_BAKE_SCALE_MAX,
             [this](float scale) {
                 (void)scale;
-                if (m_bakeTransform.onChanged) {
+                if (m_bakeTransform.onChanged != nullptr) {
                     m_bakeTransform.onChanged();
                 }
             },
             "%.3f");
         rowDropdown(t, "Up axis", MESH_UP_AXIS_LABELS[m_bakeTransform.upAxis], upAxisOptions, [this](int axis) {
             m_bakeTransform.upAxis = static_cast<MeshUpAxis>(axis);
-            if (m_bakeTransform.onChanged) {
+            if (m_bakeTransform.onChanged != nullptr) {
                 m_bakeTransform.onChanged();
             }
         });
