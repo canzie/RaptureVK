@@ -19,6 +19,7 @@
 #include <string_view>
 #include <typeindex>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 /**
@@ -203,8 +204,8 @@ class PropertySection {
     Amethyst::CollapsibleHeader *header = nullptr;
 
     /**
-     * @brief Asks the list to work out which sections the subject has again, for a control that
-     * adds or removes a facet rather than editing one.
+     * @brief Asks the list to work out which sections the subject has again and to build this section's
+     * body anew, for a control that adds or removes a facet or a body whose rows follow the subject.
      */
     std::function<void()> requestRefresh;
 
@@ -253,6 +254,21 @@ class PropertySectionList {
     template <std::derived_from<PropertySection> T, typename... Args>
     T *ensure(bool present, Args &&...args)
     {
+        return ensurePrepared<T>(present, [](T &) {}, std::forward<Args>(args)...);
+    }
+
+    /**
+     * @brief Does what ensure does, running prepare on the section before its body is first built and on
+     * every later ensure, so a body built against the subject sees the subject it is for.
+     * @tparam T A PropertySection-derived type.
+     * @param present Whether the subject has the facet this section edits.
+     * @param prepare Called with the live section, before any body of it is built.
+     * @param args Passed to the section's constructor when it is created.
+     * @return The live section, or nullptr when present is false.
+     */
+    template <std::derived_from<PropertySection> T, typename Prepare, typename... Args>
+    T *ensurePrepared(bool present, Prepare &&prepare, Args &&...args)
+    {
         std::type_index key(typeid(T));
         auto it = m_sections.find(key);
 
@@ -266,8 +282,11 @@ class PropertySectionList {
 
         if (it == m_sections.end()) {
             auto section = std::make_unique<T>(std::forward<Args>(args)...);
+            prepare(*section);
             buildSection(*section);
             it = m_sections.emplace(key, std::move(section)).first;
+        } else {
+            prepare(static_cast<T &>(*it->second));
         }
         m_active.push_back(it->second.get());
         return static_cast<T *>(it->second.get());
@@ -300,11 +319,17 @@ class PropertySectionList {
     void buildSection(PropertySection &section);
     void destroySection(PropertySection &section);
 
+    /**
+     * @brief Builds every live section that asked for it anew, against the subject it now holds
+     */
+    void rebuildRequestedSections();
+
   private:
     Amethyst::ScrollingFrame *m_view = nullptr;
     Amethyst::EventConnection m_viewDestroyConn;
     std::unordered_map<std::type_index, std::unique_ptr<PropertySection>> m_sections;
     std::vector<PropertySection *> m_active;
+    std::unordered_set<PropertySection *> m_rebuildRequested;
     bool m_refreshRequested = false;
 };
 

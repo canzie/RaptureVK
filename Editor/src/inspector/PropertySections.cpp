@@ -371,6 +371,7 @@ void PropertySectionList::refresh(const std::function<void()> &fn)
     if (fn) {
         fn();
     }
+    rebuildRequestedSections();
     relayout();
 }
 
@@ -387,7 +388,10 @@ void PropertySectionList::buildSection(PropertySection &section)
         return;
     }
 
-    section.requestRefresh = [this]() { m_refreshRequested = true; };
+    section.requestRefresh = [this, &section]() {
+        m_refreshRequested = true;
+        m_rebuildRequested.insert(&section);
+    };
     section.requestRelayout = [this]() { relayout(); };
 
     Amethyst::UIScope(*m_view).collapsibleHeader(
@@ -421,6 +425,23 @@ void PropertySectionList::destroySection(PropertySection &section)
         m_view->removeChild(section.header);
     }
     std::erase(m_active, &section);
+    m_rebuildRequested.erase(&section);
+}
+
+void PropertySectionList::rebuildRequestedSections()
+{
+    for (PropertySection *section : m_active) {
+        if (!m_rebuildRequested.contains(section)) {
+            continue;
+        }
+
+        if (m_view != nullptr && section->header != nullptr) {
+            m_view->removeChild(section->header);
+            section->header = nullptr;
+        }
+        buildSection(*section);
+    }
+    m_rebuildRequested.clear();
 }
 
 void PropertySectionList::relayout()
