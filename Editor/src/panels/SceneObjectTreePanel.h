@@ -11,6 +11,7 @@
 #include <rapture/core/events/EventSignal.h>
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace Rapture {
@@ -46,16 +47,17 @@ class SceneObjectTreePanel : public Panel {
     void onRootDestroyed() override;
 
   private:
-    void setupHeader(Amethyst::UIScope &scope);
+    void setupSearchField(Amethyst::UIScope &scope);
     void setupTree(Amethyst::UIScope &scope);
 
     void buildSubtree(Rapture::SceneObject *instance, Amethyst::TreeRowScope &rowScope);
 
     /**
-     * @brief The scene object an added object is parented to, which is the selected one or the root
+     * @brief Fills a row's name cell: the class icon, the name, the root chip and the icons of the attached components
+     * @param cell Scope of the cell
+     * @param instance The scene object the row stands for
      */
-    Rapture::SceneObject *addTarget(void) const;
-    void showAddMenu(Amethyst::vec2 pos);
+    void buildNameCell(Amethyst::UIScope &cell, const Rapture::SceneObject *instance) const;
 
     void onRowClicked(uint32_t row);
     void onRowRightClicked(uint32_t row, Amethyst::vec2 pos);
@@ -81,6 +83,8 @@ class SceneObjectTreePanel : public Panel {
      * @brief Maps a TreeView logical row index to its scene object, filled in DFS build order during refresh().
      */
     std::vector<Rapture::SceneObject *> m_rowObjects;
+
+    std::string m_loweredFilter;
 
     Rapture::SceneObject *m_pendingDeleteObject = nullptr;
 

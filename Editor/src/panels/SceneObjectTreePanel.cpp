@@ -3,6 +3,8 @@
 #include "EntitySelection.h"
 #include "Icons.h"
 #include "panels/AddSceneObjectMenu.h"
+#include "ui/AssetVisuals.h"
+#include "ui/controls/SearchField.h"
 #include "ui/menus/ContextMenuItems.h"
 #include <rapture/scene/Scene.h>
 #include <rapture/scene/instances/SceneObject.h>
@@ -10,9 +12,13 @@
 
 #include <components/common.h>
 #include <components/context_menu_item.h>
+#include <components/extensions/ui_list_layout.h>
 #include <components/text_label.h>
 #include <components/ui_scope.h>
 
+#include <algorithm>
+#include <array>
+#include <cctype>
 #include <memory>
 #include <string>
 #include <unordered_set>
@@ -25,20 +31,80 @@ static bool s_showsInOutliner(const Rapture::SceneObject *object)
     return visibility == nullptr || visibility->inOutliner;
 }
 
-static constexpr float HEADER_HEIGHT = 26.0f;
-static constexpr float HEADER_PAD = 6.0f;
-static constexpr float CONTENT_OFFSET = HEADER_HEIGHT + (HEADER_PAD * 2.0f);
-static constexpr float ADD_BUTTON_WIDTH = 64.0f;
+static std::string s_toLowercase(std::string_view text)
+{
+    std::string lowered(text);
+    std::ranges::transform(lowered, lowered.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return lowered;
+}
+
+static bool s_subtreeMatchesFilter(const Rapture::SceneObject *object, std::string_view loweredFilter)
+{
+    if (loweredFilter.empty() || s_toLowercase(object->name()).find(loweredFilter) != std::string::npos) {
+        return true;
+    }
+    for (const auto &child : object->children()) {
+        if (s_showsInOutliner(child.get()) && s_subtreeMatchesFilter(child.get(), loweredFilter)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+struct SceneComponentIcon {
+    std::string_view className;
+    const char *svg;
+};
+
+static constexpr std::array<SceneComponentIcon, 4> SCENE_COMPONENT_ICONS = {{
+    {"RigidBody3D", Icons::SVG_CUBE},
+    {"CharacterBody3D", Icons::SVG_CONTROLLER},
+    {"ScriptComponent", Icons::SVG_SCRIPT},
+    {"VisibilityComponent", Icons::SVG_EYE},
+}};
+
+static const char *s_iconForSceneComponent(const Rapture::SceneComponent &component)
+{
+    for (const SceneComponentIcon &entry : SCENE_COMPONENT_ICONS) {
+        if (component.type().name == entry.className) {
+            return entry.svg;
+        }
+    }
+    return nullptr;
+}
+
+static constexpr float SEARCH_FIELD_MARGIN = 8.0f;
+static constexpr float SEARCH_FIELD_HEIGHT = 26.0f;
+static constexpr float SEARCH_TREE_GAP = 6.0f;
+static constexpr float TREE_TOP = SEARCH_FIELD_MARGIN + SEARCH_FIELD_HEIGHT + SEARCH_TREE_GAP;
+
+static constexpr float DISCLOSURE_TRIANGLE_SIZE = 24.0f;
+static constexpr float DISCLOSURE_TRIANGLE_PADDING = 4.0f;
+static constexpr float ROW_ICON_SIZE = 13.0f;
+static constexpr float ROW_ICON_PAD = 2.0f;
+static constexpr float ROW_ITEM_GAP = 5.0f;
+static constexpr float COMPONENT_ICON_SIZE = 12.0f;
+static constexpr float COMPONENTS_GAP = 4.0f;
+static constexpr float ROOT_CHIP_HEIGHT = 16.0f;
+static constexpr float ROOT_CHIP_PADDING = 6.0f;
+static constexpr float LABEL_TEXT_LEFT = 2.0f;
+static constexpr float NAME_TEXT_LEFT =
+    DISCLOSURE_TRIANGLE_SIZE + DISCLOSURE_TRIANGLE_PADDING * 2.0f + ROW_ICON_PAD + ROW_ICON_SIZE + ROW_ITEM_GAP;
+
+static constexpr std::string_view PRIMARY_COLUMN_CLASS = "treeview-primary-column";
+static constexpr std::string_view SECONDARY_COLUMN_CLASS = "treeview-secondary-column";
+static constexpr std::string_view ROOT_CHIP_CLASS = "scene-object-root-chip";
+static constexpr std::string_view COMPONENT_ICON_CLASS = "scene-object-component-icon";
 
 SceneObjectTreePanel::SceneObjectTreePanel(const WorkspaceContext &context, Rapture::SceneObject *root)
     : Panel("Scene Objects", context), m_scene(context.scene), m_rootObject(root)
 {
-    m_icon = Icons::SVG_SCENE;
+    m_icon = Icons::SVG_LAYERS;
 }
 
 void SceneObjectTreePanel::build(Amethyst::UIScope &scope)
 {
-    setupHeader(scope);
+    setupSearchField(scope);
     setupTree(scope);
 
     m_contextMenu = m_root->add<Amethyst::ContextMenu>();
@@ -64,61 +130,39 @@ void SceneObjectTreePanel::onRootDestroyed()
     m_contextMenu = nullptr;
 }
 
-void SceneObjectTreePanel::setupHeader(Amethyst::UIScope &scope)
+void SceneObjectTreePanel::setupSearchField(Amethyst::UIScope &scope)
 {
-    scope.frame(
-        {
-            .base =
-                {
-                    .position = Amethyst::UDim2::fromOffset(HEADER_PAD, HEADER_PAD),
-                    .size = Amethyst::UDim2(1.0f, -HEADER_PAD * 2.0f, 0.0f, HEADER_HEIGHT),
-                },
-            .style = {.backgroundTransparency = 1.0f},
-        },
-        [this](Amethyst::FrameScope &header) {
-            header.textButton({.classes = {"generic-text-button"},
-                               .base = {.size = Amethyst::UDim2(0.0f, ADD_BUTTON_WIDTH, 1.0f, 0.0f)},
-                               .label = "Add"},
-                              [this](Amethyst::TextButtonScope &b) {
-                                  b.component.track(b.component.onMouseButton1ClickCb.connect([this, button = &b.component]() {
-                                      showAddMenu(
-                                          {button->absolutePosition.x, button->absolutePosition.y + button->absoluteSize.y});
-                                  }));
-                              });
-        });
+    SearchField *searchField = scope.get().add<SearchField>("Search");
+    searchField->setBaseProperties({
+        .position = Amethyst::UDim2::fromOffset(SEARCH_FIELD_MARGIN, SEARCH_FIELD_MARGIN),
+        .size = Amethyst::UDim2(1.0f, -2.0f * SEARCH_FIELD_MARGIN, 0.0f, SEARCH_FIELD_HEIGHT),
+    });
+    searchField->setOnTextChanged([this](const std::string &text) {
+        m_loweredFilter = s_toLowercase(text);
+        m_pendingRefresh = true;
+    });
 }
 
 void SceneObjectTreePanel::setupTree(Amethyst::UIScope &scope)
 {
-    scope.scrollingFrame(
+    scope.treeView(
         {
-            .classes = {"panel"},
             .base =
                 {
-                    .clipsDescendants = true,
-                    .position = Amethyst::UDim2::fromOffset(0.0f, CONTENT_OFFSET),
-                    .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -CONTENT_OFFSET),
+                    .position = Amethyst::UDim2::fromOffset(0.0f, TREE_TOP),
+                    .size = Amethyst::UDim2(1.0f, 0.0f, 1.0f, -TREE_TOP),
                 },
-            .scroll =
-                {
-                    .scrollAxis = Amethyst::ScrollAxis::Y,
-                    .scrollBarVisibility = Amethyst::ScrollBarVisibility::AUTO,
-                    .automaticCanvasSize = Amethyst::AutomaticSize::Y,
-                },
+            .treeView = {.cellPadding = Amethyst::UDim4{{0.0f, 0.0f}},
+                         .showColumnSeparators = false,
+                         .disclosureTriangleSize = DISCLOSURE_TRIANGLE_SIZE,
+                         .disclosureTrianglePadding = DISCLOSURE_TRIANGLE_PADDING,
+                         .fillRows = true,
+                         .showHeader = true},
         },
-        [this](Amethyst::ScrollingFrameScope &sf) {
-            sf.treeView(
-                {
-                    .base = {.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
-                    .treeView = {.cellPadding = Amethyst::UDim4{{0.0f, 0.0f}},
-                                 .showColumnSeparators = false,
-                                 .disclosureTriangleSize = 24.0f,
-                                 .showHeader = false},
-                },
-                [this](Amethyst::TreeViewScope &tv) {
-                    m_treeView = &tv.component;
-                    tv.column({.header = "Name", .weight = 1.0f, .labelPadding = Amethyst::UDim4{.left = {0.0f, 0.0f}}});
-                });
+        [this](Amethyst::TreeViewScope &tv) {
+            m_treeView = &tv.component;
+            tv.column({.header = "Name", .weight = 3.0f, .labelPadding = Amethyst::UDim4{.left = {0.0f, NAME_TEXT_LEFT}}});
+            tv.column({.header = "Type", .weight = 1.0f, .labelPadding = Amethyst::UDim4{.left = {0.0f, LABEL_TEXT_LEFT}}});
         });
 
     m_treeView->onRowClicked = [this](uint32_t row) { onRowClicked(row); };
@@ -179,27 +223,111 @@ void SceneObjectTreePanel::buildSubtree(Rapture::SceneObject *instance, Amethyst
 
     m_rowObjects.push_back(instance);
 
-    std::string name(instance->name());
-    rowScope.cell([name](Amethyst::UIScope &s) {
-        s.textLabel(
+    rowScope.cell([this, instance](Amethyst::UIScope &cell) { buildNameCell(cell, instance); });
+
+    std::string typeName(instance->type().name);
+    rowScope.cell([typeName](Amethyst::UIScope &cell) {
+        cell.textLabel(
             {
-                .classes = {"treeview-primary-column"},
-                .base = {.padding = Amethyst::UDim4{.left = Amethyst::UDim::fromOffset(2.0f)},
+                .classes = {std::string(SECONDARY_COLUMN_CLASS)},
+                .base = {.padding = Amethyst::UDim4{.left = Amethyst::UDim::fromOffset(LABEL_TEXT_LEFT)},
                          .size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
                 .style = {.backgroundTransparency = 1.0f},
                 .text = {.textYAlignment = Amethyst::TextYAlignment::CENTER},
-                .label = name,
+                .label = typeName,
             },
             [](Amethyst::TextLabelScope &l) { l.component.propagate(Amethyst::INTERACTION_CATEGORY_ALL); });
     });
 
     for (const auto &child : instance->children()) {
         Rapture::SceneObject *childObject = child.get();
-        if (!s_showsInOutliner(childObject)) {
+        if (!s_showsInOutliner(childObject) || !s_subtreeMatchesFilter(childObject, m_loweredFilter)) {
             continue;
         }
         rowScope.row([this, childObject](Amethyst::TreeRowScope &childRow) { buildSubtree(childObject, childRow); });
     }
+}
+
+void SceneObjectTreePanel::buildNameCell(Amethyst::UIScope &cell, const Rapture::SceneObject *instance) const
+{
+    const SceneObjectIcon icon = SceneObject_iconForClass(&instance->type());
+    const bool isRoot = instance == m_rootObject;
+
+    cell.frame(
+        {
+            .base = {.padding = Amethyst::UDim4{.left = Amethyst::UDim::fromOffset(ROW_ICON_PAD)},
+                     .size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
+            .style = {.backgroundTransparency = 1.0f},
+        },
+        [&](Amethyst::FrameScope &row) {
+            row.component.propagate(Amethyst::INTERACTION_CATEGORY_ALL);
+            auto *layout = row.component.addExtension<Amethyst::UIListLayout>();
+            layout->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
+            layout->verticalAlignment = Amethyst::VerticalAlignment::ALIGN_CENTER_V;
+            layout->innerPadding = Amethyst::UDim::fromOffset(ROW_ITEM_GAP);
+
+            uint32_t order = 0;
+            row.imageLabel({
+                .classes = {std::string(icon.styleClass)},
+                .base = {.interactable = false, .layoutOrder = order++, .size = Amethyst::UDim2::fromOffset(ROW_ICON_SIZE, ROW_ICON_SIZE)},
+                .style = {.backgroundTransparency = 1.0f},
+                .svg = icon.svg,
+            });
+
+            row.textLabel(
+                {
+                    .classes = {std::string(PRIMARY_COLUMN_CLASS)},
+                    .base = {.automaticSize = Amethyst::AutomaticSize::X, .layoutOrder = order++, .size = Amethyst::UDim2::fromScale(0.0f, 1.0f)},
+                    .style = {.backgroundTransparency = 1.0f},
+                    .text = {.textYAlignment = Amethyst::TextYAlignment::CENTER},
+                    .label = std::string(instance->name()),
+                },
+                [](Amethyst::TextLabelScope &l) { l.component.propagate(Amethyst::INTERACTION_CATEGORY_ALL); });
+
+            if (isRoot) {
+                row.textLabel(
+                    {
+                        .classes = {std::string(ROOT_CHIP_CLASS)},
+                        .base = {.automaticSize = Amethyst::AutomaticSize::X,
+                                 .layoutOrder = order++,
+                                 .padding = Amethyst::UDim4{.right = Amethyst::UDim::fromOffset(ROOT_CHIP_PADDING),
+                                                            .left = Amethyst::UDim::fromOffset(ROOT_CHIP_PADDING)},
+                                 .size = Amethyst::UDim2::fromOffset(0.0f, ROOT_CHIP_HEIGHT)},
+                        .style = {.backgroundColor = Asset_colorForType(Rapture::ASSET_MODULE)},
+                        .label = "Root",
+                    },
+                    [](Amethyst::TextLabelScope &l) { l.component.propagate(Amethyst::INTERACTION_CATEGORY_ALL); });
+            }
+
+            row.frame(
+                {
+                    .base = {.automaticSize = Amethyst::AutomaticSize::X,
+                             .interactable = false,
+                             .layoutOrder = order++,
+                             .size = Amethyst::UDim2::fromOffset(0.0f, COMPONENT_ICON_SIZE)},
+                    .style = {.backgroundTransparency = 1.0f},
+                },
+                [&](Amethyst::FrameScope &components) {
+                    auto *iconRow = components.component.addExtension<Amethyst::UIListLayout>();
+                    iconRow->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
+                    iconRow->innerPadding = Amethyst::UDim::fromOffset(COMPONENTS_GAP);
+
+                    uint32_t componentOrder = 0;
+                    for (const auto &component : instance->components()) {
+                        const char *svg = s_iconForSceneComponent(*component);
+                        if (svg == nullptr) {
+                            continue;
+                        }
+                        components.imageLabel({
+                            .classes = {std::string(COMPONENT_ICON_CLASS)},
+                            .base = {.interactable = false,
+                                     .layoutOrder = componentOrder++,
+                                     .size = Amethyst::UDim2::fromOffset(COMPONENT_ICON_SIZE, COMPONENT_ICON_SIZE)},
+                            .svg = svg,
+                        });
+                    }
+                });
+        });
 }
 
 Rapture::SceneObject *SceneObjectTreePanel::instanceForRow(uint32_t row) const
@@ -208,26 +336,6 @@ Rapture::SceneObject *SceneObjectTreePanel::instanceForRow(uint32_t row) const
         return nullptr;
     }
     return m_rowObjects[row];
-}
-
-Rapture::SceneObject *SceneObjectTreePanel::addTarget() const
-{
-    if (m_treeView != nullptr && m_treeView->selectedRow != Amethyst::TreeView::NO_ROW_SELECTION) {
-        if (Rapture::SceneObject *selected = instanceForRow(static_cast<uint32_t>(m_treeView->selectedRow))) {
-            return selected;
-        }
-    }
-    return m_rootObject;
-}
-
-void SceneObjectTreePanel::showAddMenu(Amethyst::vec2 pos)
-{
-    if (m_contextMenu == nullptr || m_selection == nullptr) {
-        return;
-    }
-
-    m_contextMenu->setItems(AddSceneObjectMenu_buildItems(addTarget(), *m_selection, SCENE_OBJECT_SCOPE_ASSET));
-    m_contextMenu->showAt(pos);
 }
 
 void SceneObjectTreePanel::onRowClicked(uint32_t row)

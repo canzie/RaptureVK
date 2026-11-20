@@ -553,6 +553,19 @@ text-area {
     image-color: @type-folder;
 }
 
+.scene-object-root-chip {
+    background-transparency: 0.65;
+    corner-radius: 3px;
+    font-size: 10px;
+    text-color: @text-1;
+    text-y-alignment: center;
+}
+
+.scene-object-component-icon {
+    background-transparency: 1.0;
+    image-color: @text-3;
+}
+
 // the material graph: its canvas, nodes, wires and the overlays floating over it
 .graph-canvas {
     background-color: @bg-canvas;
