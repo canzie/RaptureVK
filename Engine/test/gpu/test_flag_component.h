@@ -1,5 +1,5 @@
-#ifndef RAPTURE__SERIALIZED_FLAG_COMPONENT_H
-#define RAPTURE__SERIALIZED_FLAG_COMPONENT_H
+#ifndef RAPTURE__TEST_FLAG_COMPONENT_H
+#define RAPTURE__TEST_FLAG_COMPONENT_H
 
 #include <rapture/core/serialization/SerialDocument.h>
 #include <rapture/core/utils/TypeInfo.h>
@@ -9,15 +9,15 @@
 #include <string_view>
 
 /**
- * @brief A scene component holding one flag it writes and reads back
+ * @brief A scene component for tests, holding one flag it writes and reads back
  */
-class SerializedFlagComponent : public Rapture::SceneComponent {
+class TestFlagComponent : public Rapture::SceneComponent {
   public:
-    SerializedFlagComponent(Rapture::Scene &scene, std::string_view name) : SceneComponent(scene, name) {}
+    TestFlagComponent(Rapture::Scene &scene, std::string_view name) : SceneComponent(scene, name) {}
 
     static const Rapture::TypeInfo &staticType()
     {
-        static const Rapture::TypeInfo type("SerializedFlagComponent", &Rapture::SceneComponent::staticType());
+        static const Rapture::TypeInfo type("TestFlagComponent", &Rapture::SceneComponent::staticType());
         return type;
     }
 
@@ -41,7 +41,7 @@ class SerializedFlagComponent : public Rapture::SceneComponent {
     static void registerClass()
     {
         if (!Rapture::InstanceRegistry::containsComponent(staticType().name)) {
-            Rapture::InstanceRegistry::addComponent<SerializedFlagComponent>();
+            Rapture::InstanceRegistry::addComponent<TestFlagComponent>();
         }
     }
 
@@ -52,4 +52,4 @@ class SerializedFlagComponent : public Rapture::SceneComponent {
     static constexpr std::string_view KEY_FLAG = "flag";
 };
 
-#endif // RAPTURE__SERIALIZED_FLAG_COMPONENT_H
+#endif // RAPTURE__TEST_FLAG_COMPONENT_H

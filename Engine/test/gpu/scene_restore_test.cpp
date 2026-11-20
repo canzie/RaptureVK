@@ -1,4 +1,4 @@
-#include "serialized_flag_component.h"
+#include "test_flag_component.h"
 #include "windowless_application_environment.h"
 
 #include <rapture/core/serialization/SerialDocument.h>
@@ -10,7 +10,7 @@ class SceneRestore : public WindowlessGpuTest {
     void SetUp() override
     {
         WindowlessGpuTest::SetUp();
-        SerializedFlagComponent::registerClass();
+        TestFlagComponent::registerClass();
     }
 };
 
@@ -20,7 +20,7 @@ TEST_F(SceneRestore, DropsComponentsAddedAfterTheSnapshot)
     auto *node = scene.root()->add<Rapture::Node3D>("Node");
 
     Rapture::SerialDocument snapshot = scene.snapshot();
-    node->addComponent<SerializedFlagComponent>();
+    node->addComponent<TestFlagComponent>();
 
     ASSERT_TRUE(scene.restoreFrom(snapshot.rootView()));
 
@@ -31,14 +31,14 @@ TEST_F(SceneRestore, BringsBackRemovedComponentsWithTheirFields)
 {
     Rapture::Scene scene("SceneRestore");
     auto *node = scene.root()->add<Rapture::Node3D>("Node");
-    node->addComponent<SerializedFlagComponent>()->flag = false;
+    node->addComponent<TestFlagComponent>()->flag = false;
 
     Rapture::SerialDocument snapshot = scene.snapshot();
-    node->removeComponent<SerializedFlagComponent>();
+    node->removeComponent<TestFlagComponent>();
 
     ASSERT_TRUE(scene.restoreFrom(snapshot.rootView()));
 
-    auto *restored = node->component<SerializedFlagComponent>();
+    auto *restored = node->component<TestFlagComponent>();
     ASSERT_NE(restored, nullptr);
     EXPECT_FALSE(restored->flag);
     EXPECT_EQ(node->components().size(), 1u);
@@ -48,14 +48,14 @@ TEST_F(SceneRestore, RevertsChangedComponentFields)
 {
     Rapture::Scene scene("SceneRestore");
     auto *node = scene.root()->add<Rapture::Node3D>("Node");
-    node->addComponent<SerializedFlagComponent>()->flag = false;
+    node->addComponent<TestFlagComponent>()->flag = false;
 
     Rapture::SerialDocument snapshot = scene.snapshot();
-    node->component<SerializedFlagComponent>()->flag = true;
+    node->component<TestFlagComponent>()->flag = true;
 
     ASSERT_TRUE(scene.restoreFrom(snapshot.rootView()));
 
-    auto *restored = node->component<SerializedFlagComponent>();
+    auto *restored = node->component<TestFlagComponent>();
     ASSERT_NE(restored, nullptr);
     EXPECT_FALSE(restored->flag);
 }
@@ -64,7 +64,7 @@ TEST_F(SceneRestore, DestroyedObjectComesBackWithItsComponents)
 {
     Rapture::Scene scene("SceneRestore");
     auto *node = scene.root()->add<Rapture::Node3D>("Node");
-    node->addComponent<SerializedFlagComponent>()->flag = false;
+    node->addComponent<TestFlagComponent>()->flag = false;
     const Rapture::InstanceId id = node->id();
 
     Rapture::SerialDocument snapshot = scene.snapshot();
@@ -76,7 +76,7 @@ TEST_F(SceneRestore, DestroyedObjectComesBackWithItsComponents)
     ASSERT_NE(restored, nullptr);
     EXPECT_EQ(restored->id(), id);
 
-    auto *component = restored->component<SerializedFlagComponent>();
+    auto *component = restored->component<TestFlagComponent>();
     ASSERT_NE(component, nullptr);
     EXPECT_FALSE(component->flag);
 }
@@ -105,15 +105,15 @@ TEST_F(SceneRestore, RoundTripMatchesTheSnapshot)
     Rapture::Scene scene("SceneRestore");
     auto *parent = scene.root()->add<Rapture::Node3D>("Parent");
     auto *child = parent->add<Rapture::Node3D>("Child");
-    child->addComponent<SerializedFlagComponent>();
+    child->addComponent<TestFlagComponent>();
     child->setPosition(glm::vec3(1.0f, 2.0f, 3.0f));
 
     Rapture::SerialDocument snapshot = scene.snapshot();
     const std::string before = snapshot.toText();
 
     child->setPosition(glm::vec3(-4.0f));
-    child->removeComponent<SerializedFlagComponent>();
-    parent->addComponent<SerializedFlagComponent>();
+    child->removeComponent<TestFlagComponent>();
+    parent->addComponent<TestFlagComponent>();
     scene.root()->add<Rapture::Node3D>("Gained");
     scene.destroyInstance(parent);
 

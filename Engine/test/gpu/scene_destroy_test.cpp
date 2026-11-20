@@ -1,4 +1,4 @@
-#include "serialized_flag_component.h"
+#include "test_flag_component.h"
 #include "windowless_application_environment.h"
 
 #include <rapture/scene/Scene.h>
@@ -85,7 +85,7 @@ TEST_F(SceneDestroy, OnDestroyFiresOncePerInstance)
 
     auto *parent = scene.root()->add<Rapture::Node3D>("Parent");
     auto *child = parent->add<Rapture::Node3D>("Child");
-    auto *component = child->addComponent<SerializedFlagComponent>();
+    auto *component = child->addComponent<TestFlagComponent>();
 
     int parentFires = 0;
     int childFires = 0;
@@ -141,7 +141,7 @@ TEST_F(SceneDestroy, RemovingComponentTellsListenersWhileItIsAttached)
     Rapture::Scene scene("SceneDestroy");
 
     auto *node = scene.root()->add<Rapture::Node3D>("Node");
-    auto *component = node->addComponent<SerializedFlagComponent>();
+    auto *component = node->addComponent<TestFlagComponent>();
     std::shared_ptr<bool> alive = component->aliveFlag();
 
     Rapture::SceneObject *ownerSeen = nullptr;
@@ -152,5 +152,5 @@ TEST_F(SceneDestroy, RemovingComponentTellsListenersWhileItIsAttached)
 
     EXPECT_EQ(ownerSeen, node);
     EXPECT_FALSE(*alive);
-    EXPECT_EQ(node->component<SerializedFlagComponent>(), nullptr);
+    EXPECT_EQ(node->component<TestFlagComponent>(), nullptr);
 }
