@@ -1,37 +1,28 @@
 #include "ModuleEditorWorkspace.h"
 
 #include "Icons.h"
+#include "panels/AddSceneObjectMenu.h"
 #include "panels/PropertiesPanel.h"
 #include "panels/SceneObjectTreePanel.h"
-#include "panels/TextEditorPanel.h"
 #include "panels/ViewportPanel.h"
-#include "ui/ControlTooltip.h"
+#include "scene/EditorCamera.h"
+#include "ui/AssetVisuals.h"
+#include "ui/controls/IconLabelButton.h"
+#include "ui/menus/ContextMenuItems.h"
 
 #include <rapture/app/Application.h>
 #include <rapture/assets/asset_manager/AssetManager.h>
-#include <rapture/core/ecs/entity_accessor.h>
 #include <rapture/core/serialization/SerialDocument.h>
 #include <rapture/core/utils/Log.h>
 #include <rapture/gpu/render_targets/SceneRenderTarget.h>
 #include <rapture/renderer/viewport/ViewportManager.h>
 #include <rapture/scene/Scene.h>
-#include <rapture/scene/components/Components.h>
+#include <rapture/scene/instances/Camera3D.h>
 #include <rapture/scene/instances/DirectionalLight3D.h>
 #include <rapture/scene/instances/Node3D.h>
-#include <rapture/scene/systems/Transforms.h>
-
-#include <array>
-
-enum ModuleEditorTooltip {
-    MODULE_EDITOR_TOOLTIP_SAVE,
-    MODULE_EDITOR_TOOLTIP_COUNT
-};
-
-static constexpr std::array<ControlTooltip, MODULE_EDITOR_TOOLTIP_COUNT> MODULE_EDITOR_TOOLTIPS = {{
-    {.name = "Save", .description = "Writes this module to its asset file"},
-}};
 
 static constexpr std::string_view ROOT_NAME = "Scene Root";
+static constexpr std::string_view ADD_BUTTON_CLASS = "hotbar-primary-button";
 
 // the viewport panel resizes it to its pane, so this only has to be a sane first frame
 static constexpr uint32_t VIEWPORT_WIDTH = 1280;
@@ -40,8 +31,8 @@ static constexpr uint32_t VIEWPORT_HEIGHT = 720;
 static constexpr float SUN_PITCH = -1.874f;
 static constexpr float SUN_INTENSITY = 3.14f;
 
-static constexpr float TREE_SPLIT = 0.7f;
-static constexpr float PROPERTIES_SPLIT = 0.45f;
+static constexpr float VIEWPORT_SPLIT = 0.68f;
+static constexpr float TREE_SPLIT = 0.4f;
 
 ModuleEditorWorkspace::ModuleEditorWorkspace(const EditorContext &context, Rapture::AssetHandle handle)
     : AssetWorkspace(context, handle)
@@ -62,12 +53,13 @@ ModuleEditorWorkspace::~ModuleEditorWorkspace()
     Rapture::Application::getInstance().getViewportManager().destroyViewport(m_viewport);
     m_viewport = {};
 
+    m_editorCamera.reset();
     m_scene.reset();
 }
 
 std::string_view ModuleEditorWorkspace::tabIcon() const
 {
-    return Icons::SVG_SCENE;
+    return Asset_iconForType(Rapture::ASSET_MODULE);
 }
 
 void ModuleEditorWorkspace::setupScene()
@@ -75,19 +67,22 @@ void ModuleEditorWorkspace::setupScene()
     auto &app = Rapture::Application::getInstance();
 
     m_scene = std::make_unique<Rapture::Scene>(std::string(assetName()));
-    setupLighting();
-    m_sceneRoot = spawn();
     m_scene->active = true;
 
-    Rapture::ecs::EntityAccessor camera = m_scene->createEntity("Editor Camera");
-    auto &cameraTransform = camera.add<Rapture::TransformComponent>();
-    cameraTransform.local = Rapture::transform::compose(glm::vec3(0.0f, 1.5f, 5.0f), glm::vec3(0.0f), glm::vec3(1.0f));
-    cameraTransform.world = cameraTransform.local;
-    camera.add<Rapture::CameraComponent>(60.0f, 16.0f / 9.0f, 0.1f, 1000.0f);
+    // a sibling of the module's root rather than a child of it, so a save never captures it
+    auto *sun = m_scene->root()->add<Rapture::DirectionalLight3D>("Editor Sun");
+    sun->setRotation(glm::vec3(SUN_PITCH, 0.0f, 0.0f));
+    sun->setColor(glm::vec3(1.0f));
+    sun->setIntensity(SUN_INTENSITY);
+    sun->setCastsShadow(true);
+
+    m_moduleRoot = spawnModuleRoot();
+
+    m_editorCamera = std::make_unique<EditorCamera>(*m_scene);
 
     m_viewport = app.getViewportManager().createViewport({
         .scene = m_scene.get(),
-        .camera = camera,
+        .camera = m_editorCamera->camera().accessor(),
         .name = std::string(assetName()),
         .targetType = Rapture::SceneRenderTarget::TargetType::OFFSCREEN,
         .width = VIEWPORT_WIDTH,
@@ -99,21 +94,11 @@ void ModuleEditorWorkspace::setupScene()
 
     m_context.scene = m_scene.get();
     m_context.viewport = m_viewport.viewport;
+    m_context.editorCamera = m_editorCamera.get();
 }
 
-void ModuleEditorWorkspace::setupLighting()
+Rapture::SceneObject *ModuleEditorWorkspace::spawnModuleRoot()
 {
-    // parented beside the asset's root rather than inside it, so a save never captures it
-    auto *sun = m_scene->root()->add<Rapture::DirectionalLight3D>("Editor Sun");
-    sun->setRotation(glm::vec3(SUN_PITCH, 0.0f, 0.0f));
-    sun->setColor(glm::vec3(1.0f));
-    sun->setIntensity(SUN_INTENSITY);
-    sun->setCastsShadow(true);
-}
-
-Rapture::SceneObject *ModuleEditorWorkspace::spawn()
-{
-    // an asset that has never been authored starts from the root everything else hangs off
     if (m_document == nullptr || !m_document->isReadable()) {
         return m_scene->root()->add<Rapture::Node3D>(std::string(ROOT_NAME));
     }
@@ -123,50 +108,75 @@ Rapture::SceneObject *ModuleEditorWorkspace::spawn()
 
 void ModuleEditorWorkspace::build()
 {
-    Amethyst::TabBar *propertiesTabBar = nullptr;
     Amethyst::TabBar *viewportTabBar = nullptr;
     Amethyst::TabBar *treeTabBar = nullptr;
+    Amethyst::TabBar *propertiesTabBar = nullptr;
 
     Amethyst::DockScope(*m_contentDock)
         .split(
-            Amethyst::SplitAxis::VERTICAL, TREE_SPLIT,
+            Amethyst::SplitAxis::VERTICAL, VIEWPORT_SPLIT,
             [&](Amethyst::DockScope &l) { l.panel([&](Amethyst::TabBarScope &tb) { viewportTabBar = &tb.component; }); },
             [&](Amethyst::DockScope &r) {
                 r.split(
-                    Amethyst::SplitAxis::HORIZONTAL, PROPERTIES_SPLIT,
+                    Amethyst::SplitAxis::HORIZONTAL, TREE_SPLIT,
                     [&](Amethyst::DockScope &t) { t.panel([&](Amethyst::TabBarScope &tb) { treeTabBar = &tb.component; }); },
                     [&](Amethyst::DockScope &b) { b.panel([&](Amethyst::TabBarScope &tb) { propertiesTabBar = &tb.component; }); });
             });
 
     addPanel(std::make_unique<ViewportPanel>(m_context, ViewportOverlays{.toolbar = true, .orientationGizmo = true}), viewportTabBar);
-    addPanel(std::make_unique<TextEditorPanel>(m_context, "Script"), viewportTabBar);
-
-    if (m_sceneRoot != nullptr) {
-        addPanel(std::make_unique<SceneObjectTreePanel>(m_context, m_sceneRoot), treeTabBar);
+    if (m_moduleRoot != nullptr) {
+        addPanel(std::make_unique<SceneObjectTreePanel>(m_context, m_moduleRoot), treeTabBar);
     }
     addPanel(std::make_unique<PropertiesPanel>(m_context), propertiesTabBar);
+
+    m_addMenu = m_container->add<Amethyst::ContextMenu>();
+    m_addMenu->setRowFactories({.separator = [] { return std::make_unique<SeparatorMenuItemView>(); }});
 }
 
 void ModuleEditorWorkspace::buildHotbar()
 {
-    Amethyst::TextButton *saveButton = addHotbarButton("Save", [this]() { save(); });
-    ControlTooltip_attach(*saveButton, MODULE_EDITOR_TOOLTIPS[MODULE_EDITOR_TOOLTIP_SAVE], m_editor);
+    m_addButton = addHotbarButton("Add", Icons::SVG_PLUS, ADD_BUTTON_CLASS, [this]() { showAddMenu(); });
+    addHotbarSeparator();
+    addHotbarButton("Save", Icons::SVG_SAVE, [this]() { save(); });
+    addHotbarSeparator();
+}
+
+Rapture::SceneObject *ModuleEditorWorkspace::getAddTarget() const
+{
+    Rapture::ecs::EntityAccessor selected = m_selection.entity();
+    if (selected.isValid()) {
+        if (Rapture::SceneObject *object = m_scene->instanceFor(selected.getEntity())) {
+            return object;
+        }
+    }
+    return m_moduleRoot;
+}
+
+void ModuleEditorWorkspace::showAddMenu()
+{
+    Rapture::SceneObject *target = getAddTarget();
+    if (m_addMenu == nullptr || target == nullptr) {
+        return;
+    }
+
+    m_addMenu->setItems(AddSceneObjectMenu_buildItems(target, m_selection, SCENE_OBJECT_SCOPE_ASSET));
+    m_addMenu->showAt({m_addButton->absolutePosition.x, m_addButton->absolutePosition.y + m_addButton->absoluteSize.y});
 }
 
 void ModuleEditorWorkspace::save()
 {
-    if (m_document == nullptr || m_sceneRoot == nullptr) {
+    if (m_document == nullptr || m_moduleRoot == nullptr) {
         return;
     }
 
     Rapture::SerialDocument authored;
-    m_sceneRoot->serialize(authored.root());
+    m_moduleRoot->serialize(authored.root());
     authored.freeze();
     *m_document = std::move(authored);
 
-    auto &project = Rapture::Application::getInstance().getProject();
-    if (!Rapture::AssetManager::saveAsset(handle(), project.getContentDirectory())) {
-        RP_ERROR("Could not save module '{}'", assetName());
+    const Rapture::AssetMetadata &metadata = Rapture::AssetManager::getAssetMetadata(handle());
+    if (!Rapture::AssetManager::saveAsset(handle(), metadata.assetPath.parent_path())) {
+        RP_ERROR("could not save module '{}'", assetName());
     }
 }
 
