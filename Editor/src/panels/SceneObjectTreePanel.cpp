@@ -8,7 +8,6 @@
 #include "ui/menus/ContextMenuItems.h"
 #include <rapture/scene/Scene.h>
 #include <rapture/scene/instances/SceneObject.h>
-#include <rapture/scene/instances/scene_components/VisibilityComponent.h>
 
 #include <components/common.h>
 #include <components/context_menu_item.h>
@@ -26,8 +25,7 @@
 
 static bool s_showsInOutliner(const Rapture::SceneObject *object)
 {
-    Rapture::VisibilityComponent *visibility = object->component<Rapture::VisibilityComponent>();
-    return visibility == nullptr || visibility->inOutliner;
+    return object->visibility().inOutliner;
 }
 
 static std::string s_toLowercase(std::string_view text)

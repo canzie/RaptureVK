@@ -15,6 +15,8 @@ static constexpr std::string_view KEY_ID = "id";
 static constexpr std::string_view KEY_NAME = "name";
 static constexpr std::string_view KEY_COMPONENTS = "components";
 static constexpr std::string_view KEY_CHILDREN = "children";
+static constexpr std::string_view KEY_IN_OUTLINER = "inOutliner";
+static constexpr std::string_view KEY_ATTRIBUTES = "attributes";
 
 SceneObject::SceneObject(Scene &scene, std::string_view name) : Instance(scene, name)
 {
@@ -296,6 +298,14 @@ void SceneObject::serialize(WriteNode node) const
 {
     Instance::serialize(node);
 
+    if (!m_visibility.inOutliner) {
+        node.set(KEY_IN_OUTLINER, false);
+    }
+
+    if (!m_attributes.values().entries().empty()) {
+        m_attributes.serialize(node.addArray(KEY_ATTRIBUTES));
+    }
+
     if (!m_components.empty()) {
         WriteNode components = node.addArray(KEY_COMPONENTS);
         for (const auto &component : m_components) {
@@ -314,6 +324,14 @@ void SceneObject::serialize(WriteNode node) const
         }
         child->serialize(children.appendObject());
     }
+}
+
+void SceneObject::deserialize(ReadNode node)
+{
+    Instance::deserialize(node);
+
+    m_visibility.inOutliner = node.child(KEY_IN_OUTLINER).asBool(true);
+    m_attributes.deserialize(node.child(KEY_ATTRIBUTES));
 }
 
 SceneObject::DocumentHeader SceneObject::readHeader(ReadNode node)

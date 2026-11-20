@@ -10,7 +10,6 @@
 #include <rapture/scene/World.h>
 #include <rapture/scene/instances/Module.h>
 #include <rapture/scene/instances/SceneObject.h>
-#include <rapture/scene/instances/scene_components/VisibilityComponent.h>
 
 #include <components/common.h>
 #include <components/context_menu_item.h>
@@ -39,8 +38,7 @@ static constexpr float TREE_TOP = SEARCH_FIELD_MARGIN + SEARCH_FIELD_HEIGHT + SE
 
 static bool s_showsInOutliner(const Rapture::SceneObject *object)
 {
-    Rapture::VisibilityComponent *visibility = object->component<Rapture::VisibilityComponent>();
-    return visibility == nullptr || visibility->inOutliner;
+    return object->visibility().inOutliner;
 }
 
 static std::string s_toLowercase(std::string_view text)

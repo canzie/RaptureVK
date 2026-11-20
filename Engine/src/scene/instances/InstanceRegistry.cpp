@@ -19,7 +19,6 @@
 #include <rapture/scene/instances/Terrain3D.h>
 #include <rapture/scene/instances/controllers/CameraController.h>
 #include <rapture/scene/instances/controllers/PlayerController.h>
-#include <rapture/scene/instances/scene_components/VisibilityComponent.h>
 
 #include <unordered_map>
 #include <vector>
@@ -58,7 +57,6 @@ void InstanceRegistry::init()
     addComponent<CharacterBody3D>();
     addComponent<RigidBody3D>();
     addComponent<ScriptComponent>();
-    addComponent<VisibilityComponent>();
 
     s_isInitialized = true;
 }

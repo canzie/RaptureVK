@@ -1,8 +1,8 @@
+#include "serialized_flag_component.h"
 #include "windowless_application_environment.h"
 
 #include <rapture/scene/Scene.h>
 #include <rapture/scene/instances/Node3D.h>
-#include <rapture/scene/instances/scene_components/VisibilityComponent.h>
 
 #include <memory>
 #include <string_view>
@@ -85,7 +85,7 @@ TEST_F(SceneDestroy, OnDestroyFiresOncePerInstance)
 
     auto *parent = scene.root()->add<Rapture::Node3D>("Parent");
     auto *child = parent->add<Rapture::Node3D>("Child");
-    auto *component = child->addComponent<Rapture::VisibilityComponent>();
+    auto *component = child->addComponent<SerializedFlagComponent>();
 
     int parentFires = 0;
     int childFires = 0;
@@ -141,7 +141,7 @@ TEST_F(SceneDestroy, RemovingComponentTellsListenersWhileItIsAttached)
     Rapture::Scene scene("SceneDestroy");
 
     auto *node = scene.root()->add<Rapture::Node3D>("Node");
-    auto *component = node->addComponent<Rapture::VisibilityComponent>();
+    auto *component = node->addComponent<SerializedFlagComponent>();
     std::shared_ptr<bool> alive = component->aliveFlag();
 
     Rapture::SceneObject *ownerSeen = nullptr;
@@ -152,5 +152,5 @@ TEST_F(SceneDestroy, RemovingComponentTellsListenersWhileItIsAttached)
 
     EXPECT_EQ(ownerSeen, node);
     EXPECT_FALSE(*alive);
-    EXPECT_EQ(node->component<Rapture::VisibilityComponent>(), nullptr);
+    EXPECT_EQ(node->component<SerializedFlagComponent>(), nullptr);
 }

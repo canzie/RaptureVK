@@ -2,6 +2,7 @@
 #define RAPTURE__SCENE_OBJECT_H
 
 #include <rapture/core/ecs/entity_accessor.h>
+#include <rapture/core/named_values/Attributes.h>
 #include <rapture/scene/instances/Instance.h>
 #include <rapture/scene/instances/SceneComponent.h>
 
@@ -26,6 +27,13 @@ enum SceneObjectFlag {
     SCENE_OBJECT_FLAG_NONE = 0,
     SCENE_OBJECT_FLAG_INTERNAL = 1 << 0,
     SCENE_OBJECT_FLAG_SERIALIZED = 1 << 1
+};
+
+/**
+ * @brief Where a scene object is shown
+ */
+struct SceneObjectVisibility {
+    bool inOutliner = true;
 };
 
 /**
@@ -225,6 +233,12 @@ class SceneObject : public Instance {
     void serialize(WriteNode node) const override;
 
     /**
+     * @brief Reads this object's own fields back, leaving its components and children to the load
+     * @param node Cursor to this object's object
+     */
+    void deserialize(ReadNode node) override;
+
+    /**
      * @brief What a document says a scene object is, readable before there is one to read into
      */
     struct DocumentHeader {
@@ -288,6 +302,12 @@ class SceneObject : public Instance {
      */
     const ecs::EntityAccessor &accessor() const { return m_entity; }
 
+    SceneObjectVisibility &visibility() { return m_visibility; }
+    const SceneObjectVisibility &visibility() const { return m_visibility; }
+
+    Attributes &attributes() { return m_attributes; }
+    const Attributes &attributes() const { return m_attributes; }
+
   protected:
     /**
      * @brief Called on an object once it has been linked to a new parent, or unlinked from one.
@@ -342,6 +362,8 @@ class SceneObject : public Instance {
     std::vector<std::unique_ptr<SceneComponent>> m_components;
     size_t m_internalCount = 0;
     uint32_t m_flags = SCENE_OBJECT_FLAG_SERIALIZED;
+    SceneObjectVisibility m_visibility;
+    Attributes m_attributes;
 };
 
 /**

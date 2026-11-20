@@ -44,8 +44,6 @@ static constexpr SceneComponentDescription SCENE_COMPONENT_DESCRIPTIONS[] = {
      "The object walks, jumps and collides under a controller instead of being pushed around by the simulation."},
     {"ScriptComponent", "Script", Icons::SVG_SCRIPT, "Runs a Lua script with this object as its owner",
      "Runs a Lua script with this object as its owner, connected to its events while the world plays."},
-    {"VisibilityComponent", "Visibility", Icons::SVG_EYE, "Where this object is shown",
-     "Where this object is shown, such as whether the outliner lists it."},
 };
 
 const SceneComponentDescription *SceneComponent_describeClass(std::string_view className)
