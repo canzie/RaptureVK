@@ -6,6 +6,7 @@
 #include "ui/controls/SearchField.h"
 
 #include <rapture/scene/instances/InstanceRegistry.h>
+#include <rapture/scene/instances/PhysicsBody3D.h>
 #include <rapture/scene/instances/SceneObject.h>
 
 #include <components/extensions/ui_drag_detector.h>
@@ -16,6 +17,7 @@
 #include <algorithm>
 #include <cctype>
 #include <memory>
+#include <string>
 #include <vector>
 
 static constexpr float WINDOW_WIDTH = 560.0f;
@@ -50,7 +52,7 @@ static constexpr std::string_view ROW_CLASS = "add-component-row";
 static constexpr std::string_view ROW_ICON_CLASS = "add-component-row-icon";
 static constexpr std::string_view ROW_NAME_CLASS = "add-component-row-name";
 static constexpr std::string_view ROW_SUMMARY_CLASS = "add-component-row-summary";
-static constexpr std::string_view ATTACHED_SUFFIX = "-attached";
+static constexpr std::string_view UNAVAILABLE_SUFFIX = "-unavailable";
 static constexpr std::string_view EXPAND_BUTTON_CLASS = "add-component-expand";
 static constexpr std::string_view DETAILS_CLASS = "add-component-details";
 static constexpr std::string_view DETAILS_LINE_CLASS = "add-component-details-line";
@@ -65,6 +67,28 @@ static std::string s_toLowercase(std::string_view text)
 static bool s_hasComponentOfClass(const Rapture::SceneObject &object, const Rapture::TypeInfo &type)
 {
     return std::ranges::any_of(object.components(), [&type](const auto &component) { return &component->type() == &type; });
+}
+
+/**
+ * @brief Why a component class cannot be attached to an object
+ * @param object The object it would be attached to
+ * @param type The component class
+ * @return The reason shown on its row, empty when it can be attached
+ */
+static std::string s_reasonComponentIsUnavailable(const Rapture::SceneObject &object, const Rapture::TypeInfo &type)
+{
+    if (s_hasComponentOfClass(object, type)) {
+        return "Already attached";
+    }
+
+    // every physics body moves the object it is part of, so an object has one at most
+    const Rapture::PhysicsBody3D *body = object.component<Rapture::PhysicsBody3D>();
+    if (body != nullptr && type.isA(Rapture::PhysicsBody3D::staticType())) {
+        const SceneComponentDescription *existing = SceneComponent_describeClass(body->type().name);
+        return "Already has a " + std::string(existing != nullptr ? existing->name : body->type().name);
+    }
+
+    return {};
 }
 
 static void s_ignoreChildInput(Amethyst::UIObject &object)
@@ -113,7 +137,6 @@ void AddComponentWindow::buildTitleBar(Amethyst::UIScope &window)
             .classes = {std::string(TITLE_BAR_CLASS)},
             .base =
                 {
-                    .interactable = false,
                     .layoutOrder = 0,
                     .padding = Amethyst::UDim4{.right = Amethyst::UDim::fromOffset(BODY_PADDING),
                                                .left = Amethyst::UDim::fromOffset(TITLE_PADDING)},
@@ -122,6 +145,8 @@ void AddComponentWindow::buildTitleBar(Amethyst::UIScope &window)
         },
         [this](Amethyst::FrameScope &bar) {
             m_titleBar = &bar.component;
+            // a press on the bar itself reaches the window, which is dragged by it
+            m_titleBar->ignore(Amethyst::INTERACTION_CATEGORY_ALL);
             auto *row = m_titleBar->addExtension<Amethyst::UIListLayout>();
             row->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
             row->horizontalFlex = Amethyst::UiFlexAlignment::FILL;
@@ -253,16 +278,17 @@ void AddComponentWindow::fillRows(std::string_view search)
 void AddComponentWindow::buildRow(Amethyst::UIScope &rows, const Rapture::TypeInfo &type, uint32_t order)
 {
     const SceneComponentDescription *description = SceneComponent_describeClass(type.name);
-    const bool attached = m_target != nullptr && s_hasComponentOfClass(*m_target, type);
+    const std::string unavailableReason = m_target != nullptr ? s_reasonComponentIsUnavailable(*m_target, type) : std::string{};
+    const bool unavailable = !unavailableReason.empty();
 
     const std::string name(description != nullptr ? description->name : type.name);
-    const std::string summary(attached ? std::string_view("Already attached") : (description != nullptr ? description->summary : std::string_view{}));
+    const std::string summary = unavailable ? unavailableReason : std::string(description != nullptr ? description->summary : std::string_view{});
     const std::string_view detailsText = description != nullptr ? description->details : std::string_view{};
     const char *svg = description != nullptr ? description->svg : Icons::SVG_CUBE;
     const std::string_view className = type.name;
 
-    auto rowClasses = [attached](std::string_view styleClass) {
-        return std::vector<std::string>{attached ? std::string(styleClass) + std::string(ATTACHED_SUFFIX) : std::string(styleClass)};
+    auto rowClasses = [unavailable](std::string_view styleClass) {
+        return std::vector<std::string>{unavailable ? std::string(styleClass) + std::string(UNAVAILABLE_SUFFIX) : std::string(styleClass)};
     };
 
     rows.frame(
@@ -317,7 +343,7 @@ void AddComponentWindow::buildRow(Amethyst::UIScope &rows, const Rapture::TypeIn
                         expandButton->setBaseProperties({.layoutOrder = 3, .size = Amethyst::UDim2::fromOffset(EXPAND_BUTTON_SIZE, EXPAND_BUTTON_SIZE)});
                     }
 
-                    if (!attached) {
+                    if (!unavailable) {
                         row.component.track(row.component.onMouseButton1ClickCb.connect([this, className]() { addComponentToTarget(className); }));
                     }
                 });
