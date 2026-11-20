@@ -1,7 +1,6 @@
 #include "HeaderLayouts.h"
 
 #include "Icons.h"
-#include <rapture/core/utils/Log.h>
 
 #include <amethyst/Amethyst.h>
 #include <components/ui_scope.h>
@@ -16,7 +15,7 @@ static constexpr float HEADER_MENU_BUTTON_RIGHT_PAD = 6.0f;
 static constexpr float HEADER_LABEL_RIGHT_RESERVED = HEADER_MENU_BUTTON_RIGHT_PAD + HEADER_MENU_BUTTON_SIZE + 4.0f;
 
 std::function<void(Amethyst::FrameScope &)> componentHeaderLayout(std::string_view label, std::string_view iconSvg,
-                                                                  std::function<void(void)> onMenuClicked)
+                                                                  std::function<void(Amethyst::UIObject &)> onMenuClicked)
 {
     return [label = std::string(label), iconSvg = std::string(iconSvg), onMenuClicked](Amethyst::FrameScope &scope) {
         float textOffset = HEADER_CONTENT_OFFSET;
@@ -36,16 +35,21 @@ std::function<void(Amethyst::FrameScope &)> componentHeaderLayout(std::string_vi
             textOffset = HEADER_CONTENT_OFFSET + HEADER_ICON_SIZE + HEADER_ICON_LABEL_GAP;
         }
 
+        const float labelRightReserved = onMenuClicked != nullptr ? HEADER_LABEL_RIGHT_RESERVED : 0.0f;
         scope.textLabel({
             .classes = {"component-header"},
             .base =
                 {
                     .position = Amethyst::UDim2(0.0f, textOffset, 0.0f, 0.0f),
-                    .size = Amethyst::UDim2(1.0f, -(textOffset + HEADER_LABEL_RIGHT_RESERVED), 1.0f, 0.0f),
+                    .size = Amethyst::UDim2(1.0f, -(textOffset + labelRightReserved), 1.0f, 0.0f),
                 },
             .style = {.backgroundTransparency = 1.0f},
             .label = label,
         });
+
+        if (onMenuClicked == nullptr) {
+            return;
+        }
 
         scope.imageButton(
             {
@@ -59,20 +63,14 @@ std::function<void(Amethyst::FrameScope &)> componentHeaderLayout(std::string_vi
                 .image = {.imageColor = Amethyst::Color4(0.6f, 0.6f, 0.6f, 1.0f)},
                 .svg = Icons::SVG_MORE,
             },
-            [label, onMenuClicked](Amethyst::ImageButtonScope &btn) {
+            [onMenuClicked](Amethyst::ImageButtonScope &btn) {
                 auto *b = &btn.component;
                 b->track(b->onHoverChanged.connect([b](bool hovered) {
                     b->setImageStyleProperties({.imageColor = hovered ? Amethyst::Color4{0.85f, 0.85f, 0.85f, 1.0f}
                                                                       : Amethyst::Color4{0.6f, 0.6f, 0.6f, 1.0f}});
                     b->setBaseStyleProperties({.backgroundTransparency = hovered ? 0.85f : 1.0f});
                 }));
-                b->track(b->onMouseButton1ClickCb.connect([label, onMenuClicked]() {
-                    if (onMenuClicked) {
-                        onMenuClicked();
-                    } else {
-                        RP_INFO("{} menu clicked", label);
-                    }
-                }));
+                b->track(b->onMouseButton1ClickCb.connect([b, onMenuClicked]() { onMenuClicked(*b); }));
             });
     };
 }

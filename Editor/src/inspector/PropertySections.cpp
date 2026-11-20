@@ -3,6 +3,7 @@
 #include "ui/chrome/HeaderLayouts.h"
 
 #include <components/checkbox.h>
+#include <components/context_menu_item.h>
 #include <components/common.h>
 
 #include <array>
@@ -359,10 +360,28 @@ PropertySectionList::PropertySectionList(Amethyst::Frame &parent, Amethyst::Scro
         m_view = &sf.component;
         m_viewDestroyConn = m_view->onDestroy.connect([this](Amethyst::Instance *) {
             m_view = nullptr;
+            m_removeMenu = nullptr;
             m_active.clear();
             m_sections.clear();
         });
     });
+
+    m_removeMenu = parent.add<Amethyst::ContextMenu>();
+}
+
+void PropertySectionList::showRemoveMenu(PropertySection &section, Amethyst::UIObject &anchor)
+{
+    if (m_removeMenu == nullptr) {
+        return;
+    }
+
+    std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
+    items.push_back(Amethyst::makeActionItem("Delete", [this, &section]() {
+        section.remove();
+        m_refreshRequested = true;
+    }));
+    m_removeMenu->setItems(std::move(items));
+    m_removeMenu->show(&anchor);
 }
 
 void PropertySectionList::refresh(const std::function<void()> &fn)
@@ -393,6 +412,7 @@ void PropertySectionList::buildSection(PropertySection &section)
         m_rebuildRequested.insert(&section);
     };
     section.requestRelayout = [this]() { relayout(); };
+    section.requestRemoveMenu = [this](PropertySection &removed, Amethyst::UIObject &anchor) { showRemoveMenu(removed, anchor); };
 
     Amethyst::UIScope(*m_view).collapsibleHeader(
         {
@@ -411,7 +431,11 @@ void PropertySectionList::buildSection(PropertySection &section)
         },
         [&](Amethyst::CollapsibleHeaderScope &ch) {
             section.header = &ch.component;
-            ch.header(componentHeaderLayout(section.title(), section.icon()));
+            std::function<void(Amethyst::UIObject &)> onMenuClicked;
+            if (section.isRemovable()) {
+                onMenuClicked = [this, &section](Amethyst::UIObject &button) { showRemoveMenu(section, button); };
+            }
+            ch.header(componentHeaderLayout(section.title(), section.icon(), std::move(onMenuClicked)));
             section.buildBody(ch);
             section.header->setBaseProperties({.size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, HEADER_HEIGHT + section.bodyHeight())});
         });

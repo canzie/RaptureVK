@@ -193,6 +193,8 @@ class RigidBody3DEditor : public ComponentEditorBase {
     const char *icon() const override { return ""; }
     void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
     void sync(const Rapture::ecs::EntityAccessor &entity) override;
+    bool isRemovable() const override { return true; }
+    void remove() override;
 
   private:
     /**
@@ -215,6 +217,8 @@ class CharacterBody3DEditor : public ComponentEditorBase {
     const char *icon() const override { return ""; }
     void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
     void sync(const Rapture::ecs::EntityAccessor &entity) override;
+    bool isRemovable() const override { return true; }
+    void remove() override;
 
   private:
     /**

@@ -2,6 +2,7 @@
 #define RAPTURE__PROPERTY_SECTIONS_H
 
 #include <amethyst/Amethyst.h>
+#include <components/context_menu.h>
 #include <components/table.h>
 #include <components/ui_scope.h>
 
@@ -57,6 +58,16 @@ class PropertySection {
      * @brief Pushes the subject's data into the bound widget buffers.
      */
     virtual void sync() = 0;
+
+    /**
+     * @brief Whether the facet this section edits can be taken off the subject.
+     */
+    virtual bool isRemovable() const { return false; }
+
+    /**
+     * @brief Takes the facet this section edits off the subject.
+     */
+    virtual void remove() {}
 
   protected:
     /**
@@ -214,6 +225,12 @@ class PropertySection {
      */
     std::function<void()> requestRelayout;
 
+    /**
+     * @brief Asks the list to open the menu that removes a section, below the button it was asked from, for a
+     * section holding another section's header.
+     */
+    std::function<void(PropertySection &, Amethyst::UIObject &)> requestRemoveMenu;
+
   protected:
     float m_bodyHeight = 0.0f;
 };
@@ -320,12 +337,20 @@ class PropertySectionList {
     void destroySection(PropertySection &section);
 
     /**
+     * @brief Opens the menu that removes a section's facet from the subject
+     * @param section The section whose facet is removed
+     * @param anchor The button the menu opens below
+     */
+    void showRemoveMenu(PropertySection &section, Amethyst::UIObject &anchor);
+
+    /**
      * @brief Builds every live section that asked for it anew, against the subject it now holds
      */
     void rebuildRequestedSections();
 
   private:
     Amethyst::ScrollingFrame *m_view = nullptr;
+    Amethyst::ContextMenu *m_removeMenu = nullptr;
     Amethyst::EventConnection m_viewDestroyConn;
     std::unordered_map<std::type_index, std::unique_ptr<PropertySection>> m_sections;
     std::vector<PropertySection *> m_active;

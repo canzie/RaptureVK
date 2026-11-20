@@ -518,7 +518,11 @@ void PhysicsEditor::buildPhysicsSubEditor(PhysicsBodyKind kind)
         },
         [this](Amethyst::CollapsibleHeaderScope &nested) {
             m_physicsSubHeader = &nested.component;
-            nested.header(componentHeaderLayout(m_physicsSubEditor->title(), m_physicsSubEditor->icon()));
+            nested.header(componentHeaderLayout(m_physicsSubEditor->title(), m_physicsSubEditor->icon(), [this](Amethyst::UIObject &button) {
+                if (requestRemoveMenu != nullptr && m_physicsSubEditor != nullptr) {
+                    requestRemoveMenu(*m_physicsSubEditor, button);
+                }
+            }));
             m_physicsSubEditor->buildBody(nested);
             m_physicsSubHeader->setBaseProperties(
                 {.size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, HEADER_HEIGHT + m_physicsSubEditor->bodyHeight())});
@@ -583,6 +587,13 @@ void PhysicsEditor::setSubject(Rapture::Scene *scene, const Rapture::ecs::Entity
 
     if (m_physicsSubEditor != nullptr) {
         m_physicsSubEditor->setSubject(scene, entity);
+    }
+}
+
+void RigidBody3DEditor::remove()
+{
+    if (Rapture::SceneObject *object = s_instanceAs<Rapture::SceneObject>(m_scene, m_entity)) {
+        object->removeComponent<Rapture::RigidBody3D>();
     }
 }
 
@@ -652,6 +663,13 @@ Rapture::CharacterBody3D *CharacterBody3DEditor::resolveBody(const Rapture::ecs:
 {
     Rapture::SceneObject *object = s_instanceAs<Rapture::SceneObject>(m_scene, entity);
     return object != nullptr ? object->component<Rapture::CharacterBody3D>() : nullptr;
+}
+
+void CharacterBody3DEditor::remove()
+{
+    if (Rapture::SceneObject *object = s_instanceAs<Rapture::SceneObject>(m_scene, m_entity)) {
+        object->removeComponent<Rapture::CharacterBody3D>();
+    }
 }
 
 void CharacterBody3DEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
