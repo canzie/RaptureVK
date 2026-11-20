@@ -1,12 +1,16 @@
 #include "PropertySections.h"
 
+#include "Icons.h"
 #include "ui/chrome/HeaderLayouts.h"
+#include "ui/controls/IconButton.h"
 
 #include <components/checkbox.h>
 #include <components/context_menu_item.h>
 #include <components/common.h>
+#include <components/text_input.h>
 
 #include <array>
+#include <memory>
 #include <span>
 #include <string_view>
 
@@ -20,6 +24,9 @@ static constexpr float CONTROL_HPAD = 10.0f;
 static constexpr float CONTROL_GAP = 6.0f;
 static constexpr float SINGLE_FIELD_WIDTH = 190.0f;
 static constexpr float AXIS_BAR_WIDTH = 3.0f;
+static constexpr float REMOVE_BUTTON_SIZE = 20.0f;
+static constexpr float REMOVE_ICON_SIZE = 10.0f;
+static constexpr std::string_view REMOVE_BUTTON_CLASS = "property-remove-button";
 
 static constexpr std::array<std::string_view, 3> AXIS_BAR_CLASSES = {"axis-bar-x", "axis-bar-y", "axis-bar-z"};
 
@@ -61,47 +68,53 @@ void PropertySection::fieldTable(Amethyst::CollapsibleHeaderScope &ch, const std
         });
 }
 
+static void s_vec3Fields(Amethyst::UIScope &cell, double (&values)[3], double speed, double min, double max,
+                         const std::function<void(void)> &onChanged, std::span<const std::string_view> axisBarClasses)
+{
+    const float w = 1.0f / 3.0f;
+    for (int axis = 0; axis < 3; ++axis) {
+        // the outer edges take the control padding, the inner ones half the gutter each
+        float leftInset = axis == 0 ? CONTROL_HPAD : CONTROL_GAP * 0.5f;
+        float rightInset = axis == 2 ? CONTROL_HPAD : CONTROL_GAP * 0.5f;
+
+        cell.dragFloat(
+            {
+                .classes = {"property-input-field"},
+                .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
+                         .position = Amethyst::UDim2(axis * w, leftInset, 0.5f, 0.0f),
+                         .size = Amethyst::UDim2(w, -(leftInset + rightInset), 1.0f, -2.0f * CONTROL_VPAD)},
+                .speed = speed,
+                .min = min,
+                .max = max,
+                .value = &values[axis],
+            },
+            [onChanged, axis, axisBarClasses](Amethyst::DragFloatScope &d) {
+                if (!axisBarClasses.empty()) {
+                    d.frame({
+                        .classes = {std::string(axisBarClasses[axis])},
+                        .base =
+                            {
+                                .interactable = false,
+                                .size = Amethyst::UDim2(0.0f, AXIS_BAR_WIDTH, 1.0f, 0.0f),
+                            },
+                    });
+                }
+                d.component.onValueChanged = [onChanged](double) {
+                    if (onChanged) {
+                        onChanged();
+                    }
+                };
+            });
+    }
+}
+
 static void s_rowVec3(Amethyst::TableScope &t, std::string_view label, double (&values)[3], double speed, double min, double max,
                       const std::function<void(void)> &onChanged, std::span<const std::string_view> axisBarClasses)
 {
     t.row([&](Amethyst::TableRowScope &tr) {
         tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
         tr.cell([&values, speed, min, max, onChanged, axisBarClasses](Amethyst::UIScope &cell) {
-            const float w = 1.0f / 3.0f;
-            for (int axis = 0; axis < 3; ++axis) {
-                // the outer edges take the control padding, the inner ones half the gutter each
-                float leftInset = axis == 0 ? CONTROL_HPAD : CONTROL_GAP * 0.5f;
-                float rightInset = axis == 2 ? CONTROL_HPAD : CONTROL_GAP * 0.5f;
-
-                cell.dragFloat(
-                    {
-                        .classes = {"property-input-field"},
-                        .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
-                                 .position = Amethyst::UDim2(axis * w, leftInset, 0.5f, 0.0f),
-                                 .size = Amethyst::UDim2(w, -(leftInset + rightInset), 1.0f, -2.0f * CONTROL_VPAD)},
-                        .speed = speed,
-                        .min = min,
-                        .max = max,
-                        .value = &values[axis],
-                    },
-                    [onChanged, axis, axisBarClasses](Amethyst::DragFloatScope &d) {
-                        if (!axisBarClasses.empty()) {
-                            d.frame({
-                                .classes = {std::string(axisBarClasses[axis])},
-                                .base =
-                                    {
-                                        .interactable = false,
-                                        .size = Amethyst::UDim2(0.0f, AXIS_BAR_WIDTH, 1.0f, 0.0f),
-                                    },
-                            });
-                        }
-                        d.component.onValueChanged = [onChanged](double) {
-                            if (onChanged) {
-                                onChanged();
-                            }
-                        };
-                    });
-            }
+            s_vec3Fields(cell, values, speed, min, max, onChanged, axisBarClasses);
         });
     });
 }
@@ -167,24 +180,27 @@ Amethyst::TextLabel *PropertySection::rowText(Amethyst::TableScope &t, std::stri
     return result;
 }
 
+void PropertySection::fieldCheckbox(Amethyst::UIScope &cell, bool *value, const std::function<void(bool)> &onChanged)
+{
+    cell.checkbox({.base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
+                            .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
+                            .size = Amethyst::UDim2::fromOffset(18.0f, 18.0f)},
+                   .value = value},
+                  [onChanged](Amethyst::CheckboxScope &c) {
+                      c.component.onValueChanged = [onChanged](bool b) {
+                          if (onChanged) {
+                              onChanged(b);
+                          }
+                      };
+                  });
+}
+
 void PropertySection::rowCheckbox(Amethyst::TableScope &t, std::string_view label, bool *value,
                                   const std::function<void(bool)> &onChanged)
 {
     t.row([&](Amethyst::TableRowScope &tr) {
         tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
-        tr.cell([value, onChanged](Amethyst::UIScope &cell) {
-            cell.checkbox({.base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
-                                    .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
-                                    .size = Amethyst::UDim2::fromOffset(18.0f, 18.0f)},
-                           .value = value},
-                          [value, onChanged](Amethyst::CheckboxScope &c) {
-                              c.component.onValueChanged = [onChanged](bool b) {
-                                  if (onChanged) {
-                                      onChanged(b);
-                                  }
-                              };
-                          });
-        });
+        tr.cell([value, onChanged](Amethyst::UIScope &cell) { fieldCheckbox(cell, value, onChanged); });
     });
 }
 
@@ -290,30 +306,106 @@ Amethyst::Dropdown *PropertySection::rowDropdown(Amethyst::TableScope &t, std::s
     return dropdown;
 }
 
+void PropertySection::fieldDragFloat(Amethyst::UIScope &cell, double *value, double speed, double min, double max, std::string format,
+                                     const std::function<void(double)> &onChanged)
+{
+    cell.dragFloat(
+        {
+            .classes = {"property-input-field"},
+            .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
+                     .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
+                     .size = Amethyst::UDim2(0.0f, SINGLE_FIELD_WIDTH, 1.0f, -2.0f * CONTROL_VPAD)},
+            .format = std::move(format),
+            .speed = speed,
+            .min = min,
+            .max = max,
+            .value = value,
+        },
+        [onChanged](Amethyst::DragFloatScope &d) {
+            d.component.onValueChanged = [onChanged](double v) {
+                if (onChanged) {
+                    onChanged(v);
+                }
+            };
+        });
+}
+
+void PropertySection::fieldVec3(Amethyst::UIScope &cell, double (&values)[3], double speed, double min, double max,
+                                const std::function<void(void)> &onChanged)
+{
+    s_vec3Fields(cell, values, speed, min, max, onChanged, AXIS_BAR_CLASSES);
+}
+
 void PropertySection::rowDragFloat(Amethyst::TableScope &t, std::string_view label, double *value, double speed, double min,
                                    double max, std::string format, const std::function<void(double)> &onChanged)
 {
     t.row([&](Amethyst::TableRowScope &tr) {
         tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
         tr.cell([value, speed, min, max, format, onChanged](Amethyst::UIScope &cell) {
-            cell.dragFloat(
+            fieldDragFloat(cell, value, speed, min, max, format, onChanged);
+        });
+    });
+}
+
+void PropertySection::rowRemovable(Amethyst::TableScope &t, std::string_view label, const std::function<void()> &onRemove,
+                                   const std::function<void(Amethyst::UIScope &)> &fillField)
+{
+    t.row([&](Amethyst::TableRowScope &tr) {
+        tr.cell([label, onRemove](Amethyst::UIScope &cell) {
+            cell.textLabel({
+                .classes = {"property-label"},
+                .base = {.position = Amethyst::UDim2(0.0f, LABEL_PAD, 0.0f, 0.0f),
+                         .size = Amethyst::UDim2(1.0f, -(LABEL_PAD + REMOVE_BUTTON_SIZE + CONTROL_HPAD), 1.0f, 0.0f)},
+                .text = {.textTruncate = Amethyst::TextTruncate::ELLIPSIS},
+                .label = std::string(label),
+            });
+            auto *remove = cell.get().add<IconButton>(Icons::SVG_X, REMOVE_ICON_SIZE, std::vector<std::string>{std::string(REMOVE_BUTTON_CLASS)});
+            remove->setBaseProperties({
+                .anchorPoint = Amethyst::vec2(1.0f, 0.5f),
+                .position = Amethyst::UDim2(1.0f, -CONTROL_HPAD, 0.5f, 0.0f),
+                .size = Amethyst::UDim2::fromOffset(REMOVE_BUTTON_SIZE, REMOVE_BUTTON_SIZE),
+            });
+            remove->track(remove->onMouseButton1ClickCb.connect([onRemove]() { onRemove(); }));
+        });
+        tr.cell([fillField](Amethyst::UIScope &cell) { fillField(cell); });
+    });
+}
+
+void PropertySection::rowNameFieldWithDropdown(Amethyst::TableScope &t, std::string_view placeholder, std::string_view dropdownLabel,
+                                               const std::vector<std::string> &options,
+                                               const std::function<void(std::string_view, int)> &onSelect)
+{
+    t.row([&](Amethyst::TableRowScope &tr) {
+        auto nameInput = std::make_shared<Amethyst::TextInput *>(nullptr);
+        tr.cell([placeholder, nameInput](Amethyst::UIScope &cell) {
+            cell.textInput(
                 {
                     .classes = {"property-input-field"},
                     .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
+                             .position = Amethyst::UDim2(0.0f, LABEL_PAD, 0.5f, 0.0f),
+                             .size = Amethyst::UDim2(1.0f, -(LABEL_PAD + CONTROL_HPAD), 1.0f, -2.0f * CONTROL_VPAD)},
+                    .placeholder = std::string(placeholder),
+                },
+                [nameInput](Amethyst::TextInputScope &ti) { *nameInput = &ti.component; });
+        });
+        tr.cell([&](Amethyst::UIScope &cell) {
+            cell.dropdown(
+                {
+                    .classes = {"property-input-field", "property-dropdown"},
+                    .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
                              .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
                              .size = Amethyst::UDim2(0.0f, SINGLE_FIELD_WIDTH, 1.0f, -2.0f * CONTROL_VPAD)},
-                    .format = format,
-                    .speed = speed,
-                    .min = min,
-                    .max = max,
-                    .value = value,
+                    .text = {.textXAlignment = Amethyst::TextXAlignment::LEFT, .textYAlignment = Amethyst::TextYAlignment::CENTER},
+                    .label = std::string(dropdownLabel),
                 },
-                [onChanged](Amethyst::DragFloatScope &d) {
-                    d.component.onValueChanged = [onChanged](double v) {
-                        if (onChanged) {
-                            onChanged(v);
-                        }
-                    };
+                [&](Amethyst::DropdownScope &d) {
+                    for (size_t i = 0; i < options.size(); ++i) {
+                        d.action(options[i], [onSelect, nameInput, i]() {
+                            if (*nameInput != nullptr && onSelect) {
+                                onSelect((*nameInput)->getText(), static_cast<int>(i));
+                            }
+                        });
+                    }
                 });
         });
     });

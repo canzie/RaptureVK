@@ -204,6 +204,60 @@ class PropertySection {
     void rowFloatFields(Amethyst::TableScope &t, std::string_view label, std::span<float> values, bool wholeNumbers,
                         const std::function<void(void)> &onChanged);
 
+    /**
+     * @brief Adds a row whose label carries a button that removes what the row shows.
+     * @param t Scope of the table the row is added to.
+     * @param label Text shown in the row's label column.
+     * @param onRemove Called when the remove button is pressed.
+     * @param fillField Fills the row's value column.
+     */
+    void rowRemovable(Amethyst::TableScope &t, std::string_view label, const std::function<void()> &onRemove,
+                      const std::function<void(Amethyst::UIScope &)> &fillField);
+
+    /**
+     * @brief Adds a row holding a name field in the label column and a dropdown in the value column.
+     * @param t Scope of the table the row is added to.
+     * @param placeholder Text the name field shows while empty.
+     * @param dropdownLabel Text the dropdown shows.
+     * @param options The selectable entries, in order.
+     * @param onSelect Called with the name field's text and the index of the picked entry.
+     */
+    void rowNameFieldWithDropdown(Amethyst::TableScope &t, std::string_view placeholder, std::string_view dropdownLabel,
+                                  const std::vector<std::string> &options, const std::function<void(std::string_view, int)> &onSelect);
+
+    /**
+     * @brief Fills a value column with a single drag field.
+     * @param cell Scope of the value column.
+     * @param value The value the field is bound to.
+     * @param speed Units moved per pixel dragged.
+     * @param min Lower bound of the field.
+     * @param max Upper bound of the field.
+     * @param format printf-style format for the readout, empty for the field's default.
+     * @param onChanged Called with the new value on change.
+     */
+    static void fieldDragFloat(Amethyst::UIScope &cell, double *value, double speed, double min, double max, std::string format,
+                               const std::function<void(double)> &onChanged);
+
+    /**
+     * @brief Fills a value column with a single checkbox.
+     * @param cell Scope of the value column.
+     * @param value The value the checkbox is bound to.
+     * @param onChanged Called with the new value on change.
+     */
+    static void fieldCheckbox(Amethyst::UIScope &cell, bool *value, const std::function<void(bool)> &onChanged);
+
+    /**
+     * @brief Fills a value column with three drag fields for the X, Y and Z axes, each edged in its axis color.
+     * @param cell Scope of the value column.
+     * @param values The three values the fields are bound to.
+     * @param speed Units moved per pixel dragged.
+     * @param min Lower bound of every axis.
+     * @param max Upper bound of every axis.
+     * @param onChanged Called after any axis changes.
+     */
+    static void fieldVec3(Amethyst::UIScope &cell, double (&values)[3], double speed, double min, double max,
+                          const std::function<void(void)> &onChanged);
+
   public:
     /// Height of the bar a section is collapsed down to
     static constexpr float HEADER_HEIGHT = 28.0f;
