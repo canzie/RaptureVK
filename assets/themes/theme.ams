@@ -566,6 +566,112 @@ text-area {
     image-color: @text-3;
 }
 
+// the window a scene component is picked from
+.add-component-window {
+    background-color: @bg-header;
+    border-pixel-size: 1px;
+    border-color: @border-4;
+    corner-radius: 6px;
+}
+
+.add-component-title {
+    background-transparency: 1.0;
+    font-family: "Roboto Bold";
+    font-size: 13px;
+    text-color: @text-1;
+    text-y-alignment: center;
+}
+
+.add-component-target {
+    background-transparency: 1.0;
+    font-size: 12px;
+    text-color: @text-3;
+    text-y-alignment: center;
+}
+
+.add-component-close {
+    background-color: @bg-buttons;
+    background-transparency: 1.0;
+    image-color: @text-3;
+    corner-radius: 4px;
+}
+
+.add-component-close:hover {
+    background-transparency: 0.0;
+    image-color: @text-1;
+}
+
+.add-component-divider {
+    background-color: @border-4;
+}
+
+.add-component-row {
+    background-color: @hover;
+    background-transparency: 1.0;
+    corner-radius: 4px;
+}
+
+.add-component-row:hover {
+    background-transparency: 0.0;
+}
+
+.add-component-row-icon {
+    background-transparency: 1.0;
+    image-color: @text-2;
+}
+
+.add-component-row-name {
+    background-transparency: 1.0;
+    font-size: 13px;
+    text-color: @text-1;
+    text-y-alignment: center;
+}
+
+.add-component-row-summary {
+    background-transparency: 1.0;
+    font-size: 11px;
+    text-color: @text-3;
+    text-y-alignment: center;
+}
+
+.add-component-row-icon-attached {
+    background-transparency: 1.0;
+    image-color: @text-4;
+}
+
+.add-component-row-name-attached {
+    background-transparency: 1.0;
+    font-size: 13px;
+    text-color: @text-4;
+    text-y-alignment: center;
+}
+
+.add-component-row-summary-attached {
+    background-transparency: 1.0;
+    font-size: 11px;
+    text-color: @text-4;
+    text-y-alignment: center;
+}
+
+.add-component-expand {
+    background-color: @bg-buttons;
+    background-transparency: 1.0;
+    image-color: @text-3;
+    corner-radius: 4px;
+}
+
+.add-component-expand:hover {
+    background-transparency: 0.0;
+    image-color: @text-1;
+}
+
+.add-component-details {
+    background-transparency: 1.0;
+    font-size: 12px;
+    text-color: @text-2;
+    text-x-alignment: left;
+}
+
 // the material graph: its canvas, nodes, wires and the overlays floating over it
 .graph-canvas {
     background-color: @bg-canvas;

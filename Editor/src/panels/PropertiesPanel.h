@@ -6,6 +6,7 @@
 
 #include "inspector/ComponentEditorBase.h"
 #include "inspector/PropertySections.h"
+#include "panels/AddComponentWindow.h"
 #include "panels/Panel.h"
 #include <rapture/core/ecs/entity_accessor.h>
 #include <rapture/core/events/EventSignal.h>
@@ -35,6 +36,11 @@ class PropertiesPanel : public Panel {
     void setupEntityView();
 
     /**
+     * @brief Opens the window that attaches a scene component to the selected object
+     */
+    void openAddComponentWindow();
+
+    /**
      * @brief Ensures the section for T and points it at the selected entity.
      * @tparam T A ComponentEditorBase-derived editor type.
      * @param present Whether the selected entity has the component this editor edits.
@@ -57,6 +63,7 @@ class PropertiesPanel : public Panel {
     Amethyst::TextLabel *m_placeholderText = nullptr;
     SearchField *m_searchField = nullptr;
     IconLabelButton *m_addComponentButton = nullptr;
+    std::optional<AddComponentWindow> m_addComponentWindow;
     std::optional<PropertySectionList> m_sections;
 
     Rapture::Scene *m_scene = nullptr;

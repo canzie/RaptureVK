@@ -36,6 +36,9 @@ void PropertiesPanel::build(Amethyst::UIScope &scope)
     setupPlaceholder(scope);
     setupEntityView();
 
+    m_addComponentWindow.emplace(*m_root);
+    m_addComponentWindow->onComponentAdded = [this]() { refresh(); };
+
     if (m_selection != nullptr) {
         m_selectionChangedConn = m_selection->onChanged.connect([this](Rapture::ecs::EntityAccessor entity) {
             if (entity.isValid()) {
@@ -81,8 +84,18 @@ void PropertiesPanel::setupSearchBar(Amethyst::UIScope &scope)
             m_addComponentButton = bar.component.add<IconLabelButton>(Icons::SVG_PLUS, "Add Component",
                                                                       std::vector<std::string>{std::string(ADD_COMPONENT_BUTTON_CLASS)});
             m_addComponentButton->setBaseProperties({.layoutOrder = 1, .size = Amethyst::UDim2::fromScale(0.0f, 1.0f)});
-            // TODO: open the list of scene components the selected object can take on
+            m_addComponentButton->track(m_addComponentButton->onMouseButton1ClickCb.connect([this]() { openAddComponentWindow(); }));
         });
+}
+
+void PropertiesPanel::openAddComponentWindow()
+{
+    Rapture::SceneObject *object = m_scene != nullptr && m_selectedEntity.isValid() ? m_scene->instanceFor(m_selectedEntity.getEntity()) : nullptr;
+    if (object == nullptr || !m_addComponentWindow.has_value()) {
+        return;
+    }
+
+    m_addComponentWindow->open(*object);
 }
 
 void PropertiesPanel::setupPlaceholder(Amethyst::UIScope &scope)
