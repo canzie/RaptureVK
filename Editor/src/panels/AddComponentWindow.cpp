@@ -41,6 +41,7 @@ static constexpr float DETAILS_PADDING_TOP = 4.0f;
 static constexpr float DIVIDER_THICKNESS = 1.0f;
 
 static constexpr std::string_view WINDOW_CLASS = "add-component-window";
+static constexpr std::string_view TITLE_BAR_CLASS = "add-component-title-bar";
 static constexpr std::string_view TITLE_CLASS = "add-component-title";
 static constexpr std::string_view TARGET_CLASS = "add-component-target";
 static constexpr std::string_view CLOSE_BUTTON_CLASS = "add-component-close";
@@ -109,6 +110,7 @@ void AddComponentWindow::buildTitleBar(Amethyst::UIScope &window)
 {
     window.frame(
         {
+            .classes = {std::string(TITLE_BAR_CLASS)},
             .base =
                 {
                     .interactable = false,
@@ -117,7 +119,6 @@ void AddComponentWindow::buildTitleBar(Amethyst::UIScope &window)
                                                .left = Amethyst::UDim::fromOffset(TITLE_PADDING)},
                     .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, TITLE_BAR_HEIGHT),
                 },
-            .style = {.backgroundTransparency = 1.0f},
         },
         [this](Amethyst::FrameScope &bar) {
             m_titleBar = &bar.component;

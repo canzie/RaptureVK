@@ -576,10 +576,15 @@ text-area {
 
 // the window a scene component is picked from
 .add-component-window {
-    background-color: @bg-header;
+    background-color: @bg-panel;
     border-pixel-size: 1px;
     border-color: @border-4;
     corner-radius: 6px;
+}
+
+.add-component-title-bar {
+    background-color: @bg-header;
+    corner-radius: 6px 6px 0px 0px;
 }
 
 .add-component-title {
