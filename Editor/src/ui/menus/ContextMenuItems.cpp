@@ -17,8 +17,11 @@ using namespace Amethyst;
 
 static constexpr float ROW_PADDING = 8.0f;
 static constexpr float THUMB_INSET = 4.0f;
-static constexpr float THUMB_GAP = 6.0f;
 static constexpr float ACCENT_HEIGHT = 2.0f;
+static constexpr float THUMB_GAP = 10.0f;
+static constexpr float MENU_NAME_HEIGHT = 17.0f;
+static constexpr float MENU_TYPE_HEIGHT = 15.0f;
+static constexpr std::string_view MENU_TYPE_CLASS = "asset-field-type";
 static constexpr float ICON_INSET = 4.0f;
 static constexpr float ICON_GAP = 10.0f;
 static constexpr float MENU_CHECKBOX_SIZE = 16.0f;
@@ -45,6 +48,7 @@ std::unique_ptr<ContextMenu::ItemData> AssetMenuItem::create(Rapture::AssetHandl
     item->assetType = metadata.assetType;
     item->authoredClass = metadata.authoredClass;
     item->name = metadata.name;
+    item->typeLabel = Asset_labelForType(metadata.assetType, metadata.authoredClass);
 
     return item;
 }
@@ -53,33 +57,31 @@ Frame *AssetMenuItemView::create(ContextMenu &owner)
 {
     Frame *row = ActionItemView::create(owner);
 
-    m_preview = row->add<ImageLabel>();
-    m_preview->setBaseStyleProperties({
-        .backgroundColor = Color3{0.1f, 0.1f, 0.1f},
-        .backgroundTransparency = 0.0f,
-        .borderPixelSize = 0.0f,
-    });
-    m_preview->setBaseProperties({
+    const float thumbSize = AssetThumbnail::sizeForHeight(owner.itemHeight - 2.0f * THUMB_INSET);
+    m_thumbnail.emplace(*row, thumbSize);
+    m_thumbnail->getRoot()->setBaseProperties({
         .anchorPoint = {0.0f, 0.5f},
-        .interactable = false,
         .position = UDim2(0.0f, ROW_PADDING, 0.5f, 0.0f),
     });
 
-    m_assetTypeAccent = m_preview->add<Frame>();
-    m_assetTypeAccent->setBaseStyleProperties({.borderPixelSize = 0.0f});
-    m_assetTypeAccent->setBaseProperties({
-        .anchorPoint = {0.0f, 1.0f},
+    const float textLeft = ROW_PADDING + thumbSize + THUMB_GAP;
+    const float blockHeight = MENU_NAME_HEIGHT + MENU_TYPE_HEIGHT;
+
+    m_nameLabel = row->add<TextLabel>();
+    m_nameLabel->setTextStyleProperties(owner.getTextStyleProperties());
+    m_nameLabel->setBaseStyleProperties({.backgroundTransparency = 1.0f, .borderPixelSize = 0.0f});
+    m_nameLabel->setBaseProperties({
         .interactable = false,
-        .position = UDim2::fromScale(0.0f, 1.0f),
-        .size = UDim2(1.0f, 0.0f, 0.0f, ACCENT_HEIGHT),
+        .position = UDim2(0.0f, textLeft, 0.5f, -blockHeight * 0.5f),
+        .size = UDim2(1.0f, -(textLeft + ROW_PADDING), 0.0f, MENU_NAME_HEIGHT),
     });
 
-    m_label = row->add<TextLabel>();
-    m_label->setTextStyleProperties(owner.getTextStyleProperties());
-    m_label->setBaseStyleProperties({.backgroundTransparency = 1.0f, .borderPixelSize = 0.0f});
-    m_label->setBaseProperties({
+    m_typeLabel = row->add<TextLabel>();
+    m_typeLabel->addClass(MENU_TYPE_CLASS);
+    m_typeLabel->setBaseProperties({
         .interactable = false,
-        .size = UDim2::fromScale(1.0f, 1.0f),
+        .position = UDim2(0.0f, textLeft, 0.5f, -blockHeight * 0.5f + MENU_NAME_HEIGHT),
+        .size = UDim2(1.0f, -(textLeft + ROW_PADDING), 0.0f, MENU_TYPE_HEIGHT),
     });
 
     return row;
@@ -91,28 +93,20 @@ void AssetMenuItemView::bind(ContextMenu::ItemData &item)
     auto &asset = item.as<AssetMenuItem>();
 
     if (asset.content) {
-        m_preview->setBaseProperties({.visible = false});
-        m_label->setBaseProperties({.visible = false});
+        m_thumbnail->getRoot()->setBaseProperties({.visible = false});
+        m_nameLabel->setBaseProperties({.visible = false});
+        m_typeLabel->setBaseProperties({.visible = false});
         asset.content(*m_row);
         return;
     }
 
-    float thumbSize = m_owner->itemHeight - THUMB_INSET;
-    m_preview->setBaseProperties({.size = UDim2::fromOffset(thumbSize, thumbSize), .visible = true});
-    if (asset.thumbnail == AM_INVALID_TEXTURE) {
-        m_preview->setSvg(Asset_iconForType(asset.assetType, asset.authoredClass));
-    } else {
-        m_preview->setImage(asset.thumbnail);
-    }
+    m_thumbnail->getRoot()->setBaseProperties({.visible = true});
+    m_thumbnail->showAsset(asset.assetType, asset.authoredClass, asset.thumbnail);
 
-    m_assetTypeAccent->setBaseStyleProperties({.backgroundColor = Asset_colorForType(asset.assetType)});
-
-    m_label->setBaseProperties({
-        .padding = UDim4{UDim::fromOffset(0.0f), UDim::fromOffset(ROW_PADDING), UDim::fromOffset(0.0f),
-                         UDim::fromOffset(ROW_PADDING + thumbSize + THUMB_GAP)},
-        .visible = true,
-    });
-    m_label->setText(asset.name);
+    m_nameLabel->setBaseProperties({.visible = true});
+    m_nameLabel->setText(asset.name);
+    m_typeLabel->setBaseProperties({.visible = true});
+    m_typeLabel->setText(asset.typeLabel);
 }
 
 std::unique_ptr<ContextMenu::ItemData> AddAssetMenuItem::createIconRow(std::string label, std::string svgIcon,

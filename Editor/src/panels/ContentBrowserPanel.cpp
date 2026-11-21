@@ -176,14 +176,6 @@ static std::string s_assetFileName(std::string_view name)
 }
 
 // an authored asset is labelled with the class it holds, every other asset with its type
-static std::string s_typeLabel(Rapture::AssetType type, const Rapture::TypeInfo *authoredClass)
-{
-    if (authoredClass != nullptr && type == Rapture::ASSET_MODULE) {
-        return std::string(authoredClass->name);
-    }
-    return std::string(Rapture::AssetRegistry::displayName(type));
-}
-
 static void s_setGuiStateFlag(Amethyst::UIObject &object, uint16_t flag, bool on)
 {
     const uint16_t state = object.getGuiState();
@@ -394,7 +386,7 @@ static AssetTooltipContent s_describeEntryForTooltip(const std::filesystem::dire
         return content;
     }
 
-    content.typeLabel = s_typeLabel(metadata->assetType, metadata->authoredClass);
+    content.typeLabel = Asset_labelForType(metadata->assetType, metadata->authoredClass);
     content.iconSvg = Asset_iconForType(metadata->assetType, metadata->authoredClass);
     content.typeColor = Asset_colorForType(metadata->assetType);
     content.facts.push_back({.key = "Id", .value = std::format("{:016x}", handle), .monospace = true});
@@ -1213,7 +1205,7 @@ void ContentBrowserPanel::refreshFileBrowser()
         } else if (metadata != nullptr) {
             item.icon->setSvg(Asset_iconForType(metadata->assetType, metadata->authoredClass));
             item.icon->setClasses({"content-browser-card-icon"});
-            layoutCardFooter(item, s_typeLabel(metadata->assetType, metadata->authoredClass), Asset_colorForType(metadata->assetType));
+            layoutCardFooter(item, Asset_labelForType(metadata->assetType, metadata->authoredClass), Asset_colorForType(metadata->assetType));
         } else {
             item.icon->setSvg(Icons::SVG_SCRIPT);
             item.icon->setClasses({"content-browser-card-icon"});
@@ -1294,7 +1286,7 @@ void ContentBrowserPanel::refreshFileBrowser()
             Rapture::AssetType assetType = m_edit.kind == CONTENT_EDIT_MODULE ? Rapture::ASSET_MODULE : Rapture::ASSET_SCRIPT;
             item.icon->setSvg(Asset_iconForType(assetType, m_edit.objectClass));
             item.icon->setClasses({"content-browser-card-icon"});
-            layoutCardFooter(item, s_typeLabel(assetType, m_edit.objectClass), Asset_colorForType(assetType));
+            layoutCardFooter(item, Asset_labelForType(assetType, m_edit.objectClass), Asset_colorForType(assetType));
         }
 
         m_edit.itemIndex = index;

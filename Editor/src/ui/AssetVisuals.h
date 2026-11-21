@@ -5,6 +5,7 @@
 
 #include <modules/color.h>
 
+#include <string>
 #include <string_view>
 
 namespace Rapture {
@@ -17,6 +18,14 @@ struct TypeInfo;
  * @return The color for that type
  */
 Amethyst::Color3 Asset_colorForType(Rapture::AssetType type);
+
+/**
+ * @brief What an asset of the given type is called where it is shown to the user
+ * @param type The asset type
+ * @param authoredClass The class a module holds, which names it ahead of the type
+ * @return The name
+ */
+std::string Asset_labelForType(Rapture::AssetType type, const Rapture::TypeInfo *authoredClass = nullptr);
 
 /**
  * @brief Icon standing in for an asset of the given type when it has no thumbnail

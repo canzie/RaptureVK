@@ -1,14 +1,19 @@
 #ifndef RAPTURE__ASSET_PICKER_H
 #define RAPTURE__ASSET_PICKER_H
 
+#include "ui/AssetThumbnail.h"
+
 #include <rapture/assets/asset_manager/AssetCommon.h>
 
 #include <amethyst/Amethyst.h>
 #include <components/ui_scope.h>
 
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
+
+class IconButton;
 
 namespace Rapture {
 struct AssetMetadata;
@@ -36,16 +41,17 @@ std::vector<Rapture::AssetHandle> AssetQuery_collect(const AssetQuery &query);
 struct AssetPickerConfig {
     std::vector<Rapture::AssetType> types; // empty = every type
     std::function<bool(Rapture::AssetHandle, const Rapture::AssetMetadata &)> predicate = {};
-    float rowHeight = 47.0f;
+    float rowHeight = 52.0f;
     int32_t maxVisibleRows = 10;
     float popupWidth = 0.0f; // 0 = match the picker's own width
-    float previewSize = 18.0f;
+    float previewSize = 56.0f;
+    bool allowsEmpty = false; // shows the remove button, which unselects the asset
 };
 
 /**
- * @brief Editor asset field: a bar showing the selected asset that drops down the matching assets on click.
- * The dropdown rows are AssetMenuItemView rows in a ContextMenu. The given theme classes are applied to every
- * component it builds, the popup included.
+ * @brief Editor asset field: the selected asset's thumbnail, name and type, which drops down the matching assets on
+ * click and, where the field may be empty, unselects the asset from its remove button.
+ * The dropdown rows are AssetMenuItemView rows in a ContextMenu, which takes the given theme classes.
  */
 class AssetPicker {
   public:
@@ -65,15 +71,32 @@ class AssetPicker {
     Amethyst::Frame *getRoot() const { return m_root; }
 
   public:
+    /**
+     * @brief Called with the picked asset, or with no asset when the remove button unselects it
+     */
     std::function<void(Rapture::AssetHandle)> onAssetSelected;
 
   private:
     void buildFace(Amethyst::UIScope &parent);
+
+    /**
+     * @brief Builds the name over the type beside the thumbnail
+     * @param face Scope of the field's frame
+     */
+    void buildNameAndType(Amethyst::FrameScope &face);
+
+    void buildRemoveButton();
     void buildMenu();
     void rebuildItems();
     void applySelection();
     void applyOpenState(bool open);
     void selectAsset(Rapture::AssetHandle handle);
+
+    /**
+     * @brief The type the picker offers
+     * @return The type, or none when it offers several
+     */
+    Rapture::AssetType expectedType() const;
 
   private:
     AssetPickerConfig m_config;
@@ -81,10 +104,10 @@ class AssetPicker {
     Rapture::AssetHandle m_selected = Rapture::INVALID_ASSET_HANDLE;
 
     Amethyst::Frame *m_root = nullptr;
-    Amethyst::ImageLabel *m_preview = nullptr;
-    Amethyst::Frame *m_typeAccent = nullptr;
-    Amethyst::TextLabel *m_label = nullptr;
-    Amethyst::ImageLabel *m_arrow = nullptr;
+    std::optional<AssetThumbnail> m_thumbnail;
+    Amethyst::TextLabel *m_nameLabel = nullptr;
+    Amethyst::TextLabel *m_typeLabel = nullptr;
+    IconButton *m_removeButton = nullptr;
     Amethyst::ContextMenu *m_menu = nullptr;
 };
 

@@ -2,21 +2,33 @@
 
 #include "Icons.h"
 #include "ui/AssetVisuals.h"
+#include "ui/controls/IconButton.h"
 #include "ui/menus/ContextMenuItems.h"
 #include <rapture/assets/asset_manager/AssetManager.h>
 
+#include <components/text_label.h>
+
 #include <algorithm>
 #include <cctype>
+#include <format>
 #include <memory>
 #include <string_view>
 #include <utility>
 
-static constexpr float FACE_PADDING = 4.0f;
-static constexpr float PREVIEW_GAP = 6.0f;
-static constexpr float ACCENT_HEIGHT = 2.0f;
-static constexpr float ARROW_SIZE = 10.0f;
-static constexpr float ARROW_GAP = 4.0f;
-static constexpr float ARROW_OPEN_ROTATION = 180.0f;
+static constexpr float FACE_PADDING = 6.0f;
+static constexpr float TEXT_GAP = 12.0f;
+static constexpr float NAME_HEIGHT = 18.0f;
+static constexpr float TYPE_HEIGHT = 15.0f;
+static constexpr float NAME_TYPE_GAP = 2.0f;
+static constexpr float REMOVE_BUTTON_SIZE = 24.0f;
+static constexpr float REMOVE_ICON_SIZE = 13.0f;
+
+static constexpr std::string_view FACE_CLASS = "asset-field";
+static constexpr std::string_view NAME_CLASS = "asset-field-name";
+static constexpr std::string_view MISSING_NAME_CLASS = "asset-field-name-missing";
+static constexpr std::string_view TYPE_CLASS = "asset-field-type";
+static constexpr std::string_view EXPECTED_TYPE_CLASS = "asset-field-type-expected";
+static constexpr std::string_view REMOVE_BUTTON_CLASS = "asset-field-button";
 
 // name match quality, lower sorts first
 static constexpr int32_t SCORE_EXACT = 0;
@@ -162,74 +174,33 @@ void AssetPicker::close()
     m_menu->hide();
 }
 
+static void s_setGuiStateFlag(Amethyst::UIObject &object, uint16_t flag, bool on)
+{
+    const uint16_t state = object.getGuiState();
+    object.setGuiState(on ? static_cast<uint16_t>(state | flag) : static_cast<uint16_t>(state & ~flag));
+}
+
 void AssetPicker::buildFace(Amethyst::UIScope &parent)
 {
     parent.frame(
         {
-            .classes = m_classes,
+            .classes = {std::string(FACE_CLASS)},
             .base = {.interactable = true, .size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
         },
         [this](Amethyst::FrameScope &f) {
             m_root = &f.component;
 
-            f.imageLabel(
-                {
-                    .classes = m_classes,
-                    .base =
-                        {
-                            .anchorPoint = Amethyst::vec2(0.0f, 0.5f),
-                            .interactable = false,
-                            .position = Amethyst::UDim2(0.0f, FACE_PADDING, 0.5f, 0.0f),
-                            .size = Amethyst::UDim2::fromOffset(m_config.previewSize, m_config.previewSize),
-                        },
-                },
-                [this](Amethyst::ImageLabelScope &il) {
-                    m_preview = &il.component;
-                    il.frame(
-                        {
-                            .base =
-                                {
-                                    .anchorPoint = Amethyst::vec2(0.0f, 1.0f),
-                                    .interactable = false,
-                                    .position = Amethyst::UDim2::fromScale(0.0f, 1.0f),
-                                    .size = Amethyst::UDim2(1.0f, 0.0f, 0.0f, ACCENT_HEIGHT),
-                                },
-                            .style = {.backgroundTransparency = 0.0f, .borderPixelSize = 0.0f},
-                        },
-                        [this](Amethyst::FrameScope &accent) { m_typeAccent = &accent.component; });
-                });
+            m_thumbnail.emplace(*m_root, m_config.previewSize);
+            m_thumbnail->getRoot()->setBaseProperties({
+                .anchorPoint = Amethyst::vec2(0.0f, 0.5f),
+                .position = Amethyst::UDim2(0.0f, FACE_PADDING, 0.5f, 0.0f),
+            });
 
-            float textLeft = FACE_PADDING + m_config.previewSize + PREVIEW_GAP;
-            float textRight = FACE_PADDING + ARROW_SIZE + ARROW_GAP;
+            buildNameAndType(f);
+            buildRemoveButton();
 
-            f.textLabel(
-                {
-                    .classes = m_classes,
-                    .base =
-                        {
-                            .interactable = false,
-                            .position = Amethyst::UDim2(0.0f, textLeft, 0.0f, 0.0f),
-                            .size = Amethyst::UDim2(1.0f, -(textLeft + textRight), 1.0f, 0.0f),
-                        },
-                    .style = {.backgroundTransparency = 1.0f, .borderPixelSize = 0.0f},
-                },
-                [this](Amethyst::TextLabelScope &tl) { m_label = &tl.component; });
-
-            f.imageLabel(
-                {
-                    .classes = m_classes,
-                    .base =
-                        {
-                            .anchorPoint = Amethyst::vec2(1.0f, 0.5f),
-                            .interactable = false,
-                            .position = Amethyst::UDim2(1.0f, -FACE_PADDING, 0.5f, 0.0f),
-                            .size = Amethyst::UDim2::fromOffset(ARROW_SIZE, ARROW_SIZE),
-                        },
-                    .style = {.backgroundTransparency = 1.0f, .borderPixelSize = 0.0f},
-                    .svg = Icons::SVG_CARET_DOWN,
-                },
-                [this](Amethyst::ImageLabelScope &il) { m_arrow = &il.component; });
-
+            m_root->track(m_root->onHoverChanged.connect(
+                [this](bool hovered) { s_setGuiStateFlag(*m_root, Amethyst::GUI_STATE_HOVERED, hovered); }));
             m_root->track(m_root->onInputBeganCb.connect([this](const Amethyst::InputObject &io) {
                 if (io.type != Amethyst::InputType::MOUSE_BUTTON_1) {
                     return;
@@ -241,6 +212,50 @@ void AssetPicker::buildFace(Amethyst::UIScope &parent)
                 }
             }));
         });
+}
+
+void AssetPicker::buildNameAndType(Amethyst::FrameScope &face)
+{
+    const float textLeft = FACE_PADDING + m_config.previewSize + TEXT_GAP;
+    const float textRight = m_config.allowsEmpty ? FACE_PADDING + REMOVE_BUTTON_SIZE + TEXT_GAP : FACE_PADDING;
+    const float blockHeight = NAME_HEIGHT + NAME_TYPE_GAP + TYPE_HEIGHT;
+
+    face.textLabel(
+        {
+            .classes = {std::string(NAME_CLASS)},
+            .base =
+                {
+                    .interactable = false,
+                    .position = Amethyst::UDim2(0.0f, textLeft, 0.5f, -blockHeight * 0.5f),
+                    .size = Amethyst::UDim2(1.0f, -(textLeft + textRight), 0.0f, NAME_HEIGHT),
+                },
+        },
+        [this](Amethyst::TextLabelScope &tl) { m_nameLabel = &tl.component; });
+
+    face.textLabel(
+        {
+            .classes = {std::string(TYPE_CLASS)},
+            .base =
+                {
+                    .interactable = false,
+                    .position = Amethyst::UDim2(0.0f, textLeft, 0.5f, -blockHeight * 0.5f + NAME_HEIGHT + NAME_TYPE_GAP),
+                    .size = Amethyst::UDim2(1.0f, -(textLeft + textRight), 0.0f, TYPE_HEIGHT),
+                },
+        },
+        [this](Amethyst::TextLabelScope &tl) { m_typeLabel = &tl.component; });
+}
+
+void AssetPicker::buildRemoveButton()
+{
+    m_removeButton =
+        m_root->add<IconButton>(Icons::SVG_X, REMOVE_ICON_SIZE, std::vector<std::string>{std::string(REMOVE_BUTTON_CLASS)});
+    m_removeButton->setBaseProperties({
+        .anchorPoint = Amethyst::vec2(1.0f, 0.5f),
+        .position = Amethyst::UDim2(1.0f, -FACE_PADDING, 0.5f, 0.0f),
+        .size = Amethyst::UDim2::fromOffset(REMOVE_BUTTON_SIZE, REMOVE_BUTTON_SIZE),
+    });
+    m_removeButton->track(
+        m_removeButton->onMouseButton1ClickCb.connect([this]() { selectAsset(Rapture::INVALID_ASSET_HANDLE); }));
 }
 
 void AssetPicker::buildMenu()
@@ -286,16 +301,47 @@ void AssetPicker::selectAsset(Rapture::AssetHandle handle)
     }
 }
 
+Rapture::AssetType AssetPicker::expectedType() const
+{
+    return m_config.types.size() == 1 ? m_config.types.front() : Rapture::ASSET_NONE;
+}
+
 void AssetPicker::applySelection()
 {
-    const Rapture::AssetMetadata &metadata = Rapture::AssetManager::getAssetMetadata(m_selected);
+    const Rapture::AssetType expected = expectedType();
+    const std::string expectedLabel = expected == Rapture::ASSET_NONE ? std::string() : Asset_labelForType(expected);
 
-    m_label->setText(metadata.name);
-    m_preview->setSvg(Asset_iconForType(metadata.assetType, metadata.authoredClass));
-    m_typeAccent->setBaseStyleProperties({.backgroundColor = Asset_colorForType(metadata.assetType)});
+    m_nameLabel->removeClass(MISSING_NAME_CLASS);
+    m_typeLabel->removeClass(EXPECTED_TYPE_CLASS);
+
+    if (m_selected == Rapture::INVALID_ASSET_HANDLE) {
+        m_thumbnail->showEmpty(expected);
+        m_nameLabel->setBaseProperties({.visible = false});
+        m_typeLabel->addClass(EXPECTED_TYPE_CLASS);
+        m_typeLabel->setText(expectedLabel);
+        m_removeButton->setBaseProperties({.visible = false});
+        return;
+    }
+
+    m_nameLabel->setBaseProperties({.visible = true});
+    m_removeButton->setBaseProperties({.visible = m_config.allowsEmpty});
+
+    const Rapture::AssetMetadata &metadata = Rapture::AssetManager::getAssetMetadata(m_selected);
+    if (metadata.assetType == Rapture::ASSET_NONE) {
+        // the asset is gone with its metadata, so its id is all that is left to name it by
+        m_thumbnail->showMissing(expected);
+        m_nameLabel->addClass(MISSING_NAME_CLASS);
+        m_nameLabel->setText(std::format("{:016x}", m_selected));
+        m_typeLabel->setText(expectedLabel);
+        return;
+    }
+
+    m_thumbnail->showAsset(metadata.assetType, metadata.authoredClass);
+    m_nameLabel->setText(metadata.name);
+    m_typeLabel->setText(Asset_labelForType(metadata.assetType, metadata.authoredClass));
 }
 
 void AssetPicker::applyOpenState(bool open)
 {
-    m_arrow->setBaseProperties({.rotation = open ? ARROW_OPEN_ROTATION : 0.0f});
+    s_setGuiStateFlag(*m_root, Amethyst::GUI_STATE_ACTIVE, open);
 }

@@ -151,7 +151,7 @@ class PropertySection {
      * @param label Text shown in the row's label column.
      * @param out Receives the picker, which stays alive for as long as this section does.
      * @param config What the picker may select and how it presents it.
-     * @param onSelected Called with the picked asset.
+     * @param onSelected Called with the picked asset, or with no asset when the picker's remove button unselects it.
      */
     void rowAssetPicker(Amethyst::TableScope &t, std::string_view label, std::optional<AssetPicker> &out, AssetPickerConfig config,
                         const std::function<void(Rapture::AssetHandle)> &onSelected);

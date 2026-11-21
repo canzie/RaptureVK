@@ -13,8 +13,9 @@
 #include <string_view>
 
 static constexpr float ROW_HEIGHT = 30.0f;
-static constexpr float PICKER_ROW_HEIGHT = 52.0f;
-static constexpr float PICKER_PREVIEW_SIZE = 28.0f;
+static constexpr float PICKER_ROW_HEIGHT = 80.0f;
+static constexpr float PICKER_PREVIEW_SIZE = 56.0f;
+static constexpr float INSTANCE_PICKER_ROW_HEIGHT = 52.0f;
 static constexpr float LABEL_FRAC = 0.4f;
 static constexpr float LABEL_PAD = 30.0f;
 static constexpr float CONTROL_VPAD = 4.0f;
@@ -39,6 +40,42 @@ static void s_labelCell(Amethyst::UIScope &cell, std::string_view label)
         .base = {.position = Amethyst::UDim2(0.0f, LABEL_PAD, 0.0f, 0.0f), .size = Amethyst::UDim2(1.0f, -LABEL_PAD, 1.0f, 0.0f)},
         .label = std::string(label),
     });
+}
+
+static void s_removableLabelCell(Amethyst::UIScope &cell, std::string_view label, const std::function<void()> &onRemove)
+{
+    cell.textLabel({
+        .classes = {"property-label"},
+        .base = {.position = Amethyst::UDim2(0.0f, LABEL_PAD, 0.0f, 0.0f),
+                 .size = Amethyst::UDim2(1.0f, -(LABEL_PAD + REMOVE_BUTTON_SIZE + CONTROL_HPAD), 1.0f, 0.0f)},
+        .text = {.textTruncate = Amethyst::TextTruncate::ELLIPSIS},
+        .label = std::string(label),
+    });
+    auto *remove = cell.get().add<IconButton>(Icons::SVG_X, REMOVE_ICON_SIZE, std::vector<std::string>{std::string(REMOVE_BUTTON_CLASS)});
+    remove->setBaseProperties({
+        .anchorPoint = Amethyst::vec2(1.0f, 0.5f),
+        .position = Amethyst::UDim2(1.0f, -CONTROL_HPAD, 0.5f, 0.0f),
+        .size = Amethyst::UDim2::fromOffset(REMOVE_BUTTON_SIZE, REMOVE_BUTTON_SIZE),
+    });
+    remove->track(remove->onMouseButton1ClickCb.connect([onRemove]() { onRemove(); }));
+}
+
+static void s_assetPickerCell(Amethyst::UIScope &cell, std::optional<AssetPicker> &out, AssetPickerConfig config,
+                              const std::function<void(Rapture::AssetHandle)> &onSelected)
+{
+    config.previewSize = PICKER_PREVIEW_SIZE;
+
+    cell.frame(
+        {
+            .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
+                     .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
+                     .size = Amethyst::UDim2(1.0f, -2.0f * CONTROL_HPAD, 1.0f, -2.0f * CONTROL_VPAD)},
+            .style = {.backgroundTransparency = 1.0f},
+        },
+        [&](Amethyst::FrameScope &wrap) {
+            out.emplace(wrap, std::move(config), std::vector<std::string>{"property-input-field"});
+            out->onAssetSelected = onSelected;
+        });
 }
 
 void PropertySection::fieldTable(Amethyst::CollapsibleHeaderScope &ch, const std::function<void(Amethyst::TableScope &)> &fn)
@@ -231,23 +268,9 @@ void PropertySection::rowColor(Amethyst::TableScope &t, std::string_view label, 
 void PropertySection::rowAssetPicker(Amethyst::TableScope &t, std::string_view label, std::optional<AssetPicker> &out,
                                      AssetPickerConfig config, const std::function<void(Rapture::AssetHandle)> &onSelected)
 {
-    config.previewSize = PICKER_PREVIEW_SIZE;
-
     t.row(PICKER_ROW_HEIGHT, [&](Amethyst::TableRowScope &tr) {
         tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
-        tr.cell([&](Amethyst::UIScope &cell) {
-            cell.frame(
-                {
-                    .base = {.anchorPoint = glm::vec2(0.0f, 0.5f),
-                             .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
-                             .size = Amethyst::UDim2(1.0f, -2.0f * CONTROL_HPAD, 1.0f, -2.0f * CONTROL_VPAD)},
-                    .style = {.backgroundTransparency = 1.0f},
-                },
-                [&](Amethyst::FrameScope &wrap) {
-                    out.emplace(wrap, std::move(config), std::vector<std::string>{"property-input-field"});
-                    out->onAssetSelected = onSelected;
-                });
-        });
+        tr.cell([&](Amethyst::UIScope &cell) { s_assetPickerCell(cell, out, std::move(config), onSelected); });
     });
 }
 
@@ -255,7 +278,7 @@ void PropertySection::rowInstancePicker(Amethyst::TableScope &t, std::string_vie
                                         const Rapture::TypeInfo &type,
                                         const std::function<void(Rapture::SceneObject *)> &onSelected)
 {
-    t.row(PICKER_ROW_HEIGHT, [&](Amethyst::TableRowScope &tr) {
+    t.row(INSTANCE_PICKER_ROW_HEIGHT, [&](Amethyst::TableRowScope &tr) {
         tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
         tr.cell([&](Amethyst::UIScope &cell) {
             cell.frame(
@@ -349,22 +372,7 @@ void PropertySection::rowRemovable(Amethyst::TableScope &t, std::string_view lab
                                    const std::function<void(Amethyst::UIScope &)> &fillField)
 {
     t.row([&](Amethyst::TableRowScope &tr) {
-        tr.cell([label, onRemove](Amethyst::UIScope &cell) {
-            cell.textLabel({
-                .classes = {"property-label"},
-                .base = {.position = Amethyst::UDim2(0.0f, LABEL_PAD, 0.0f, 0.0f),
-                         .size = Amethyst::UDim2(1.0f, -(LABEL_PAD + REMOVE_BUTTON_SIZE + CONTROL_HPAD), 1.0f, 0.0f)},
-                .text = {.textTruncate = Amethyst::TextTruncate::ELLIPSIS},
-                .label = std::string(label),
-            });
-            auto *remove = cell.get().add<IconButton>(Icons::SVG_X, REMOVE_ICON_SIZE, std::vector<std::string>{std::string(REMOVE_BUTTON_CLASS)});
-            remove->setBaseProperties({
-                .anchorPoint = Amethyst::vec2(1.0f, 0.5f),
-                .position = Amethyst::UDim2(1.0f, -CONTROL_HPAD, 0.5f, 0.0f),
-                .size = Amethyst::UDim2::fromOffset(REMOVE_BUTTON_SIZE, REMOVE_BUTTON_SIZE),
-            });
-            remove->track(remove->onMouseButton1ClickCb.connect([onRemove]() { onRemove(); }));
-        });
+        tr.cell([label, onRemove](Amethyst::UIScope &cell) { s_removableLabelCell(cell, label, onRemove); });
         tr.cell([fillField](Amethyst::UIScope &cell) { fillField(cell); });
     });
 }

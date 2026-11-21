@@ -4,6 +4,7 @@
 #include "components/checkbox.h"
 #include "components/context_menu.h"
 #include "components/radio_button.h"
+#include "ui/AssetThumbnail.h"
 #include <rapture/assets/asset_manager/AssetCommon.h>
 
 #include <components/common.h>
@@ -14,6 +15,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -35,6 +37,7 @@ class AssetMenuItem : public AM::ContextMenu::ActionItemData {
     const Rapture::TypeInfo *authoredClass = nullptr;
     Amethyst::AmTextureId thumbnail = AM::AM_INVALID_TEXTURE;
     std::string name;
+    std::string typeLabel;
 };
 
 class AssetMenuItemView : public AM::ContextMenu::ActionItemView {
@@ -43,9 +46,9 @@ class AssetMenuItemView : public AM::ContextMenu::ActionItemView {
     void bind(AM::ContextMenu::ItemData &item) override;
 
   private:
-    AM::ImageLabel *m_preview = nullptr;
-    AM::Frame *m_assetTypeAccent = nullptr;
-    AM::TextLabel *m_label = nullptr;
+    std::optional<AssetThumbnail> m_thumbnail;
+    AM::TextLabel *m_nameLabel = nullptr;
+    AM::TextLabel *m_typeLabel = nullptr;
 };
 
 /**

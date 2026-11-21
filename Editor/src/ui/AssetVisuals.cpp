@@ -2,6 +2,7 @@
 
 #include "Icons.h"
 
+#include <rapture/assets/asset_manager/AssetRegistry.h>
 #include <rapture/scene/instances/Bone3D.h>
 #include <rapture/scene/instances/Camera3D.h>
 #include <rapture/scene/instances/Environment.h>
@@ -99,6 +100,14 @@ SceneObjectIcon SceneObject_iconForClass(const Rapture::TypeInfo *authoredClass)
     }
 
     return {Icons::SVG_CUBE, ICON_CLASS_DEFAULT};
+}
+
+std::string Asset_labelForType(Rapture::AssetType type, const Rapture::TypeInfo *authoredClass)
+{
+    if (authoredClass != nullptr && type == Rapture::ASSET_MODULE) {
+        return std::string(authoredClass->name);
+    }
+    return std::string(Rapture::AssetRegistry::displayName(type));
 }
 
 const char *Asset_iconForType(Rapture::AssetType type, const Rapture::TypeInfo *authoredClass)

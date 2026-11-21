@@ -1115,6 +1115,97 @@ radio-button:active {
     background-position: 12px 12px;
 }
 
+.asset-field {
+    background-color: @row-hover;
+    background-transparency: 1.0;
+    border-pixel-size: 0px;
+    border-color: @accent;
+    border-mode: inset;
+    corner-radius: 6px;
+}
+
+.asset-field:hover {
+    background-transparency: 0.0;
+}
+
+.asset-field:active {
+    background-transparency: 0.0;
+    border-pixel-size: 1px;
+}
+
+.asset-field-name {
+    font-size: 13px;
+    text-color: @text-1;
+    text-truncate: ellipsis;
+    background-transparency: 1.0;
+    border-pixel-size: 0px;
+}
+
+.asset-field-name-missing {
+    text-color: @status-error;
+}
+
+.asset-field-type {
+    font-size: 11px;
+    text-color: @text-3;
+    text-truncate: ellipsis;
+    background-transparency: 1.0;
+    border-pixel-size: 0px;
+}
+
+.asset-field-type-expected {
+    text-color: @text-2;
+}
+
+.asset-field-button {
+    background-color: @hover;
+    background-transparency: 1.0;
+    image-color: @text-4;
+    corner-radius: 4px;
+}
+
+.asset-field-button:hover {
+    background-transparency: 0.0;
+    image-color: @text-1;
+}
+
+.asset-thumbnail {
+    background-color: @bg-input;
+    border-pixel-size: 1px;
+    border-color: @input-border;
+    border-mode: outline;
+    corner-radius: 3px;
+}
+
+.asset-thumbnail-empty {
+    background-color: @bg-buttons;
+}
+
+.asset-thumbnail-missing {
+    background-color: @status-error;
+    background-transparency: 0.8;
+}
+
+.asset-thumbnail-squares {
+    background-color: @bg-frame;
+    border-pixel-size: 0px;
+}
+
+.asset-thumbnail-picture {
+    background-transparency: 1.0;
+    border-pixel-size: 0px;
+    image-color: @text-2;
+}
+
+.asset-thumbnail-plus {
+    image-color: @text-1;
+}
+
+.asset-thumbnail-stripes {
+    image-color: @status-error;
+    image-transparency: 0.45;
+}
+
 .orientation-gizmo {
     background-transparency: 1.0;
     border-pixel-size: 0px;
