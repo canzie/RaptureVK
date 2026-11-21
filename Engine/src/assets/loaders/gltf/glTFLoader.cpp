@@ -1113,9 +1113,11 @@ AssetRef glTF2Loader::loadMaterial(size_t materialIndex)
         materialName = "Material_" + std::to_string(materialIndex);
     }
 
-    glm::vec3 baseColor(0.5f, 0.5f, 0.5f);
-    float metallic = 0.0f;
-    float roughness = 0.5f;
+    glm::vec4 baseColor(1.0f);
+    float metallic = 1.0f;
+    float roughness = 1.0f;
+    glm::vec3 emissiveFactor(0.0f);
+    float emissiveStrength = 1.0f;
 
     auto baseMaterial = s_obtainGltfBaseMaterial();
     if (!baseMaterial) {
@@ -1126,20 +1128,21 @@ AssetRef glTF2Loader::loadMaterial(size_t materialIndex)
     yyjson_val *pbrMetallicRoughness = getObjectValue(materialVal, "pbrMetallicRoughness");
     if (pbrMetallicRoughness) {
         yyjson_val *baseColorFactorVal = getObjectValue(pbrMetallicRoughness, "baseColorFactor");
-        if (baseColorFactorVal && yyjson_is_arr(baseColorFactorVal) && getArraySize(baseColorFactorVal) >= 3) {
-            baseColor = glm::vec3(static_cast<float>(getDouble(getArrayElement(baseColorFactorVal, 0), 0.5)),
-                                  static_cast<float>(getDouble(getArrayElement(baseColorFactorVal, 1), 0.5)),
-                                  static_cast<float>(getDouble(getArrayElement(baseColorFactorVal, 2), 0.5)));
+        if (baseColorFactorVal && yyjson_is_arr(baseColorFactorVal) && getArraySize(baseColorFactorVal) >= 4) {
+            baseColor = glm::vec4(static_cast<float>(getDouble(getArrayElement(baseColorFactorVal, 0), 1.0)),
+                                  static_cast<float>(getDouble(getArrayElement(baseColorFactorVal, 1), 1.0)),
+                                  static_cast<float>(getDouble(getArrayElement(baseColorFactorVal, 2), 1.0)),
+                                  static_cast<float>(getDouble(getArrayElement(baseColorFactorVal, 3), 1.0)));
         }
 
         yyjson_val *metallicFactorVal = getObjectValue(pbrMetallicRoughness, "metallicFactor");
         if (metallicFactorVal) {
-            metallic = static_cast<float>(getDouble(metallicFactorVal, 0.0));
+            metallic = static_cast<float>(getDouble(metallicFactorVal, 1.0));
         }
 
         yyjson_val *roughnessFactorVal = getObjectValue(pbrMetallicRoughness, "roughnessFactor");
         if (roughnessFactorVal) {
-            roughness = static_cast<float>(getDouble(roughnessFactorVal, 0.5));
+            roughness = static_cast<float>(getDouble(roughnessFactorVal, 1.0));
         }
 
         yyjson_val *baseColorTextureInfo = getObjectValue(pbrMetallicRoughness, "baseColorTexture");
@@ -1185,15 +1188,22 @@ AssetRef glTF2Loader::loadMaterial(size_t materialIndex)
 
     yyjson_val *emissiveFactorVal = getObjectValue(materialVal, "emissiveFactor");
     if (emissiveFactorVal && yyjson_is_arr(emissiveFactorVal) && getArraySize(emissiveFactorVal) >= 3) {
-        glm::vec3 emissiveFactor(static_cast<float>(getDouble(getArrayElement(emissiveFactorVal, 0), 0.0)),
-                                 static_cast<float>(getDouble(getArrayElement(emissiveFactorVal, 1), 0.0)),
-                                 static_cast<float>(getDouble(getArrayElement(emissiveFactorVal, 2), 0.0)));
-        material->setParameter(MP_EMISSIVE, emissiveFactor);
+        emissiveFactor = glm::vec3(static_cast<float>(getDouble(getArrayElement(emissiveFactorVal, 0), 0.0)),
+                                   static_cast<float>(getDouble(getArrayElement(emissiveFactorVal, 1), 0.0)),
+                                   static_cast<float>(getDouble(getArrayElement(emissiveFactorVal, 2), 0.0)));
     }
 
-    material->setParameter(MP_ALBEDO, glm::vec4(baseColor, 1.0f));
+    yyjson_val *emissiveStrengthVal =
+        getObjectValue(getObjectValue(getObjectValue(materialVal, "extensions"), "KHR_materials_emissive_strength"), "emissiveStrength");
+    if (emissiveStrengthVal) {
+        emissiveStrength = static_cast<float>(getDouble(emissiveStrengthVal, 1.0));
+    }
+
+    material->setParameter(MP_ALBEDO, baseColor);
     material->setParameter(MP_METALLIC, metallic);
     material->setParameter(MP_ROUGHNESS, roughness);
+    material->setParameter(MP_EMISSIVE, emissiveFactor);
+    material->setParameter(MP_EMISSIVE_STRENGTH, emissiveStrength);
 
     AssetRef ref = AssetManager::importAsset(AssetImportDataRequest{
         .data = MaterialInstanceImportData{std::move(material)}, .output = m_outputFolder, .name = materialName});
