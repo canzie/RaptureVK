@@ -35,18 +35,19 @@ static void s_setButtonGuiStateFlag(Amethyst::TextButton &button, uint16_t flag,
     button.setGuiState(on ? static_cast<uint16_t>(state | flag) : static_cast<uint16_t>(state & ~flag));
 }
 
-static bool s_workspaceContainsContentBrowserPanel(Workspace *workspace)
+static ContentBrowserPanel *s_findContentBrowserPanelInWorkspace(Workspace *workspace)
 {
     if (workspace == nullptr) {
-        return false;
+        return nullptr;
     }
 
     for (const auto &panel : workspace->getPanels()) {
-        if (dynamic_cast<ContentBrowserPanel *>(panel.get()) != nullptr) {
-            return true;
+        auto *browser = dynamic_cast<ContentBrowserPanel *>(panel.get());
+        if (browser != nullptr) {
+            return browser;
         }
     }
-    return false;
+    return nullptr;
 }
 
 BottomBar::BottomBar(Amethyst::Window *window, const EditorContext &context) : m_editor(context), m_window(window)
@@ -240,10 +241,28 @@ void BottomBar::setCurrentWorkspace(Workspace *workspace)
     }
 }
 
+void BottomBar::showAssetInContentBrowser(Rapture::AssetHandle handle)
+{
+    ContentBrowserPanel *docked = s_findContentBrowserPanelInWorkspace(m_currWorkspace);
+    if (docked != nullptr) {
+        docked->revealAsset(handle);
+        return;
+    }
+
+    if (m_contentBrowserPopup == nullptr || m_contentBrowserPanel == nullptr) {
+        setupContentBrowserToggle();
+    }
+
+    if (!m_contentBrowserPopup->isOpen()) {
+        m_contentBrowserPopup->open(m_contentBrowserBtn);
+    }
+    m_contentBrowserPanel->revealAsset(handle);
+}
+
 void BottomBar::toggleContentBrowser()
 {
     if (m_contentBrowserPopup == nullptr || m_contentBrowserPanel == nullptr) {
-        if (s_workspaceContainsContentBrowserPanel(m_currWorkspace)) {
+        if (s_findContentBrowserPanelInWorkspace(m_currWorkspace) != nullptr) {
             return;
         }
         setupContentBrowserToggle();

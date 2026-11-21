@@ -1,5 +1,8 @@
 #include <rapture/scene/SceneLoadContext.h>
 
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/instances/SceneObject.h>
+
 namespace Rapture {
 
 void SceneLoadContext::addInstance(InstanceId documentId, Instance *instance)
@@ -18,7 +21,11 @@ void SceneLoadContext::addInstance(InstanceId documentId, Instance *instance)
 Instance *SceneLoadContext::find(InstanceId documentId) const
 {
     auto found = m_byDocumentId.find(documentId);
-    return found != m_byDocumentId.end() ? found->second : nullptr;
+    if (found != m_byDocumentId.end()) {
+        return found->second;
+    }
+
+    return m_scene.findObjectById(documentId);
 }
 
 void SceneLoadContext::finish()

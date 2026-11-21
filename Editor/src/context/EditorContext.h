@@ -87,6 +87,7 @@ struct EditorContext {
     Rapture::Project *project = nullptr;
     EditorCameraInput *cameraInput = nullptr;
     EditorCommands *commands = nullptr;
+    std::function<void(Rapture::AssetHandle)> showAssetInContentBrowser;
 };
 
 /**

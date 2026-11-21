@@ -47,6 +47,11 @@ class SkeletalMesh3D : public Mesh3D {
 
   private:
     /**
+     * @brief Leaves this object drawing nothing and without material slots
+     */
+    void clearMesh();
+
+    /**
      * @brief Puts the matrices this mesh is deformed by into the storage the draw reads them from
      */
     void writePose();

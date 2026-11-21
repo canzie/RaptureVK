@@ -10,6 +10,7 @@
 #include <rapture/scene/instances/Light3D.h>
 #include <rapture/scene/instances/Mesh3D.h>
 #include <rapture/scene/instances/Node3D.h>
+#include <rapture/scene/instances/PrimitiveMesh3D.h>
 #include <rapture/scene/instances/SpringArm3D.h>
 #include <rapture/scene/instances/Terrain3D.h>
 #include <rapture/scene/instances/controllers/CameraController.h>
@@ -32,6 +33,7 @@ static const AuthoredIcon AUTHORED_ICONS[] = {
     {&Rapture::Camera3D::staticType(), Icons::SVG_CAMERA},
     {&Rapture::SpringArm3D::staticType(), Icons::SVG_LINK},
     {&Rapture::Terrain3D::staticType(), Icons::SVG_GRID},
+    {&Rapture::PrimitiveMesh3D::staticType(), Icons::SVG_CUBE},
     {&Rapture::Mesh3D::staticType(), Icons::SVG_MESH},
     {&Rapture::Light3D::staticType(), Icons::SVG_LIGHT},
     {&Rapture::Bone3D::staticType(), Icons::SVG_BONE},

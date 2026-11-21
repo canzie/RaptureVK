@@ -30,6 +30,11 @@ class StaticMesh3D : public Mesh3D {
 
   private:
     /**
+     * @brief Leaves this object drawing nothing, out of ray tracing and without material slots
+     */
+    void clearMesh();
+
+    /**
      * @brief Points this mesh's TLAS instance at the acceleration structure of the mesh it now holds,
      * dropping it out of ray tracing if that mesh has none
      */

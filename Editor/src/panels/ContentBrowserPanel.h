@@ -39,6 +39,12 @@ class ContentBrowserPanel : public Panel {
     void refresh();
     void setBaseDirectory(const std::filesystem::path &path);
 
+    /**
+     * @brief Opens the folder an asset's file is in and selects the file
+     * @param handle The asset to show, ignored if it has no file
+     */
+    void revealAsset(Rapture::AssetHandle handle);
+
   protected:
     void build(Amethyst::UIScope &scope) override;
 
@@ -280,6 +286,7 @@ class ContentBrowserPanel : public Panel {
     std::filesystem::path m_baseDirectory;
     std::filesystem::path m_currentDirectory;
     std::vector<std::filesystem::path> m_navigationHistory;
+    std::vector<std::filesystem::path> m_shownEntryPaths;
     size_t m_historyIndex = 0;
     std::string m_searchFilter;
 };

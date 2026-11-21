@@ -207,6 +207,12 @@ void AmethystLayer::setupEditorContext()
         .config = &m_config,
         .project = &Rapture::Application::getInstance().getProject(),
         .cameraInput = &m_cameraInput,
+        .showAssetInContentBrowser =
+            [this](Rapture::AssetHandle handle) {
+                if (m_bottomBar != nullptr) {
+                    m_bottomBar->showAssetInContentBrowser(handle);
+                }
+            },
     };
 
     m_workspaceManager = std::make_unique<WorkspaceManager>(m_editorContext);

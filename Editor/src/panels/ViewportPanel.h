@@ -151,6 +151,30 @@ class ViewportPanel : public Panel {
     Rapture::CameraController *cameraController(void) const;
 
     /**
+     * @brief Offers the gizmo and focus shortcuts while the cursor is over this viewport
+     */
+    void setupShortcuts();
+
+    /**
+     * @brief Offers Shift and a key to switch the transform gizmo to an operation
+     * @param command The command the keys run
+     * @param key The key held with Shift
+     * @param operation The operation it switches to
+     */
+    void registerGizmoOperationShortcut(EditorCommand command, Rapture::KeyCode key, gizmo::TransformGizmo::Operation operation);
+
+    /**
+     * @brief Whether the editor camera is being flown
+     * @return True while the editor camera holds the cursor
+     */
+    bool isEditorCameraFlying() const;
+
+    /**
+     * @brief Moves the editor camera so the selected object fills the view
+     */
+    void focusOnSelection();
+
+    /**
      * @brief Flies the editor camera with this frame's controls while the cursor is over the image
      * @param dt Seconds since the last frame
      */

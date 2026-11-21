@@ -30,6 +30,11 @@ void StaticMesh3D::setMesh(AssetHandle _mesh)
         return;
     }
 
+    if (_mesh == INVALID_ASSET_HANDLE) {
+        clearMesh();
+        return;
+    }
+
     Ref<AStaticMesh> ref = AssetManager::getAsset<AStaticMesh>(_mesh);
     if (!ref) {
         RP_CORE_ERROR("mesh {} could not be resolved for '{}'", _mesh, name());
@@ -53,6 +58,18 @@ void StaticMesh3D::setMesh(AssetHandle _mesh)
     if (m_entity.has<RayTracedComponent>()) {
         rebuildAccelerationStructure();
     }
+}
+
+void StaticMesh3D::clearMesh()
+{
+    setRayTraced(false);
+
+    if (m_entity.has<StaticMeshComponent>()) {
+        m_entity.write<StaticMeshComponent>()->setMesh({});
+    }
+    m_mesh = INVALID_ASSET_HANDLE;
+
+    clearMaterialSlots();
 }
 
 void StaticMesh3D::rebuildAccelerationStructure()

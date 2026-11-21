@@ -60,7 +60,7 @@ class InstanceRef {
     void deserialize(ReadNode node, std::string_view key) { m_documentId = node.child(key).asU64(INVALID_INSTANCE_ID); }
 
     /**
-     * @brief Turns the id read into a pointer, leaving it an id if the read produced nothing for it
+     * @brief Turns the id read into a pointer, leaving it an id if neither the read nor the scene has anything under it
      * @param context The read this reference came out of
      */
     void link(const SceneLoadContext &context)

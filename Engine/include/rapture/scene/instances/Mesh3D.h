@@ -22,6 +22,11 @@ class Mesh3D : public Node3D {
     const TypeInfo &type() const override;
 
     AssetHandle mesh() const { return m_mesh; }
+
+    /**
+     * @brief Draws this object from a mesh, or from none
+     * @param mesh The mesh to draw, INVALID_ASSET_HANDLE to draw nothing and drop every material slot
+     */
     virtual void setMesh(AssetHandle mesh) = 0;
 
     /**
@@ -40,7 +45,7 @@ class Mesh3D : public Node3D {
     /**
      * @brief Draws one run of this object's mesh with a material of its own
      * @param slot The run to set, which has to be one the mesh has
-     * @param material The material to draw it with
+     * @param material The material to draw it with, INVALID_ASSET_HANDLE to leave the run without one
      */
     void setMaterial(uint32_t slot, AssetHandle material);
 
@@ -72,6 +77,11 @@ class Mesh3D : public Node3D {
      * @param mesh The mesh this object was just given
      */
     void adoptMaterialSlots(const AMesh &mesh);
+
+    /**
+     * @brief Drops every material slot, leaving this object with no runs to draw
+     */
+    void clearMaterialSlots();
 
   protected:
     AssetHandle m_mesh = INVALID_ASSET_HANDLE;

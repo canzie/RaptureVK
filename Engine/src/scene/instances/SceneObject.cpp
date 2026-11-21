@@ -407,7 +407,7 @@ SceneObject *SceneObject::spawnSubtree(SceneObject &parent, ReadNode node, Inter
     }
 
     // what spawns is its own object, not the one it was read from
-    SceneLoadContext context(true);
+    SceneLoadContext context(*parent.scene(), true);
 
     SceneObject *root = loadSubtree(parent, node, context, internalMode);
     if (root == nullptr) {

@@ -32,6 +32,12 @@ class BottomBar {
     void setCurrentWorkspace(Workspace *workspace);
 
     /**
+     * @brief Brings up the content browser on the file of an asset, selected
+     * @param handle The asset to show
+     */
+    void showAssetInContentBrowser(Rapture::AssetHandle handle);
+
+    /**
      * @brief Shows the latest frame time, fps and VRAM readings
      */
     void onUpdate(void);

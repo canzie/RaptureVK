@@ -31,4 +31,14 @@ enum SceneObjectScope {
 std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>>
 AddSceneObjectMenu_buildItems(Rapture::SceneObject *parent, EntitySelection &selection, SceneObjectScope scope);
 
+/**
+ * @brief Builds the context menu items that create one of the built-in shapes under a parent
+ * @param parent The scene object new shapes are parented to
+ * @param selection The selection the newly added shape becomes
+ * @param scope The scope the menu is built for
+ * @return The items, ready to hand to a ContextMenu
+ */
+std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>>
+AddSceneObjectMenu_buildShapeItems(Rapture::SceneObject *parent, EntitySelection &selection, SceneObjectScope scope);
+
 #endif // RAPTURE__ADD_SCENE_OBJECT_MENU_H

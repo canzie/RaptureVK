@@ -33,6 +33,11 @@ void SkeletalMesh3D::setMesh(AssetHandle _mesh)
         return;
     }
 
+    if (_mesh == INVALID_ASSET_HANDLE) {
+        clearMesh();
+        return;
+    }
+
     Ref<ASkeletalMesh> ref = AssetManager::getAsset<ASkeletalMesh>(_mesh);
     if (!ref) {
         RP_CORE_ERROR("mesh {} could not be resolved for '{}'", _mesh, name());
@@ -53,6 +58,17 @@ void SkeletalMesh3D::setMesh(AssetHandle _mesh)
 
     adoptMaterialSlots(*ref);
 
+    writePose();
+}
+
+void SkeletalMesh3D::clearMesh()
+{
+    if (m_entity.has<SkeletalMeshComponent>()) {
+        m_entity.write<SkeletalMeshComponent>()->setMesh({});
+    }
+    m_mesh = INVALID_ASSET_HANDLE;
+
+    clearMaterialSlots();
     writePose();
 }
 

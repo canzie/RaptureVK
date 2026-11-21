@@ -119,8 +119,6 @@ void Camera3D::deserialize(ReadNode node)
         return;
     }
 
-    RP_CORE_WARN("'{}' read fov {}", name(), camera.child(KEY_FIELD_OF_VIEW).asF64(-1.0));
-
     setFieldOfView(static_cast<float>(camera.child(KEY_FIELD_OF_VIEW).asF64(fieldOfView())));
     setNearPlane(static_cast<float>(camera.child(KEY_NEAR_PLANE).asF64(nearPlane())));
     setFarPlane(static_cast<float>(camera.child(KEY_FAR_PLANE).asF64(farPlane())));

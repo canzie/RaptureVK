@@ -55,15 +55,19 @@ void Mesh3D::setMaterial(uint32_t slot, AssetHandle _material)
         return;
     }
 
-    Ref<AMaterialInstance> ref = AssetManager::getAsset<AMaterialInstance>(_material);
-    if (!ref) {
-        RP_CORE_ERROR("material {} could not be resolved for '{}'", _material, name());
-        return;
-    }
-
     if (!m_entity.has<MaterialComponent>()) {
         return;
     }
+
+    Ref<AMaterialInstance> ref;
+    if (_material != INVALID_ASSET_HANDLE) {
+        ref = AssetManager::getAsset<AMaterialInstance>(_material);
+        if (!ref) {
+            RP_CORE_ERROR("material {} could not be resolved for '{}'", _material, name());
+            return;
+        }
+    }
+
     auto component = m_entity.write<MaterialComponent>();
 
     component->materials.resize(m_materials.size());
@@ -83,10 +87,22 @@ void Mesh3D::adoptMaterialSlots(const AMesh &mesh)
         }
     }
 
+    clearMaterialSlots();
     m_materials.assign(adopted.size(), INVALID_ASSET_HANDLE);
     for (uint32_t slot = 0; slot < adopted.size(); slot++) {
         setMaterial(slot, adopted[slot]);
     }
+}
+
+void Mesh3D::clearMaterialSlots()
+{
+    m_materials.clear();
+
+    if (!m_entity.has<MaterialComponent>()) {
+        return;
+    }
+
+    m_entity.write<MaterialComponent>()->materials.clear();
 }
 
 bool Mesh3D::isRayTraced() const
@@ -122,17 +138,11 @@ void Mesh3D::deserialize(ReadNode node)
 
     setMobility(static_cast<Mobility>(mesh.child(KEY_MOBILITY).asU64(static_cast<uint64_t>(mobility()))));
 
-    AssetHandle meshHandle = mesh.child(KEY_MESH).asU64(INVALID_ASSET_HANDLE);
-    if (meshHandle != INVALID_ASSET_HANDLE) {
-        setMesh(meshHandle);
-    }
+    setMesh(mesh.child(KEY_MESH).asU64(INVALID_ASSET_HANDLE));
 
     ReadNode materials = mesh.child(KEY_MATERIALS);
     for (uint32_t slot = 0; slot < materials.size(); slot++) {
-        AssetHandle materialHandle = materials.at(slot).asU64(INVALID_ASSET_HANDLE);
-        if (materialHandle != INVALID_ASSET_HANDLE) {
-            setMaterial(slot, materialHandle);
-        }
+        setMaterial(slot, materials.at(slot).asU64(INVALID_ASSET_HANDLE));
     }
 
     setVisible(mesh.child(KEY_VISIBLE).asBool(isVisible()));

@@ -2,16 +2,24 @@
 #include "EntitySelection.h"
 #include "Icons.h"
 #include "panels/AddSceneObjectMenu.h"
+#include "scene/EditorCamera.h"
 #include "ui/AssetVisuals.h"
+#include "ui/controls/IconLabelButton.h"
 #include "ui/controls/SearchField.h"
 #include "ui/menus/ContextMenuItems.h"
 #include <rapture/assets/asset_manager/AssetManager.h>
 #include <rapture/core/ecs/entity_accessor.h>
 #include <rapture/scene/World.h>
+#include <rapture/scene/instances/Mesh3D.h>
 #include <rapture/scene/instances/Module.h>
+#include <rapture/scene/instances/Node3D.h>
 #include <rapture/scene/instances/SceneObject.h>
+#include <rapture/scene/instances/SkeletonPose.h>
 
 #include <components/common.h>
+#include <components/container.h>
+#include <components/extensions/ui_flex_item.h>
+#include <components/extensions/ui_list_layout.h>
 #include <components/context_menu_item.h>
 #include <components/text_input.h>
 #include <components/text_label.h>
@@ -34,11 +42,30 @@ static constexpr float NAME_TEXT_LEFT =
 static constexpr float SEARCH_FIELD_MARGIN = 8.0f;
 static constexpr float SEARCH_FIELD_HEIGHT = 26.0f;
 static constexpr float SEARCH_TREE_GAP = 6.0f;
+static constexpr float SEARCH_BAR_GAP = 6.0f;
+static constexpr std::string_view ADD_BUTTON_CLASS = "generic-text-button";
 static constexpr float TREE_TOP = SEARCH_FIELD_MARGIN + SEARCH_FIELD_HEIGHT + SEARCH_TREE_GAP;
 
 static bool s_showsInOutliner(const Rapture::SceneObject *object)
 {
     return object->visibility().inOutliner;
+}
+
+static Rapture::AssetHandle s_assetWithFileBehindObject(const Rapture::SceneObject &object)
+{
+    Rapture::AssetHandle handle = Rapture::INVALID_ASSET_HANDLE;
+    if (const auto *module = object.as<Rapture::Module>(); module != nullptr) {
+        handle = module->assetHandle();
+    } else if (const auto *mesh = object.as<Rapture::Mesh3D>(); mesh != nullptr) {
+        handle = mesh->mesh();
+    } else if (const auto *pose = object.as<Rapture::SkeletonPose>(); pose != nullptr) {
+        handle = pose->skeleton();
+    }
+
+    if (handle == Rapture::INVALID_ASSET_HANDLE || Rapture::AssetManager::getAssetMetadata(handle).assetPath.empty()) {
+        return Rapture::INVALID_ASSET_HANDLE;
+    }
+    return handle;
 }
 
 static std::string s_toLowercase(std::string_view text)
@@ -61,22 +88,27 @@ static bool s_subtreeMatchesFilter(const Rapture::SceneObject *object, std::stri
     return false;
 }
 
+static float s_addRowIconReturningTextLeft(Amethyst::UIScope &s, const SceneObjectIcon &icon)
+{
+    s.imageLabel({
+        .classes = {std::string(icon.styleClass)},
+        .base = {.anchorPoint = Amethyst::vec2(0.0f, 0.5f),
+                 .interactable = false,
+                 .position = Amethyst::UDim2(0.0f, ROW_ICON_PAD, 0.5f, 0.0f),
+                 .size = Amethyst::UDim2::fromOffset(ROW_ICON_SIZE, ROW_ICON_SIZE)},
+        .style = {.backgroundTransparency = 1.0f},
+        .svg = icon.svg,
+    });
+    return ROW_ICON_PAD + ROW_ICON_SIZE + ROW_ICON_GAP;
+}
+
 static void s_nameLabel(Amethyst::UIScope &s, const std::string &text, std::string_view className,
                         const SceneObjectIcon *icon = nullptr)
 {
     float textLeft = LABEL_TEXT_LEFT;
 
     if (icon != nullptr) {
-        s.imageLabel({
-            .classes = {std::string(icon->styleClass)},
-            .base = {.anchorPoint = Amethyst::vec2(0.0f, 0.5f),
-                     .interactable = false,
-                     .position = Amethyst::UDim2(0.0f, ROW_ICON_PAD, 0.5f, 0.0f),
-                     .size = Amethyst::UDim2::fromOffset(ROW_ICON_SIZE, ROW_ICON_SIZE)},
-            .style = {.backgroundTransparency = 1.0f},
-            .svg = icon->svg,
-        });
-        textLeft = ROW_ICON_PAD + ROW_ICON_SIZE + ROW_ICON_GAP;
+        textLeft = s_addRowIconReturningTextLeft(s, *icon);
     }
 
     Amethyst::UDim4 pd = {.left = Amethyst::UDim::fromOffset(textLeft)};
@@ -96,17 +128,53 @@ OutlinerPanel::OutlinerPanel(const WorkspaceContext &context) : Panel("Outliner"
     m_icon = Icons::SVG_LAYERS;
 }
 
+void OutlinerPanel::setupSearchBar(Amethyst::UIScope &scope)
+{
+    scope.frame(
+        {
+            .base =
+                {
+                    .position = Amethyst::UDim2::fromOffset(SEARCH_FIELD_MARGIN, SEARCH_FIELD_MARGIN),
+                    .size = Amethyst::UDim2(1.0f, -2.0f * SEARCH_FIELD_MARGIN, 0.0f, SEARCH_FIELD_HEIGHT),
+                },
+            .style = {.backgroundTransparency = 1.0f},
+        },
+        [this](Amethyst::FrameScope &bar) {
+            auto *row = bar.component.addExtension<Amethyst::UIListLayout>();
+            row->fillDirection = Amethyst::FillDirection::FILL_HORIZONTAL;
+            row->horizontalFlex = Amethyst::UiFlexAlignment::FILL;
+            row->verticalAlignment = Amethyst::VerticalAlignment::ALIGN_CENTER_V;
+            row->innerPadding = Amethyst::UDim::fromOffset(SEARCH_BAR_GAP);
+
+            SearchField *searchField = bar.component.add<SearchField>("Search");
+            searchField->setBaseProperties({.layoutOrder = 0, .size = Amethyst::UDim2::fromScale(0.0f, 1.0f)});
+            searchField->addExtension<Amethyst::UIFlexItem>();
+            searchField->setOnTextChanged([this](const std::string &text) {
+                m_loweredFilter = s_toLowercase(text);
+                m_pendingRefresh = true;
+            });
+
+            IconLabelButton *addButton =
+                bar.component.add<IconLabelButton>(Icons::SVG_PLUS, "Add", std::vector<std::string>{std::string(ADD_BUTTON_CLASS)});
+            addButton->setBaseProperties({.layoutOrder = 1, .size = Amethyst::UDim2::fromScale(0.0f, 1.0f)});
+            addButton->track(addButton->onMouseButton1ClickCb.connect([this, addButton]() {
+                showAddMenu({addButton->absolutePosition.x, addButton->absolutePosition.y + addButton->absoluteSize.y});
+            }));
+        });
+}
+
+void OutlinerPanel::showAddMenu(Amethyst::vec2 pos)
+{
+    if (m_scene == nullptr || m_selection == nullptr) {
+        return;
+    }
+
+    showContextMenu(pos, AddSceneObjectMenu_buildItems(m_scene->root(), *m_selection, SCENE_OBJECT_SCOPE_LEVEL));
+}
+
 void OutlinerPanel::build(Amethyst::UIScope &scope)
 {
-    SearchField *searchField = scope.get().add<SearchField>("Search");
-    searchField->setBaseProperties({
-        .position = Amethyst::UDim2::fromOffset(SEARCH_FIELD_MARGIN, SEARCH_FIELD_MARGIN),
-        .size = Amethyst::UDim2(1.0f, -2.0f * SEARCH_FIELD_MARGIN, 0.0f, SEARCH_FIELD_HEIGHT),
-    });
-    searchField->setOnTextChanged([this](const std::string &text) {
-        m_loweredFilter = s_toLowercase(text);
-        m_pendingRefresh = true;
-    });
+    setupSearchBar(scope);
 
     scope.treeView(
         {
@@ -131,12 +199,30 @@ void OutlinerPanel::build(Amethyst::UIScope &scope)
 
     m_treeView->onRowClicked = [this](uint32_t row) { onRowClicked(row); };
     m_treeView->onRowRightClicked = [this](uint32_t row, Amethyst::vec2 pos) { onRowRightClicked(row, pos); };
+    m_treeView->onEmptySpaceRightClicked = [this](Amethyst::vec2 pos) { showAddMenu(pos); };
 
     m_contextMenu = m_root->add<Amethyst::ContextMenu>();
     m_contextMenu->setContextMenuProperties({.itemHoverBackground = COL_MENU_HOVER});
     m_contextMenu->setRowFactories({.separator = [] { return std::make_unique<SeparatorMenuItemView>(); }});
 
+    if (m_context.editor->shortcuts != nullptr) {
+        m_context.editor->shortcuts->registerShortcut(EDITOR_COMMAND_FOCUS_SELECTION, {Rapture::KEY_F}, m_root,
+                                                      [this]() { focusOnSelection(); });
+    }
+
     setScene(m_context.scene);
+}
+
+void OutlinerPanel::focusOnSelection()
+{
+    if (m_context.editorCamera == nullptr || m_scene == nullptr || m_selection == nullptr || !m_selection->has()) {
+        return;
+    }
+
+    Rapture::SceneObject *object = m_scene->instanceFor(m_selection->entity().getEntity());
+    if (object != nullptr) {
+        m_context.editorCamera->focusOnObject(*object);
+    }
 }
 
 void OutlinerPanel::onRootDestroyed()
@@ -301,12 +387,19 @@ void OutlinerPanel::onRowRightClicked(uint32_t row, Amethyst::vec2 pos)
     bool hasChildren = !instance->children().empty();
 
     std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
-    if (m_selection != nullptr) {
-        items.push_back(
-            Amethyst::makeSubmenuItem("Add", AddSceneObjectMenu_buildItems(instance, *m_selection, SCENE_OBJECT_SCOPE_LEVEL)));
-    }
-    items.push_back(SeparatorMenuItem::create());
     items.push_back(Amethyst::makeActionItem("Rename", [this, row, instance]() { startRename(row, instance); }));
+
+    if (m_context.editorCamera != nullptr && instance->isA<Rapture::Node3D>()) {
+        items.push_back(Amethyst::makeActionItem("Focus in Viewport", [this, instance]() { m_context.editorCamera->focusOnObject(*instance); }));
+    }
+
+    const Rapture::AssetHandle asset = s_assetWithFileBehindObject(*instance);
+    if (asset != Rapture::INVALID_ASSET_HANDLE && m_context.editor->showAssetInContentBrowser != nullptr) {
+        items.push_back(Amethyst::makeActionItem("Show in Content Browser",
+                                                 [this, asset]() { m_context.editor->showAssetInContentBrowser(asset); }));
+    }
+
+    items.push_back(SeparatorMenuItem::create());
     items.push_back(Amethyst::makeActionItem("Delete", [this, instance]() { requestDelete(instance, false); }));
     if (hasChildren) {
         items.push_back(Amethyst::makeActionItem("Delete (keep children)", [this, instance]() { requestDelete(instance, true); }));
@@ -367,32 +460,37 @@ void OutlinerPanel::buildNameCell(uint32_t row, Rapture::SceneObject *instance, 
         return;
     }
 
-    if (editing) {
-        auto input = std::make_unique<Amethyst::TextInput>();
-        Amethyst::TextInput *raw = input.get();
-        m_renameInput = raw;
-        raw->addClass("property-input-field");
-        raw->setText(name);
-        raw->setBaseProperties({
-            .padding = Amethyst::UDim4{.left = Amethyst::UDim::fromOffset(2.0f)},
-            .size = Amethyst::UDim2::fromScale(1.0f, 1.0f),
-            .zIndex = 2,
-        });
-        raw->setTextInputProperties({.text = {.fontSize = 14.0f, .textYAlignment = Amethyst::TextYAlignment::CENTER}});
-        raw->onEnterPressed = [this, instance, raw]() { onRenameCommitted(instance, raw->getText()); };
-        raw->onFocusLost = [this, instance, raw]() { onRenameCommitted(instance, raw->getText()); };
-        m_treeView->setCell(row, 0, std::move(input));
-    } else {
-        auto label = std::make_unique<Amethyst::TextLabel>();
-        label->setText(name);
-        label->setClasses({"treeview-primary-column"});
-        label->setBaseProperties(
-            {.padding = Amethyst::UDim4{.left = Amethyst::UDim::fromOffset(2.0f)}, .size = Amethyst::UDim2::fromScale(1.0f, 1.0f)});
-        label->setBaseStyleProperties({.backgroundTransparency = 1.0f});
-        label->setTextStyleProperties({.textYAlignment = Amethyst::TextYAlignment::CENTER});
-        label->propagate(Amethyst::INTERACTION_CATEGORY_ALL);
-        m_treeView->setCell(row, 0, std::move(label));
+    const SceneObjectIcon icon = SceneObject_iconForClass(&instance->type());
+    auto cell = std::make_unique<Amethyst::Container>();
+    cell->setBaseProperties({.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)});
+    Amethyst::UIScope scope(*cell);
+
+    if (!editing) {
+        s_nameLabel(scope, name, "treeview-primary-column", &icon);
+        m_treeView->setCell(row, 0, std::move(cell));
+        return;
     }
+
+    const float textLeft = s_addRowIconReturningTextLeft(scope, icon);
+
+    auto *input = cell->add<Amethyst::TextInput>();
+    m_renameInput = input;
+    input->addClass("property-input-field");
+    input->setText(name);
+    input->setBaseProperties({
+        .padding = Amethyst::UDim4{.left = Amethyst::UDim::fromOffset(2.0f)},
+        .position = Amethyst::UDim2::fromOffset(textLeft, 0.0f),
+        .size = Amethyst::UDim2(1.0f, -textLeft, 1.0f, 0.0f),
+        .zIndex = 2,
+    });
+    input->setTextInputProperties({.text = {.fontSize = 14.0f, .textYAlignment = Amethyst::TextYAlignment::CENTER}});
+    input->onEnterPressed = [this, instance, input]() { onRenameCommitted(instance, input->getText()); };
+    input->onFocusLost = [this, instance, input]() { onRenameCommitted(instance, input->getText()); };
+
+    m_treeView->setCell(row, 0, std::move(cell));
+
+    input->focus();
+    input->selectAll();
 }
 
 void OutlinerPanel::startRename(uint32_t row, Rapture::SceneObject *instance)

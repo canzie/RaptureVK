@@ -27,7 +27,8 @@
 
 #include <array>
 
-static constexpr std::string_view ADD_BUTTON_CLASS = "hotbar-primary-button";
+static constexpr std::string_view PRIMARY_HOTBAR_BUTTON_CLASS = "hotbar-primary-button";
+static constexpr std::string_view ADD_SHAPE_ICON_CLASS = "hotbar-add-shape-icon";
 
 static constexpr float MODE_DROPDOWN_WIDTH = 120.0f;
 
@@ -50,7 +51,7 @@ static constexpr uint32_t INITIAL_VIEWPORT_HEIGHT = 720;
 static constexpr std::string_view EDITOR_LAYER_NAME = "Editor Layer";
 
 enum WorldEditorTooltip {
-    WORLD_EDITOR_TOOLTIP_ADD,
+    WORLD_EDITOR_TOOLTIP_ADD_SHAPE,
     WORLD_EDITOR_TOOLTIP_SAVE_WORLD,
     WORLD_EDITOR_TOOLTIP_PLAY,
     WORLD_EDITOR_TOOLTIP_STOP,
@@ -61,7 +62,7 @@ enum WorldEditorTooltip {
 };
 
 static constexpr std::array<ControlTooltip, WORLD_EDITOR_TOOLTIP_COUNT> WORLD_EDITOR_TOOLTIPS = {{
-    {.name = "Add", .description = "Adds an object to the root of the world"},
+    {.name = "Add Shape", .description = "Adds a box, sphere or plane to the root of the world"},
     {.name = "Save World", .description = "Writes this world and its objects to its asset file"},
     {.name = "Play", .description = "Play the world"},
     {.name = "Stop", .description = "Stop playing", .command = EDITOR_COMMAND_PLAY_MODE_STOP},
@@ -141,8 +142,8 @@ void WorldEditorWorkspace::build()
     addPanel(std::make_unique<PropertiesPanel>(m_context), propertiesTabBar);
     addPanel(std::make_unique<WorldSettingsPanel>(m_context), propertiesTabBar);
 
-    m_addMenu = m_container->add<Amethyst::ContextMenu>();
-    m_addMenu->setRowFactories({.separator = [] { return std::make_unique<SeparatorMenuItemView>(); }});
+    m_shapeMenu = m_container->add<Amethyst::ContextMenu>();
+    m_shapeMenu->setRowFactories({.separator = [] { return std::make_unique<SeparatorMenuItemView>(); }});
 
     setupShortcuts();
 }
@@ -155,8 +156,11 @@ void WorldEditorWorkspace::buildHotbar()
                          [](EditorMode mode) { RP_TRACE("{} chosen, the world editor does nothing with it yet", EDITOR_MODE_LABELS[mode]); });
     });
     addHotbarSeparator();
-    m_addButton = addHotbarButton("Add", Icons::SVG_PLUS, ADD_BUTTON_CLASS, [this]() { showAddMenu(*m_addButton); });
-    ControlTooltip_attach(*m_addButton, WORLD_EDITOR_TOOLTIPS[WORLD_EDITOR_TOOLTIP_ADD], m_editor);
+    IconLabelButton *addShapeButton =
+        addHotbarButton("Add", Icons::SVG_CUBE, PRIMARY_HOTBAR_BUTTON_CLASS, [this]() { showShapeMenu(*m_addShapeButton); });
+    addShapeButton->getIcon().addClass(std::string(ADD_SHAPE_ICON_CLASS));
+    m_addShapeButton = addShapeButton;
+    ControlTooltip_attach(*m_addShapeButton, WORLD_EDITOR_TOOLTIPS[WORLD_EDITOR_TOOLTIP_ADD_SHAPE], m_editor);
     addHotbarSeparator();
     IconLabelButton *saveButton = addHotbarButton("Save World", Icons::SVG_SAVE, [this]() { saveWorld(); });
     ControlTooltip_attach(*saveButton, WORLD_EDITOR_TOOLTIPS[WORLD_EDITOR_TOOLTIP_SAVE_WORLD], m_editor);
@@ -328,14 +332,14 @@ void WorldEditorWorkspace::stopPlay()
     syncPlayingIndicators();
 }
 
-void WorldEditorWorkspace::showAddMenu(Amethyst::TextButton &button)
+void WorldEditorWorkspace::showShapeMenu(Amethyst::TextButton &button)
 {
-    if (m_addMenu == nullptr) {
+    if (m_shapeMenu == nullptr) {
         return;
     }
 
-    m_addMenu->setItems(AddSceneObjectMenu_buildItems(m_world->getScene()->root(), m_selection, SCENE_OBJECT_SCOPE_LEVEL));
-    m_addMenu->showAt({button.absolutePosition.x, button.absolutePosition.y + button.absoluteSize.y});
+    m_shapeMenu->setItems(AddSceneObjectMenu_buildShapeItems(m_world->getScene()->root(), m_selection, SCENE_OBJECT_SCOPE_LEVEL));
+    m_shapeMenu->showAt({button.absolutePosition.x, button.absolutePosition.y + button.absoluteSize.y});
 }
 
 void WorldEditorWorkspace::saveWorld()

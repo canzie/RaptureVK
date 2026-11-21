@@ -7,6 +7,7 @@ namespace Rapture {
 class Camera3D;
 class CameraController;
 class Scene;
+class SceneObject;
 } // namespace Rapture
 
 /**
@@ -26,6 +27,12 @@ class EditorCamera {
 
     Rapture::Camera3D &camera() { return *m_camera; }
     Rapture::CameraController &controller() { return *m_controller; }
+
+    /**
+     * @brief Moves the camera so a scene object fills the view, keeping the direction it looks along
+     * @param object The object to look at, ignored if it has no place in the world
+     */
+    void focusOnObject(const Rapture::SceneObject &object);
 
   private:
     std::unique_ptr<Rapture::Camera3D> m_camera;

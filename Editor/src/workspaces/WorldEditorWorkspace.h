@@ -49,10 +49,10 @@ class WorldEditorWorkspace : public AssetWorkspace {
     void setupShortcuts();
 
     /**
-     * @brief Opens the add menu under the hotbar button, adding to the root of the scene
+     * @brief Opens the menu of built-in shapes under the hotbar button, adding to the root of the scene
      * @param button The button the menu drops from
      */
-    void showAddMenu(Amethyst::TextButton &button);
+    void showShapeMenu(Amethyst::TextButton &button);
 
     /**
      * @brief Writes the workspace's world back into its asset
@@ -92,8 +92,8 @@ class WorldEditorWorkspace : public AssetWorkspace {
     void addPlayingNote();
 
   private:
-    Amethyst::ContextMenu *m_addMenu = nullptr;
-    Amethyst::TextButton *m_addButton = nullptr;
+    Amethyst::ContextMenu *m_shapeMenu = nullptr;
+    Amethyst::TextButton *m_addShapeButton = nullptr;
     IconButton *m_playButton = nullptr;
     IconButton *m_pauseButton = nullptr;
     IconButton *m_stepButton = nullptr;

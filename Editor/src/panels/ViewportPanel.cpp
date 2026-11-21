@@ -8,6 +8,7 @@
 #include "ui/menus/ContextMenuItems.h"
 #include <rapture/gpu/render_targets/SceneRenderTarget.h>
 #include <rapture/renderer/viewport/Viewport.h>
+#include <rapture/scene/Scene.h>
 #include <rapture/scene/World.h>
 #include <rapture/scene/components/Components.h>
 #include <rapture/scene/instances/Camera3D.h>
@@ -204,6 +205,7 @@ void ViewportPanel::build(Amethyst::UIScope &scope)
     if (m_overlays.orientationGizmo) {
         setupOrientationGizmo();
     }
+    setupShortcuts();
 
     if (m_selection != nullptr) {
         m_selectionChangedConn = m_selection->onChanged.connect([this](Rapture::ecs::EntityAccessor entity) {
@@ -471,6 +473,52 @@ void ViewportPanel::applyLightingMode(ViewportLightingMode mode)
         settings.setFlag(Rapture::RENDER_USE_GLOBAL_ILLUMINATION, true);
         settings.setFlag(Rapture::RENDER_MODULATE_INDIRECT, true);
         break;
+    }
+}
+
+void ViewportPanel::setupShortcuts()
+{
+    ShortcutRegistry *shortcuts = m_context.editor->shortcuts;
+    if (shortcuts == nullptr) {
+        return;
+    }
+
+    registerGizmoOperationShortcut(EDITOR_COMMAND_GIZMO_TRANSLATE, Rapture::KEY_G, gizmo::TransformGizmo::OPERATION_TRANSLATE);
+    registerGizmoOperationShortcut(EDITOR_COMMAND_GIZMO_ROTATE, Rapture::KEY_R, gizmo::TransformGizmo::OPERATION_ROTATE);
+    registerGizmoOperationShortcut(EDITOR_COMMAND_GIZMO_SCALE, Rapture::KEY_S, gizmo::TransformGizmo::OPERATION_SCALE);
+
+    shortcuts->registerShortcut(EDITOR_COMMAND_FOCUS_SELECTION, {Rapture::KEY_F}, m_root, [this]() {
+        if (!isEditorCameraFlying()) {
+            focusOnSelection();
+        }
+    });
+}
+
+void ViewportPanel::registerGizmoOperationShortcut(EditorCommand command, Rapture::KeyCode key, gizmo::TransformGizmo::Operation operation)
+{
+    m_context.editor->shortcuts->registerShortcut(command, {key, SHORTCUT_MOD_SHIFT}, m_root, [this, operation]() {
+        // the fly camera moves on the same letters while it holds the cursor
+        if (!isEditorCameraFlying()) {
+            setGizmoOperation(operation);
+        }
+    });
+}
+
+bool ViewportPanel::isEditorCameraFlying() const
+{
+    Rapture::CameraController *controller = cameraController();
+    return controller != nullptr && controller->capturesCursor();
+}
+
+void ViewportPanel::focusOnSelection()
+{
+    if (m_context.editorCamera == nullptr || m_context.scene == nullptr || !m_selectedEntity.isValid()) {
+        return;
+    }
+
+    Rapture::SceneObject *object = m_context.scene->instanceFor(m_selectedEntity.getEntity());
+    if (object != nullptr) {
+        m_context.editorCamera->focusOnObject(*object);
     }
 }
 

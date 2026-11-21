@@ -354,6 +354,31 @@ SceneObject *Scene::instanceFor(ecs::Entity entity) const
     return ref != nullptr ? ref->instance : nullptr;
 }
 
+static SceneObject *s_findDescendantById(const SceneObject &parent, InstanceId id)
+{
+    for (const auto &child : parent.children(true)) {
+        if (child->id() == id) {
+            return child.get();
+        }
+
+        SceneObject *found = s_findDescendantById(*child, id);
+        if (found != nullptr) {
+            return found;
+        }
+    }
+
+    return nullptr;
+}
+
+SceneObject *Scene::findObjectById(InstanceId id) const
+{
+    if (id == INVALID_INSTANCE_ID) {
+        return nullptr;
+    }
+
+    return s_findDescendantById(*m_root, id);
+}
+
 void Scene::destroyInstance(SceneObject *instance)
 {
     if (instance == nullptr || instance == m_root.get() || instance->isBeingDestroyed()) {
@@ -452,7 +477,7 @@ std::unique_ptr<Scene> Scene::deserialize(ReadNode node)
     scene->clearInstances();
 
     // the instances are the ones the document was written from, so they keep the ids it gave them
-    SceneLoadContext context(false);
+    SceneLoadContext context(*scene, false);
 
     ReadNode instances = node.child(KEY_INSTANCES);
     for (size_t i = 0; i < instances.size(); i++) {
@@ -560,7 +585,7 @@ bool Scene::restoreFrom(ReadNode node)
     s_mapInstancesById(*m_root, live);
 
     // an instance the snapshot holds keeps the id it was written under, restored or reused alike
-    SceneLoadContext context(false);
+    SceneLoadContext context(*this, false);
 
     if (!s_restoreSubtree(*m_root, node.child(KEY_INSTANCES), live, context)) {
         return false;

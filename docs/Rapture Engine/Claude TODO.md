@@ -12,6 +12,10 @@ Delete an entry when it is done or turns out not to matter. Add the date when so
 
 ## Bugs I found but did not chase
 
+- **2026-11-21 — rebinding a `SkeletonPose` to another skeleton leaves the old bones behind.** `buildBones` clears `m_bones` but never removes the old `Bone3D` children, which stay bound to joint indices of the old skeleton. The same rebind resets `m_skeletonInstance` while every `SkeletalMesh3D` drawn against the pose still holds the old instance pointer in its `SkeletalMeshComponent::pose` until it next calls `writePose`. Nothing rebinds a live pose today (only the constructor and a load bind one), so neither has fired.
+- **2026-11-21 — `Module::deserialize` respawns the module's contents every time**, even when the asset handle is unchanged. Restore relies on that, since the contents are never written, but an undo that reads a Module back will hand its contents new ids, so anything selected or referenced inside them is lost.
+- **2026-11-21 — `ScriptComponent` has no round trip test.** Its header is private to the engine, so `Engine/test` cannot set a script on one.
+
 - **2026-11-19 — a GPU test segfaults when a shader fails to compile.** `WindowlessRender.SphereStandsOutWithGlobalIllumination` crashed after `ProbeTrace.cs.glsl` failed, instead of failing cleanly. Looks like a pass carrying on with a pipeline that was never built.
 - **2026-11-19 — `LinearToSRGB` in `Tonemapping.glsl` has the wrong curve.** It computes `pow(rgb * 1.055, 1/2.4) - 0.055` instead of `1.055 * pow(rgb, 1/2.4) - 0.055`. Only runs when composite targets an 8-bit UNORM image, which the editor never does, so nobody has seen it.
 

@@ -1166,6 +1166,8 @@ void ContentBrowserPanel::refreshFileBrowser()
     std::vector<std::filesystem::directory_entry> entries(std::filesystem::directory_iterator(m_currentDirectory),
                                                           std::filesystem::directory_iterator{});
 
+    m_shownEntryPaths.clear();
+
     std::sort(entries.begin(), entries.end(),
               [](const std::filesystem::directory_entry &a, const std::filesystem::directory_entry &b) {
                   bool aDir = a.is_directory();
@@ -1197,6 +1199,7 @@ void ContentBrowserPanel::refreshFileBrowser()
 
         auto &item = acquirePoolItem(index);
         item.container->setBaseProperties({.layoutOrder = static_cast<uint32_t>(index)});
+        m_shownEntryPaths.push_back(entry.path());
 
         if (isDir) {
             item.icon->setSvg(Icons::SVG_FOLDER);
@@ -1430,6 +1433,23 @@ void ContentBrowserPanel::navigateToDirectory(const std::filesystem::path &path)
     m_historyIndex = m_navigationHistory.size() - 1;
 
     refresh();
+}
+
+void ContentBrowserPanel::revealAsset(Rapture::AssetHandle handle)
+{
+    const std::filesystem::path &assetPath = Rapture::AssetManager::getAssetMetadata(handle).assetPath;
+    if (assetPath.empty()) {
+        return;
+    }
+
+    navigateToDirectory(assetPath.parent_path());
+
+    for (size_t index = 0; index < m_shownEntryPaths.size(); index++) {
+        if (m_shownEntryPaths[index].filename() == assetPath.filename()) {
+            selectItem(index);
+            return;
+        }
+    }
 }
 
 void ContentBrowserPanel::navigateBack()

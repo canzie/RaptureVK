@@ -37,6 +37,23 @@ class OutlinerPanel : public Panel {
     void onRootDestroyed() override;
 
   private:
+    /**
+     * @brief Builds the search field and the add button beside it
+     * @param scope The panel's root scope
+     */
+    void setupSearchBar(Amethyst::UIScope &scope);
+
+    /**
+     * @brief Opens the menu of scene objects to add at the root of the scene
+     * @param pos Where the menu opens
+     */
+    void showAddMenu(Amethyst::vec2 pos);
+
+    /**
+     * @brief Moves the editor camera so the selected object fills the view
+     */
+    void focusOnSelection();
+
     void buildInstanceTree(Rapture::SceneObject *instance, Amethyst::TreeRowScope &rowScope);
 
     void onRowClicked(uint32_t row);

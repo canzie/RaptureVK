@@ -2,6 +2,7 @@
 
 #include "scene/instances/scene_components/ScriptComponent.h"
 #include <rapture/core/utils/Log.h>
+#include <rapture/scene/instances/Box3D.h>
 #include <rapture/scene/instances/Camera3D.h>
 #include <rapture/scene/instances/CharacterBody3D.h>
 #include <rapture/scene/instances/DirectionalLight3D.h>
@@ -9,10 +10,12 @@
 #include <rapture/scene/instances/Folder.h>
 #include <rapture/scene/instances/Module.h>
 #include <rapture/scene/instances/Node3D.h>
+#include <rapture/scene/instances/Plane3D.h>
 #include <rapture/scene/instances/PointLight3D.h>
 #include <rapture/scene/instances/RigidBody3D.h>
 #include <rapture/scene/instances/SkeletalMesh3D.h>
 #include <rapture/scene/instances/SkeletonPose.h>
+#include <rapture/scene/instances/Sphere3D.h>
 #include <rapture/scene/instances/SpotLight3D.h>
 #include <rapture/scene/instances/SpringArm3D.h>
 #include <rapture/scene/instances/StaticMesh3D.h>
@@ -44,6 +47,9 @@ void InstanceRegistry::init()
     addObject<Camera3D>();
     addObject<SpringArm3D>();
     addObject<StaticMesh3D>();
+    addObject<Box3D>();
+    addObject<Sphere3D>();
+    addObject<Plane3D>();
     addObject<SkeletalMesh3D>();
     addObject<SkeletonPose>();
     addObject<Terrain3D>();

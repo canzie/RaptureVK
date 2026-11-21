@@ -1,4 +1,5 @@
-#pragma once
+#ifndef RAPTURE__MESH_PRIMITIVES_H
+#define RAPTURE__MESH_PRIMITIVES_H
 
 #include <rapture/assets/meshes/StaticMesh.h>
 
@@ -25,3 +26,5 @@ class Primitives {
 };
 
 } // namespace Rapture
+
+#endif // RAPTURE__MESH_PRIMITIVES_H

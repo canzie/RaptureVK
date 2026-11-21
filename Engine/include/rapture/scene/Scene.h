@@ -15,6 +15,7 @@
 #include <rapture/scene/EntityCommon.h>
 #include <rapture/scene/TickPhase.h>
 #include <rapture/scene/components/ChangeChannels.h>
+#include <rapture/scene/instances/Instance.h>
 #include <span>
 #include <string>
 #include <vector>
@@ -114,6 +115,13 @@ class Scene {
      * @return The instance, or nullptr if the entity is not authored
      */
     SceneObject *instanceFor(ecs::Entity entity) const;
+
+    /**
+     * @brief Finds the scene object holding an id, internal ones included
+     * @param id The id to look for
+     * @return The scene object, or nullptr if none in this scene holds the id
+     */
+    SceneObject *findObjectById(InstanceId id) const;
 
     /**
      * @brief Destroys an instance along with its subtree, once the running tick phase has finished if one is running
