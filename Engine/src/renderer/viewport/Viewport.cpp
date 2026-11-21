@@ -2,7 +2,9 @@
 
 #include "renderer/DepthPrepassRenderer.h"
 #include "renderer/GizmoRenderer.h"
+#include "renderer/atmosphere/AtmosphereRenderer.h"
 #include "renderer/deferred/DeferredRenderer.h"
+#include "renderer/gi/ddgi/DynamicDiffuseGIProbeDebugRenderer.h"
 #include "renderer/shadows/ShadowRenderer.h"
 #include <rapture/app/Application.h>
 #include <rapture/core/utils/Log.h>
@@ -14,6 +16,8 @@ namespace Rapture {
 static constexpr uint32_t DRAW_ORDER_SHADOWS = 0;
 static constexpr uint32_t DRAW_ORDER_DEPTH_PREPASS = 1;
 static constexpr uint32_t DRAW_ORDER_SCENE = 2;
+static constexpr uint32_t DRAW_ORDER_ATMOSPHERE = 3;
+static constexpr uint32_t DRAW_ORDER_PROBE_DEBUG = 4;
 static constexpr uint32_t DRAW_ORDER_IMMEDIATE_SHAPES = 0;
 
 Viewport::Viewport(const ViewportConfig &config, RenderContext renderContext) : m_config(config), m_renderContext(renderContext)
@@ -91,6 +95,15 @@ void Viewport::createRenderer(RendererType type)
     RP_ASSERT(renderer != nullptr, "Failed to create renderer");
 
     m_drawManager->addRenderer(std::move(renderer), DRAW_PHASE_PRE_COMPOSITE, DRAW_ORDER_SCENE);
+
+    m_drawManager->addRenderer(std::make_unique<AtmosphereRenderer>(m_renderContext, rendererConfig), DRAW_PHASE_PRE_COMPOSITE,
+                               DRAW_ORDER_ATMOSPHERE);
+
+    if (m_config.enableAccelerationStructures) {
+        m_drawManager->addRenderer(std::make_unique<DynamicDiffuseGIProbeDebugRenderer>(m_renderContext, rendererConfig,
+                                                                                        m_drawManager->getDepthFormat()),
+                                   DRAW_PHASE_PRE_COMPOSITE, DRAW_ORDER_PROBE_DEBUG);
+    }
 
     m_drawManager->addRenderer(
         std::make_unique<GizmoRenderer>(m_renderContext, rendererConfig, m_drawManager->getDepthFormat(), &m_gizmoDrawList),

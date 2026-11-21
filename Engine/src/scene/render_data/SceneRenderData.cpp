@@ -470,7 +470,13 @@ void SceneRenderData::updateLights(uint32_t frameIndex)
         }
         data.directionAndRange = glm::vec4(direction, range);
 
-        data.colorAndIntensity = glm::vec4(light->color, light->intensity);
+        glm::vec3 color = light->color;
+        if (const DirectionalLightComponent *directional = registry.tryRead<DirectionalLightComponent>(entityId)) {
+            if (directional->atmosphereSunLight) {
+                color *= directional->atmosphereTransmittance;
+            }
+        }
+        data.colorAndIntensity = glm::vec4(color, light->intensity);
 
         data.spotAngles = glm::vec4(innerCos, outerCos, static_cast<float>(entityId), 0.0f);
     };

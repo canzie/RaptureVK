@@ -15,6 +15,12 @@ class DirectionalLight3D : public Light3D {
     bool isAtmosphereSun() const;
     void setAtmosphereSun(bool atmosphereSun);
 
+    /**
+     * @brief Sets the fraction of this light that crosses the atmosphere to reach the scene
+     * @param transmittance The transmittance per channel
+     */
+    void setAtmosphereTransmittance(const glm::vec3 &transmittance);
+
     void setCastsShadow(bool castsShadow) override;
 
     /**

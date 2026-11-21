@@ -51,6 +51,17 @@ void DirectionalLight3D::setAtmosphereSun(bool atmosphereSun)
     light->atmosphereSunLight = atmosphereSun;
 }
 
+void DirectionalLight3D::setAtmosphereTransmittance(const glm::vec3 &transmittance)
+{
+    const auto *current = m_entity.tryRead<DirectionalLightComponent>();
+    if (current == nullptr || current->atmosphereTransmittance == transmittance) {
+        return;
+    }
+    auto light = m_entity.write<DirectionalLightComponent>();
+
+    light->atmosphereTransmittance = transmittance;
+}
+
 void DirectionalLight3D::setCastsShadow(bool castsShadow)
 {
     if (!m_entity.has<DirectionalLightComponent>()) {

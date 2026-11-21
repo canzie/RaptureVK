@@ -13,7 +13,7 @@
 namespace Rapture {
 
 class ImageBasedLighting;
-class ProceduralTexture;
+class SkyAtmosphere;
 class Texture;
 
 struct AtmosphereSettings {
@@ -21,11 +21,18 @@ struct AtmosphereSettings {
     float latitude = 0.0f;
     float longitude = 0.0f;
 
-    glm::vec3 rayleigh = glm::vec3(5.8f, 13.5f, 33.1f);
-    float mie = 21.0f;
-    float sunIntensity = 20.0f;
-    float mieG = 0.76f;
-    float cameraAltitude = 1.0f;
+    glm::vec3 rayleighScattering = glm::vec3(5.802f, 13.558f, 33.1f); ///< 1e-6 per metre
+    float rayleighScaleHeight = 8.0f; ///< km
+    float mieScattering = 3.996f; ///< 1e-6 per metre
+    float mieAbsorption = 4.4f; ///< 1e-6 per metre
+    float mieScaleHeight = 1.2f; ///< km
+    float mieG = 0.8f;
+    float ozoneDensity = 1.0f;
+    float groundAlbedo = 0.3f;
+    float groundRadius = 6360.0f; ///< km
+    float atmosphereThickness = 100.0f; ///< km
+    float originAltitude = 0.0f; ///< metres above the ground
+    bool tintsSunLight = true;
 
     bool operator==(const AtmosphereSettings &other) const = default;
 };
@@ -53,7 +60,7 @@ class Environment : public SceneObject {
     const TypeInfo &type() const override;
 
     /**
-     * @brief Regenerates the atmosphere skybox and its lighting when the settings or the sun moved
+     * @brief Regenerates the atmosphere, its skybox and its lighting when the settings or the sun changed
      */
     void update();
 
@@ -76,6 +83,12 @@ class Environment : public SceneObject {
 
     ImageBasedLighting *getImageBasedLighting() const { return m_ibl.get(); }
 
+    /**
+     * @brief The atmosphere the sky is rendered from
+     * @return The atmosphere, or nullptr while the sky does not use one
+     */
+    SkyAtmosphere *getSkyAtmosphere() const;
+
     static glm::vec3 sunDirection(float timeOfDay, float latitude, float longitude);
 
     /**
@@ -93,7 +106,7 @@ class Environment : public SceneObject {
     void deserialize(ReadNode node) override;
 
   private:
-    bool ensureSkyboxGenerator();
+    void ensureSkyAtmosphere();
 
     Ref<ATexture> m_skyboxTexture;
     float m_skyIntensity = 1.0f;
@@ -103,7 +116,7 @@ class Environment : public SceneObject {
     AtmosphereSettings m_atmosphere;
     AtmosphereSettings m_lastApplied;
 
-    std::unique_ptr<ProceduralTexture> m_skyboxGenerator;
+    std::unique_ptr<SkyAtmosphere> m_skyAtmosphere;
     std::unique_ptr<ImageBasedLighting> m_ibl;
 };
 

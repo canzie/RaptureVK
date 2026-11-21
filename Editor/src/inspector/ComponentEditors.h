@@ -307,8 +307,7 @@ class EnvironmentEditor : public ComponentEditorBase {
 
     Rapture::AtmosphereSettings m_atmosphere;
     double m_wavelengths[3] = {680.0, 550.0, 440.0};
-    double m_sunIntensity = 20.0;
-    double m_cameraAltitude = 1.0;
+    double m_originAltitude = 0.0;
 
     Rapture::Environment *m_node = nullptr;
 };

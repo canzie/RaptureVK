@@ -38,7 +38,7 @@ namespace Rapture {
 
 static constexpr float DEFAULT_SUN_PITCH = -1.874f;
 static constexpr float DEFAULT_SUN_INTENSITY = 3.14f;
-static constexpr float DEFAULT_SKY_INTENSITY = 0.1f;
+static constexpr float DEFAULT_SKY_INTENSITY = 1.0f;
 static constexpr float DEFAULT_FLOOR_SIZE = 20.0f;
 
 static constexpr std::string_view KEY_FORMAT_VERSION = "formatVersion";

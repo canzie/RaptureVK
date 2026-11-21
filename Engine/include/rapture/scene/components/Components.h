@@ -253,6 +253,7 @@ struct LightComponent {
 
 struct DirectionalLightComponent : public LightComponent {
     bool atmosphereSunLight = false;
+    glm::vec3 atmosphereTransmittance = glm::vec3(1.0f);
 
     DirectionalLightComponent() = default;
     DirectionalLightComponent(const glm::vec3 &color, float intensity) : LightComponent(color, intensity) {}

@@ -72,36 +72,6 @@ struct RidgedNoisePushConstants {
 };
 
 /**
- * @brief Push constant data for atmospheric scattering.
- *
- * Based on GPU Gems 2 Chapter 16 "Accurate Atmospheric Scattering" by Sean O'Neil.
- * Total size: 96 bytes. Each vec3+float pair is 16-byte aligned.
- */
-struct AtmospherePushConstants {
-    glm::vec3 cameraPos; ///< Camera position (normalized, e.g., 0, 1.001, 0)
-    float innerRadius;   ///< Planet radius (e.g., 1.0)
-
-    glm::vec3 sunDirection; ///< Sun direction (normalized)
-    float outerRadius;      ///< Atmosphere outer radius (e.g., 1.025)
-
-    glm::vec3 cameraDir; ///< Camera forward direction
-    float scaleDepth;    ///< Scale depth (~0.25)
-
-    glm::vec3 cameraUp; ///< Camera up vector
-    float kr;           ///< Rayleigh constant (~0.0025)
-
-    glm::vec3 invWavelength; ///< 1/pow(wavelength,4) for RGB
-    float km;                ///< Mie constant (~0.001)
-
-    float eSun;           ///< Sun intensity
-    float g;              ///< Mie phase asymmetry
-    float fovY;           ///< Field of view (radians)
-    float cameraAltitude; ///< Camera altitude above planet surface (added to innerRadius)
-};
-
-static_assert(sizeof(AtmospherePushConstants) == 96, "AtmospherePushConstants size must be 96 bytes");
-
-/**
  * @brief A reflected, editable push-constant parameter of a generator's shader
  */
 struct ProceduralParameter {
@@ -351,53 +321,6 @@ class ProceduralTexture {
 
     static Ref<ATexture> generateRidgedNoise(const RidgedNoisePushConstants &params = RidgedNoisePushConstants(),
                                              const ProceduralTextureConfig &config = ProceduralTextureConfig());
-
-    /**
-     * @brief Generates an atmospheric scattering texture.
-     *
-     * Static helper method that creates an equirectangular panoramic texture
-     * with realistic atmospheric scattering using Rayleigh and Mie scattering.
-     * The texture can be used as a skybox or converted to a cubemap.
-     *
-     * Uses the built-in Atmosphere.cs.glsl shader with physically-based
-     * atmospheric scattering. The sun position is calculated from the time
-     * of day parameter.
-     *
-     * @param timeOfDay Time in hours (0.0 to 24.0, e.g., 14.5 = 2:30 PM).
-     *                  6.0 = sunrise, 12.0 = noon, 18.0 = sunset, 0.0 = midnight.
-     * @param params Optional atmospheric parameters. If null, uses Earth-like defaults.
-     * @param config Optional texture configuration. Uses RGBA16F by default for HDR.
-     * @return Shared pointer to the generated panoramic texture.
-     */
-    static Ref<ATexture> generateAtmosphere(float timeOfDay, const AtmospherePushConstants *params = nullptr,
-                                            const ProceduralTextureConfig &config = ProceduralTextureConfig());
-
-    /**
-     * @brief Generates an atmospheric scattering cubemap usable as a skybox.
-     *
-     * Renders all six cube faces in a single compute dispatch via the OUTPUT_CUBEMAP
-     * variant of the Atmosphere shader. cameraDir/cameraUp/fovY in the push constants
-     * are ignored; each face fixes its own 90 degree view.
-     *
-     * @param timeOfDay Time in hours (0.0 to 24.0). 6.0 = sunrise, 12.0 = noon, 18.0 = sunset.
-     * @param params Optional atmospheric parameters. If null, uses Earth-like defaults.
-     * @param config Optional texture configuration. Uses RGBA16F by default for HDR.
-     * @return Pointer to the generated TEXTURECUBE texture.
-     */
-    static Ref<ATexture> generateAtmosphereCubemap(float timeOfDay, const AtmospherePushConstants *params = nullptr,
-                                                   const ProceduralTextureConfig &config = ProceduralTextureConfig());
-
-    /**
-     * @brief Re-renders an atmosphere cubemap into an existing texture in place.
-     *
-     * Reuses cube, so no new texture is allocated. Use this to update a skybox
-     * when its time of day changes.
-     *
-     * @param cube Existing TEXTURECUBE storage texture, e.g. one returned by generateAtmosphereCubemap.
-     * @param timeOfDay Time in hours (0.0 to 24.0).
-     * @param params Optional atmospheric parameters. If null, uses Earth-like defaults.
-     */
-    static void regenerateAtmosphereCubemap(Texture &cube, float timeOfDay, const AtmospherePushConstants *params = nullptr);
 
   private:
     void initFromShaderPath(const std::string &shaderPath, bool createTexture = true);

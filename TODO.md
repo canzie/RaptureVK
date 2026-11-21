@@ -43,18 +43,14 @@ servers
 - virtual texturing??? like decima i guess
 
 ---
-- make a new panel for the scene object tree where components can be authored, also check if we should allow this sort of inline?
 - parseanimations from gltf
 - animation events
 - editor side of this, including a timeline for the animation and a panel to view skeletons? or skeletal meshes maybe? or maybe just a skeleton panel with a mesh preview?
-- get lua in for something basic, then get a basic text editor in the engine, nothing fancy, then check for highlighting.
 - have a talk about extensions/plugins
-- plan out undo/redo 
 - auto save
 - editor settings
 - project settings
 - a way to check if something is dirty, like if a scene objects wasnt saved yet, then show a little circle on the workspace tab
-- snapping, copy pasting scene objects, shortcuts for all kind of stuff.
 - selection border
 - snapping when sizing/using gizmo, snapping when moving items, like corner snapping, or like when free moving a cube make it so it gets placed on floor behind/below it, so it drags over the floor instead of trough?
 - forward+ renderer ontop for blended materials
@@ -65,7 +61,6 @@ servers
 # features / stuff to add
 
 - animations
-- Photometry (use camera settings to calculate the correct exposure)
 - post processing
 - some limit testing
 - volumetric fog/clouds

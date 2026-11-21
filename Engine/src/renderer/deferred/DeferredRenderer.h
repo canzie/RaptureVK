@@ -6,7 +6,6 @@
 #include "core/jobs/Counter.h"
 #include "renderer/deferred/GBufferPass.h"
 #include "renderer/deferred/LightingPass.h"
-#include "renderer/passes/DDGIProbeDebugPass.h"
 #include "renderer/passes/GroundTruthAmbientOcclusionPass.h"
 #include "renderer/passes/SkyboxPass.h"
 
@@ -47,7 +46,6 @@ class DeferredRenderer : public Renderer {
     std::unique_ptr<GroundTruthAmbientOcclusionPass> m_ambientOcclusionPass;
     std::unique_ptr<LightingPass> m_lightingPass;
     std::unique_ptr<SkyboxPass> m_skyboxPass;
-    std::unique_ptr<DDGIProbeDebugPass> m_probeDebugPass;
 
     RenderPassTargets m_passTargets;
 
@@ -56,7 +54,6 @@ class DeferredRenderer : public Renderer {
     CommandBufferLease m_gbufferCmdBuffer;
     CommandBufferLease m_lightingCmdBuffer;
     CommandBufferLease m_skyboxCmdBuffer;
-    CommandBufferLease m_probeDebugCmdBuffer;
 };
 
 } // namespace Rapture

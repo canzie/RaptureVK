@@ -893,23 +893,24 @@ void EnvironmentEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
                 m_node->setUsesAtmosphereSkybox(b);
             }
         });
+        rowCheckbox(t, "Tint Sun Light", &m_atmosphere.tintsSunLight, [this](bool) { pushAtmosphere(); });
         rowSlider(t, "Time of Day", &m_atmosphere.timeOfDay, 0.0f, 24.0f, [this](float) { pushAtmosphere(); });
         rowSlider(t, "Latitude", &m_atmosphere.latitude, -90.0f, 90.0f, [this](float) { pushAtmosphere(); });
         rowSlider(t, "Longitude", &m_atmosphere.longitude, -180.0f, 180.0f, [this](float) { pushAtmosphere(); });
-        rowSlider(t, "Mie", &m_atmosphere.mie, 0.0f, 60.0f, [this](float) { pushAtmosphere(); });
+        rowSlider(t, "Mie Scattering", &m_atmosphere.mieScattering, 0.0f, 40.0f, [this](float) { pushAtmosphere(); });
+        rowSlider(t, "Mie Absorption", &m_atmosphere.mieAbsorption, 0.0f, 20.0f, [this](float) { pushAtmosphere(); });
         rowSlider(t, "Mie G", &m_atmosphere.mieG, 0.0f, 0.999f, [this](float) { pushAtmosphere(); });
-        rowDragFloat(t, "Sun Intensity", &m_sunIntensity, 0.1, 0.0, 1000.0, {}, [this](double v) {
-            m_atmosphere.sunIntensity = static_cast<float>(v);
-            pushAtmosphere();
-        });
-        rowDragFloat(t, "Camera Altitude", &m_cameraAltitude, 1.0, 0.0, 100000.0, {}, [this](double v) {
-            m_atmosphere.cameraAltitude = static_cast<float>(v);
+        rowSlider(t, "Ozone", &m_atmosphere.ozoneDensity, 0.0f, 3.0f, [this](float) { pushAtmosphere(); });
+        rowSlider(t, "Ground Albedo", &m_atmosphere.groundAlbedo, 0.0f, 1.0f, [this](float) { pushAtmosphere(); });
+        rowDragFloat(t, "Origin Altitude", &m_originAltitude, 1.0, 0.0, 100000.0, {}, [this](double v) {
+            m_atmosphere.originAltitude = static_cast<float>(v);
             pushAtmosphere();
         });
         rowVec3(t, "Wavelength (nm)", m_wavelengths, 1.0, 380.0, 740.0, [this]() {
-            m_atmosphere.rayleigh = glm::vec3(Rapture::Environment::rayleighCoefficient(static_cast<float>(m_wavelengths[0])),
-                                              Rapture::Environment::rayleighCoefficient(static_cast<float>(m_wavelengths[1])),
-                                              Rapture::Environment::rayleighCoefficient(static_cast<float>(m_wavelengths[2])));
+            m_atmosphere.rayleighScattering =
+                glm::vec3(Rapture::Environment::rayleighCoefficient(static_cast<float>(m_wavelengths[0])),
+                          Rapture::Environment::rayleighCoefficient(static_cast<float>(m_wavelengths[1])),
+                          Rapture::Environment::rayleighCoefficient(static_cast<float>(m_wavelengths[2])));
             pushAtmosphere();
         });
     });
@@ -927,11 +928,10 @@ void EnvironmentEditor::sync(const Rapture::ecs::EntityAccessor &entity)
     m_usesAtmosphereSkybox = m_node->usesAtmosphereSkybox();
 
     m_atmosphere = m_node->atmosphere();
-    m_sunIntensity = m_atmosphere.sunIntensity;
-    m_cameraAltitude = m_atmosphere.cameraAltitude;
-    m_wavelengths[0] = Rapture::Environment::wavelengthNm(m_atmosphere.rayleigh.x);
-    m_wavelengths[1] = Rapture::Environment::wavelengthNm(m_atmosphere.rayleigh.y);
-    m_wavelengths[2] = Rapture::Environment::wavelengthNm(m_atmosphere.rayleigh.z);
+    m_originAltitude = m_atmosphere.originAltitude;
+    m_wavelengths[0] = Rapture::Environment::wavelengthNm(m_atmosphere.rayleighScattering.x);
+    m_wavelengths[1] = Rapture::Environment::wavelengthNm(m_atmosphere.rayleighScattering.y);
+    m_wavelengths[2] = Rapture::Environment::wavelengthNm(m_atmosphere.rayleighScattering.z);
 }
 
 void EnvironmentEditor::pushAtmosphere()

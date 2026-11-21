@@ -1,19 +1,15 @@
 #include <rapture/assets/textures/ATexture.h>
 #include <rapture/scene/instances/Environment.h>
 
-#include <rapture/core/utils/EnginePaths.h>
-
 #include "renderer/ImageBasedLighting.h"
+#include "renderer/atmosphere/SkyAtmosphere.h"
 #include <rapture/app/Application.h>
-#include <rapture/assets/asset_manager/AssetImportConfig.h>
 #include <rapture/assets/asset_manager/AssetManager.h>
 #include <rapture/core/utils/Log.h>
-#include <rapture/gpu/shaders/Shader.h>
 #include <rapture/gpu/textures/Texture.h>
-#include <rapture/renderer/generators/textures/ProceduralTextures.h>
 #include <rapture/scene/Scene.h>
 #include <rapture/scene/components/Components.h>
-#include <rapture/scene/instances/Node3D.h>
+#include <rapture/scene/instances/DirectionalLight3D.h>
 #include <rapture/scene/systems/Transforms.h>
 
 #include <glm/gtc/constants.hpp>
@@ -33,48 +29,24 @@ static constexpr std::string_view KEY_ATMOSPHERE = "atmosphere";
 static constexpr std::string_view KEY_TIME_OF_DAY = "timeOfDay";
 static constexpr std::string_view KEY_LATITUDE = "latitude";
 static constexpr std::string_view KEY_LONGITUDE = "longitude";
-static constexpr std::string_view KEY_MIE = "mie";
-static constexpr std::string_view KEY_MIE_G = "mieG";
-static constexpr std::string_view KEY_SUN_INTENSITY = "sunIntensity";
-static constexpr std::string_view KEY_CAMERA_ALTITUDE = "cameraAltitude";
 static constexpr std::string_view KEY_RAYLEIGH = "rayleigh";
+static constexpr std::string_view KEY_RAYLEIGH_SCALE_HEIGHT = "rayleighScaleHeight";
+static constexpr std::string_view KEY_MIE_SCATTERING = "mieScattering";
+static constexpr std::string_view KEY_MIE_ABSORPTION = "mieAbsorption";
+static constexpr std::string_view KEY_MIE_SCALE_HEIGHT = "mieScaleHeight";
+static constexpr std::string_view KEY_MIE_G = "mieG";
+static constexpr std::string_view KEY_OZONE_DENSITY = "ozoneDensity";
+static constexpr std::string_view KEY_GROUND_ALBEDO = "groundAlbedo";
+static constexpr std::string_view KEY_GROUND_RADIUS = "groundRadius";
+static constexpr std::string_view KEY_ATMOSPHERE_THICKNESS = "atmosphereThickness";
+static constexpr std::string_view KEY_ORIGIN_ALTITUDE = "originAltitude";
+static constexpr std::string_view KEY_TINTS_SUN_LIGHT = "tintsSunLight";
 
-static AssetHandle s_atmosphereShaderHandle()
-{
-    static AssetHandle s_handle = 0;
-    if (s_handle == 0) {
-        auto shaderDir = EnginePaths::shaderDirectory();
-        ShaderImportConfig importConfig;
-        importConfig.compileInfo.macros.push_back(ShaderMacro("OUTPUT_CUBEMAP"));
-        Ref<AShader> asset = AssetManager::importAsset<AShader>(shaderDir / "glsl/Generators/Atmosphere.cs.glsl", importConfig);
-        if (!asset) {
-            RP_CORE_ERROR("Failed to load Atmosphere cubemap shader");
-            return 0;
-        }
-        s_handle = asset.get()->handle();
-    }
-    return s_handle;
-}
+// The illuminance the sky is lit with when no light is marked as the atmosphere's sun
+static constexpr float DEFAULT_SUN_ILLUMINANCE = 1.0f;
 
-static AtmospherePushConstants s_buildPushConstants(const AtmosphereSettings &atmo, const glm::vec3 &sunDir)
-{
-    AtmospherePushConstants pc;
-    pc.cameraPos = glm::vec3(0.0f);
-    pc.innerRadius = 1.0f;
-    pc.sunDirection = sunDir;
-    pc.outerRadius = 1.025f;
-    pc.cameraDir = glm::vec3(0.0f, 0.0f, -1.0f);
-    pc.scaleDepth = 0.25f;
-    pc.cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
-    pc.kr = 0.0025f;
-    pc.invWavelength = atmo.rayleigh;
-    pc.km = atmo.mie;
-    pc.eSun = atmo.sunIntensity;
-    pc.g = atmo.mieG;
-    pc.fovY = 1.5708f;
-    pc.cameraAltitude = atmo.cameraAltitude;
-    return pc;
-}
+// Earth's rayleigh scattering coefficient at 550 nm, in 1e-6 per metre
+static constexpr double RAYLEIGH_AT_550_NM = 13.558;
 
 static glm::quat s_rotationBetween(const glm::vec3 &from, const glm::vec3 &to)
 {
@@ -167,12 +139,12 @@ SunAngles Environment::sunAnglesFromDirection(const glm::vec3 &sunDirection, con
 
 float Environment::rayleighCoefficient(float wavelengthNm)
 {
-    return static_cast<float>(13.5 * std::pow(550.0 / wavelengthNm, 4.0));
+    return static_cast<float>(RAYLEIGH_AT_550_NM * std::pow(550.0 / wavelengthNm, 4.0));
 }
 
 float Environment::wavelengthNm(float rayleighCoefficient)
 {
-    return static_cast<float>(550.0 * std::pow(13.5 / rayleighCoefficient, 0.25));
+    return static_cast<float>(550.0 * std::pow(RAYLEIGH_AT_550_NM / rayleighCoefficient, 0.25));
 }
 
 Environment::Environment(Scene &scene, std::string_view name) : SceneObject(scene, name)
@@ -225,14 +197,16 @@ void Environment::setSkybox(AssetHandle _skybox)
 
 void Environment::update()
 {
-    Node3D *sunNode = nullptr;
+    DirectionalLight3D *sunLight = nullptr;
+    glm::vec3 sunIlluminance = glm::vec3(DEFAULT_SUN_ILLUMINANCE);
     for (auto [entity, light] : scene()->getRegistry().read<DirectionalLightComponent>().with<TransformComponent>()) {
         if (!light.atmosphereSunLight) {
             continue;
         }
 
         SceneObject *instance = scene()->instanceFor(entity);
-        sunNode = instance != nullptr ? instance->as<Node3D>() : nullptr;
+        sunLight = instance != nullptr ? instance->as<DirectionalLight3D>() : nullptr;
+        sunIlluminance = light.color * light.intensity;
         break;
     }
 
@@ -240,12 +214,12 @@ void Environment::update()
                             m_atmosphere.longitude != m_lastApplied.longitude;
 
     glm::vec3 sunDir;
-    if (sunNode != nullptr) {
+    if (sunLight != nullptr) {
         if (sunParamsChanged) {
             sunDir = sunDirection(m_atmosphere.timeOfDay, m_atmosphere.latitude, m_atmosphere.longitude);
-            sunNode->setRotation(s_rotationBetween(glm::vec3(0.0f, 0.0f, -1.0f), -sunDir));
+            sunLight->setRotation(s_rotationBetween(glm::vec3(0.0f, 0.0f, -1.0f), -sunDir));
         } else {
-            sunDir = -transform::forward(sunNode->worldTransform());
+            sunDir = -transform::forward(sunLight->worldTransform());
             glm::vec3 expectedDir = sunDirection(m_lastApplied.timeOfDay, m_lastApplied.latitude, m_lastApplied.longitude);
             if (glm::distance(sunDir, expectedDir) > 1e-4f) {
                 SunAngles angles = sunAnglesFromDirection(sunDir, m_atmosphere);
@@ -257,52 +231,52 @@ void Environment::update()
         sunDir = sunDirection(m_atmosphere.timeOfDay, m_atmosphere.latitude, m_atmosphere.longitude);
     }
 
-    bool changed = !(m_atmosphere == m_lastApplied);
     m_lastApplied = m_atmosphere;
 
     if (!m_usesAtmosphereSkybox) {
+        if (sunLight != nullptr) {
+            sunLight->setAtmosphereTransmittance(glm::vec3(1.0f));
+        }
         return;
     }
 
-    bool created = ensureSkyboxGenerator();
-    if (m_skyboxGenerator == nullptr) {
+    if (sunLight != nullptr) {
+        glm::vec3 transmittance = m_atmosphere.tintsSunLight ? SkyAtmosphere::transmittanceToSun(m_atmosphere, sunDir) : glm::vec3(1.0f);
+        sunLight->setAtmosphereTransmittance(transmittance);
+    }
+
+    ensureSkyAtmosphere();
+    if (m_skyAtmosphere == nullptr) {
         return;
     }
 
-    if (changed || created) {
-        AtmospherePushConstants pc = s_buildPushConstants(m_atmosphere, sunDir);
-        m_skyboxGenerator->setPushConstants(pc);
-        m_skyboxGenerator->generate();
+    if (m_skyAtmosphere->update(m_atmosphere, sunDir, sunIlluminance)) {
         m_ibl->bakeFromCube(m_skyboxTexture.operator->());
     }
 }
 
-bool Environment::ensureSkyboxGenerator()
+void Environment::ensureSkyAtmosphere()
 {
-    if (m_skyboxGenerator != nullptr) {
-        return false;
+    if (m_skyAtmosphere != nullptr) {
+        return;
     }
 
-    AssetHandle handle = s_atmosphereShaderHandle();
-    if (handle == 0) {
-        return false;
+    auto skyAtmosphere = std::make_unique<SkyAtmosphere>();
+    if (!skyAtmosphere->isValid()) {
+        RP_CORE_ERROR("Failed to create the sky atmosphere");
+        return;
     }
 
-    ProceduralTextureConfig config;
-    config.name = "atmosphere_skybox_" + std::to_string(static_cast<uint64_t>(id()));
-    config.cubemap = true;
-    config.format = TextureFormat::RGBA16F;
-    config.wrap = TextureWrap::ClampToEdge;
+    m_skyAtmosphere = std::move(skyAtmosphere);
+    m_skyboxTexture = m_skyAtmosphere->getEnvironmentCubemap();
+}
 
-    m_skyboxGenerator = std::make_unique<ProceduralTexture>(handle, config);
-    if (!m_skyboxGenerator->isValid()) {
-        RP_CORE_ERROR("Failed to create atmosphere skybox generator");
-        m_skyboxGenerator.reset();
-        return false;
+SkyAtmosphere *Environment::getSkyAtmosphere() const
+{
+    if (!m_usesAtmosphereSkybox) {
+        return nullptr;
     }
-
-    m_skyboxTexture = m_skyboxGenerator->getTextureAsset();
-    return true;
+    return m_skyAtmosphere.get();
 }
 
 void Environment::serialize(WriteNode node) const
@@ -323,15 +297,22 @@ void Environment::serialize(WriteNode node) const
     atmosphere.set(KEY_TIME_OF_DAY, static_cast<double>(m_atmosphere.timeOfDay));
     atmosphere.set(KEY_LATITUDE, static_cast<double>(m_atmosphere.latitude));
     atmosphere.set(KEY_LONGITUDE, static_cast<double>(m_atmosphere.longitude));
-    atmosphere.set(KEY_MIE, static_cast<double>(m_atmosphere.mie));
+    atmosphere.set(KEY_RAYLEIGH_SCALE_HEIGHT, static_cast<double>(m_atmosphere.rayleighScaleHeight));
+    atmosphere.set(KEY_MIE_SCATTERING, static_cast<double>(m_atmosphere.mieScattering));
+    atmosphere.set(KEY_MIE_ABSORPTION, static_cast<double>(m_atmosphere.mieAbsorption));
+    atmosphere.set(KEY_MIE_SCALE_HEIGHT, static_cast<double>(m_atmosphere.mieScaleHeight));
     atmosphere.set(KEY_MIE_G, static_cast<double>(m_atmosphere.mieG));
-    atmosphere.set(KEY_SUN_INTENSITY, static_cast<double>(m_atmosphere.sunIntensity));
-    atmosphere.set(KEY_CAMERA_ALTITUDE, static_cast<double>(m_atmosphere.cameraAltitude));
+    atmosphere.set(KEY_OZONE_DENSITY, static_cast<double>(m_atmosphere.ozoneDensity));
+    atmosphere.set(KEY_GROUND_ALBEDO, static_cast<double>(m_atmosphere.groundAlbedo));
+    atmosphere.set(KEY_GROUND_RADIUS, static_cast<double>(m_atmosphere.groundRadius));
+    atmosphere.set(KEY_ATMOSPHERE_THICKNESS, static_cast<double>(m_atmosphere.atmosphereThickness));
+    atmosphere.set(KEY_ORIGIN_ALTITUDE, static_cast<double>(m_atmosphere.originAltitude));
+    atmosphere.set(KEY_TINTS_SUN_LIGHT, m_atmosphere.tintsSunLight);
 
     WriteNode rayleigh = atmosphere.addArray(KEY_RAYLEIGH);
-    rayleigh.append(static_cast<double>(m_atmosphere.rayleigh.x));
-    rayleigh.append(static_cast<double>(m_atmosphere.rayleigh.y));
-    rayleigh.append(static_cast<double>(m_atmosphere.rayleigh.z));
+    rayleigh.append(static_cast<double>(m_atmosphere.rayleighScattering.x));
+    rayleigh.append(static_cast<double>(m_atmosphere.rayleighScattering.y));
+    rayleigh.append(static_cast<double>(m_atmosphere.rayleighScattering.z));
 }
 
 void Environment::deserialize(ReadNode node)
@@ -358,16 +339,25 @@ void Environment::deserialize(ReadNode node)
     m_atmosphere.timeOfDay = static_cast<float>(atmosphere.child(KEY_TIME_OF_DAY).asF64(m_atmosphere.timeOfDay));
     m_atmosphere.latitude = static_cast<float>(atmosphere.child(KEY_LATITUDE).asF64(m_atmosphere.latitude));
     m_atmosphere.longitude = static_cast<float>(atmosphere.child(KEY_LONGITUDE).asF64(m_atmosphere.longitude));
-    m_atmosphere.mie = static_cast<float>(atmosphere.child(KEY_MIE).asF64(m_atmosphere.mie));
+    m_atmosphere.rayleighScaleHeight =
+        static_cast<float>(atmosphere.child(KEY_RAYLEIGH_SCALE_HEIGHT).asF64(m_atmosphere.rayleighScaleHeight));
+    m_atmosphere.mieScattering = static_cast<float>(atmosphere.child(KEY_MIE_SCATTERING).asF64(m_atmosphere.mieScattering));
+    m_atmosphere.mieAbsorption = static_cast<float>(atmosphere.child(KEY_MIE_ABSORPTION).asF64(m_atmosphere.mieAbsorption));
+    m_atmosphere.mieScaleHeight = static_cast<float>(atmosphere.child(KEY_MIE_SCALE_HEIGHT).asF64(m_atmosphere.mieScaleHeight));
     m_atmosphere.mieG = static_cast<float>(atmosphere.child(KEY_MIE_G).asF64(m_atmosphere.mieG));
-    m_atmosphere.sunIntensity = static_cast<float>(atmosphere.child(KEY_SUN_INTENSITY).asF64(m_atmosphere.sunIntensity));
-    m_atmosphere.cameraAltitude = static_cast<float>(atmosphere.child(KEY_CAMERA_ALTITUDE).asF64(m_atmosphere.cameraAltitude));
+    m_atmosphere.ozoneDensity = static_cast<float>(atmosphere.child(KEY_OZONE_DENSITY).asF64(m_atmosphere.ozoneDensity));
+    m_atmosphere.groundAlbedo = static_cast<float>(atmosphere.child(KEY_GROUND_ALBEDO).asF64(m_atmosphere.groundAlbedo));
+    m_atmosphere.groundRadius = static_cast<float>(atmosphere.child(KEY_GROUND_RADIUS).asF64(m_atmosphere.groundRadius));
+    m_atmosphere.atmosphereThickness =
+        static_cast<float>(atmosphere.child(KEY_ATMOSPHERE_THICKNESS).asF64(m_atmosphere.atmosphereThickness));
+    m_atmosphere.originAltitude = static_cast<float>(atmosphere.child(KEY_ORIGIN_ALTITUDE).asF64(m_atmosphere.originAltitude));
+    m_atmosphere.tintsSunLight = atmosphere.child(KEY_TINTS_SUN_LIGHT).asBool(m_atmosphere.tintsSunLight);
 
     ReadNode rayleigh = atmosphere.child(KEY_RAYLEIGH);
     if (rayleigh.size() == 3) {
-        m_atmosphere.rayleigh = glm::vec3(static_cast<float>(rayleigh.at(0).asF64(m_atmosphere.rayleigh.x)),
-                                          static_cast<float>(rayleigh.at(1).asF64(m_atmosphere.rayleigh.y)),
-                                          static_cast<float>(rayleigh.at(2).asF64(m_atmosphere.rayleigh.z)));
+        m_atmosphere.rayleighScattering = glm::vec3(static_cast<float>(rayleigh.at(0).asF64(m_atmosphere.rayleighScattering.x)),
+                                                    static_cast<float>(rayleigh.at(1).asF64(m_atmosphere.rayleighScattering.y)),
+                                                    static_cast<float>(rayleigh.at(2).asF64(m_atmosphere.rayleighScattering.z)));
     }
 }
 

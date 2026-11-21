@@ -484,11 +484,18 @@ TEST_F(SceneObjectRoundTrip, Environment)
     environment->atmosphere().timeOfDay = 18.0f;
     environment->atmosphere().latitude = 52.0f;
     environment->atmosphere().longitude = 4.5f;
-    environment->atmosphere().mie = 30.0f;
-    environment->atmosphere().mieG = 0.8f;
-    environment->atmosphere().sunIntensity = 15.0f;
-    environment->atmosphere().cameraAltitude = 2.0f;
-    environment->atmosphere().rayleigh = glm::vec3(6.0f, 14.0f, 30.0f);
+    environment->atmosphere().rayleighScattering = glm::vec3(6.0f, 14.0f, 30.0f);
+    environment->atmosphere().rayleighScaleHeight = 9.0f;
+    environment->atmosphere().mieScattering = 30.0f;
+    environment->atmosphere().mieAbsorption = 3.0f;
+    environment->atmosphere().mieScaleHeight = 1.5f;
+    environment->atmosphere().mieG = 0.7f;
+    environment->atmosphere().ozoneDensity = 2.0f;
+    environment->atmosphere().groundAlbedo = 0.5f;
+    environment->atmosphere().groundRadius = 3390.0f;
+    environment->atmosphere().atmosphereThickness = 80.0f;
+    environment->atmosphere().originAltitude = 250.0f;
+    environment->atmosphere().tintsSunLight = false;
 
     expectRestoredAndLoaded<Rapture::Environment>(
         scene, *environment,
@@ -498,11 +505,7 @@ TEST_F(SceneObjectRoundTrip, Environment)
             e.atmosphere().timeOfDay = 12.0f;
             e.atmosphere().latitude = 0.0f;
             e.atmosphere().longitude = 0.0f;
-            e.atmosphere().mie = 21.0f;
-            e.atmosphere().mieG = 0.76f;
-            e.atmosphere().sunIntensity = 20.0f;
-            e.atmosphere().cameraAltitude = 1.0f;
-            e.atmosphere().rayleigh = glm::vec3(5.8f, 13.5f, 33.1f);
+            e.atmosphere() = Rapture::AtmosphereSettings{};
         },
         [](const Rapture::Environment &e) {
             EXPECT_FLOAT_EQ(e.skyIntensity(), 2.5f);
@@ -511,11 +514,18 @@ TEST_F(SceneObjectRoundTrip, Environment)
             EXPECT_FLOAT_EQ(e.atmosphere().timeOfDay, 18.0f);
             EXPECT_FLOAT_EQ(e.atmosphere().latitude, 52.0f);
             EXPECT_FLOAT_EQ(e.atmosphere().longitude, 4.5f);
-            EXPECT_FLOAT_EQ(e.atmosphere().mie, 30.0f);
-            EXPECT_FLOAT_EQ(e.atmosphere().mieG, 0.8f);
-            EXPECT_FLOAT_EQ(e.atmosphere().sunIntensity, 15.0f);
-            EXPECT_FLOAT_EQ(e.atmosphere().cameraAltitude, 2.0f);
-            s_expectVec3Near(e.atmosphere().rayleigh, glm::vec3(6.0f, 14.0f, 30.0f));
+            s_expectVec3Near(e.atmosphere().rayleighScattering, glm::vec3(6.0f, 14.0f, 30.0f));
+            EXPECT_FLOAT_EQ(e.atmosphere().rayleighScaleHeight, 9.0f);
+            EXPECT_FLOAT_EQ(e.atmosphere().mieScattering, 30.0f);
+            EXPECT_FLOAT_EQ(e.atmosphere().mieAbsorption, 3.0f);
+            EXPECT_FLOAT_EQ(e.atmosphere().mieScaleHeight, 1.5f);
+            EXPECT_FLOAT_EQ(e.atmosphere().mieG, 0.7f);
+            EXPECT_FLOAT_EQ(e.atmosphere().ozoneDensity, 2.0f);
+            EXPECT_FLOAT_EQ(e.atmosphere().groundAlbedo, 0.5f);
+            EXPECT_FLOAT_EQ(e.atmosphere().groundRadius, 3390.0f);
+            EXPECT_FLOAT_EQ(e.atmosphere().atmosphereThickness, 80.0f);
+            EXPECT_FLOAT_EQ(e.atmosphere().originAltitude, 250.0f);
+            EXPECT_FALSE(e.atmosphere().tintsSunLight);
         });
 }
 

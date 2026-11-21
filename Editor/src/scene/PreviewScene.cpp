@@ -23,7 +23,7 @@ static const glm::vec3 FOCUS_DIRECTION = glm::normalize(glm::vec3(0.55f, -0.35f,
 
 static constexpr float SUN_PITCH = -1.874f;
 static constexpr float SUN_INTENSITY = 3.14f;
-static constexpr float SKY_INTENSITY = 0.1f;
+static constexpr float SKY_INTENSITY = 1.0f;
 static constexpr float GROUND_SIZE = 20.0f;
 
 static constexpr float NEAR_PLANE_PER_RADIUS = 0.01f;

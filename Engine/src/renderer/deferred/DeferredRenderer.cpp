@@ -23,7 +23,6 @@ DeferredRenderer::~DeferredRenderer()
 {
     m_renderContext.vulkanContext->waitIdle();
 
-    m_probeDebugPass.reset();
     m_skyboxPass.reset();
     m_lightingPass.reset();
     m_ambientOcclusionPass.reset();
@@ -61,7 +60,6 @@ void DeferredRenderer::recreateRenderPasses()
 {
     jobs().waitFor(m_cmdCounter, 0);
 
-    m_probeDebugPass.reset();
     m_skyboxPass.reset();
     m_lightingPass.reset();
     m_ambientOcclusionPass.reset();
@@ -78,16 +76,6 @@ void DeferredRenderer::recreateRenderPasses()
     m_lightingPass = std::make_unique<LightingPass>(m_width, m_height, hdrFormat);
 
     m_skyboxPass = std::make_unique<SkyboxPass>(GBufferPass::getFramebufferSpecification().depthAttachment, hdrFormat);
-
-    if (m_config.enableAccelerationStructures) {
-        DDGIProbeDebugPassConfig probeDebugConfig{};
-        probeDebugConfig.width = static_cast<uint32_t>(m_width);
-        probeDebugConfig.height = static_cast<uint32_t>(m_height);
-        probeDebugConfig.colorFormat = hdrFormat;
-        probeDebugConfig.depthFormat = GBufferPass::getFramebufferSpecification().depthAttachment;
-
-        m_probeDebugPass = std::make_unique<DDGIProbeDebugPass>(probeDebugConfig);
-    }
 }
 
 void DeferredRenderer::recordSecondaries(const RenderPassContext &frameContext, JobContext &jobContext)
@@ -102,26 +90,25 @@ void DeferredRenderer::recordSecondaries(const RenderPassContext &frameContext, 
     }
 
     Environment *environment = activeScene.environment();
+    bool atmosphereDrawsSky = false;
     if (environment != nullptr) {
         Texture *skybox = environment->isSkyboxEnabled() ? environment->skyboxTexture() : nullptr;
         m_skyboxPass->setSkyboxTexture(skybox);
         m_skyboxPass->setSkyIntensity(environment->skyIntensity());
+        atmosphereDrawsSky = environment->getSkyAtmosphere() != nullptr;
     }
 
     {
         m_gbufferCmdBuffer = {};
         m_lightingCmdBuffer = {};
         m_skyboxCmdBuffer = {};
-        m_probeDebugCmdBuffer = {};
 
         RenderPassContext context = buildPassContext(frameContext);
 
-        const bool drawSkybox = m_skyboxPass->hasActiveSkybox();
-        const bool drawProbes = m_probeDebugPass != nullptr && settings.showDDGIProbes();
+        const bool drawSkybox = !atmosphereDrawsSky && m_skyboxPass->hasActiveSkybox();
 
         uint32_t passCount = 2; // GBuffer, Lighting
         passCount += drawSkybox ? 1 : 0;
-        passCount += drawProbes ? 1 : 0;
         m_cmdCounter.increment(passCount);
 
         JobSystem &system = jobs();
@@ -162,17 +149,6 @@ void DeferredRenderer::recordSecondaries(const RenderPassContext &frameContext, 
                 JobPriority::HIGH, QueueAffinity::ANY, &m_cmdCounter, "SKYBOX"));
         }
 
-        if (drawProbes) {
-            SecondaryBufferInheritance probeDebugInheritance = m_probeDebugPass->getInheritance(context);
-
-            system.run(JobDeclaration(
-                [this, &context, probeDebugInheritance](JobContext &ctx) {
-                    (void)ctx;
-                    m_probeDebugCmdBuffer = m_probeDebugPass->record(context, probeDebugInheritance);
-                },
-                JobPriority::HIGH, QueueAffinity::ANY, &m_cmdCounter, "DDGI PROBE DEBUG"));
-        }
-
         {
             // yields the worker rather than blocking it, since this runs on a job itself
             RAPTURE_PROFILE_SCOPE("command buffer Wait");
@@ -211,13 +187,6 @@ void DeferredRenderer::replay(const RenderPassContext &frameContext, CommandBuff
         m_skyboxPass->beginRendering(context, commandBuffer);
         commandBuffer->executeSecondary(std::move(m_skyboxCmdBuffer));
         m_skyboxPass->endRendering(commandBuffer);
-    }
-
-    if (m_probeDebugCmdBuffer.isValid()) {
-        RAPTURE_PROFILE_GPU_SCOPE(commandBuffer->getCommandBufferVk(), "DDGI Probe Debug Pass");
-        m_probeDebugPass->beginRendering(context, commandBuffer);
-        commandBuffer->executeSecondary(std::move(m_probeDebugCmdBuffer));
-        m_probeDebugPass->endRendering(commandBuffer);
     }
 }
 
