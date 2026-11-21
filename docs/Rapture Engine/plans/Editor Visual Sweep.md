@@ -9,6 +9,7 @@ The mocks live in `tools/ui_mock/`:
 - `world_editor.html` reproduces the editor as it is (`current`), measured off a 1080p capture. Kept as the baseline to compare against.
 - `world_editor_sweep.html` is the World Editor proposal. Query options: `open=menu,popup` (Render menu, command popup), `browser=floating|docked`, `tooltip=button|asset`, `state=playing,unsaved`.
 - `material_editor.html` is the Material Editor proposal. Query options: `menu=add` (add node popup), `canvas=grid|plus` (background alternatives), `select=<node>`.
+- `mesh_editor.html` (static mesh), `skeletal_mesh_editor.html`, `skeleton_editor.html`, `texture_viewer.html`, `scripting.html`, `module_editor.html` and `animation_editor.html` are the first passes of the other workspaces, each with its query options listed at the top of the file. They share `workspace_chrome.js` (menu bar, workspace tabs, hotbar, panels, bottom bar, orientation gizmo, a property sheet builder), the skeleton mocks also `skeleton_tree.js` (the Skeleton panel) and `mannequin_stage.js` (the viewport figure), and `workspaces.css` on top of `sweep.css`.
 - `sweep.css` holds the styles both proposals share. `icons.js` is generated from `Editor/src/Icons.h` by `extract_icons.py`.
 - `render.sh <page> "<query>"` renders a page at 1908x1048 with headless Firefox into `renders/`, next to a side by side with `reference/current.png`. `reference/` and `renders/` are not committed.
 
@@ -54,9 +55,66 @@ Hover states are live when a mock is opened in a browser, written the way they w
 - Wires: bezier curves in their pin's type colour, drawn under the nodes.
 - Add node popup at the right click point: search, results grouped by category with a colour square and a one line description.
 
-## Other workspaces: not started
+## Other workspaces: first pass
 
-Scripting, Static Mesh, Skeletal Mesh, Skeleton and Module Editor.
+### What a workspace shows
+
+The hotbar carries a status note only where there is a real state to report (compiled or failed, a runtime error). Facts about the asset (section count, triangles, resolution) are not a status; they already sit in Details and the viewport read out.
+
+
+A workspace is opened from one asset, but what it lets you reach depends on the kind of work. Some are strictly that one asset: static mesh, skeletal mesh, skeleton, texture, material, module. Some show the whole set the asset belongs to: Scripting shows every script in the project, and the animation workspace shows every clip on the skeleton of the clip that was opened. The set is a query, never a folder, so the assets can live wherever the project keeps them.
+
+### Static Mesh
+
+Viewport with a Lit menu and a Show menu (grid, bounds, wireframe, section colours) and a stats read out (triangles, vertices, bounds). Details: material slots, one per section, as asset pickers; geometry facts; import settings. Hovering a slot outlines its section in the viewport. Hotbar: Save, Reimport.
+
+Scale and up axis are not import settings to reimport with. The Transform section edits them with a live preview on the mesh, and Save bakes them into the asset. What the mesh was imported with lives in its metadata (a `MeshImportConfig` in `AssetImportConfigVariant`, which `AssetCodec` does not encode yet): the Import section shows it as text, the Transform section starts from it, and Save writes the new values back to it and updates every scene object using that mesh asset. Today the edited values sit in a struct the workspace owns only so the section can reach the preview mesh; that goes once the section previews through the scene and Save asks the panel to apply.
+
+### Skeletal Mesh
+
+Built like the static mesh workspace, plus what skinning adds on top: the skeleton it is bound to, influences per vertex, a joints overlay in the viewport, maybe a read only joint list. The hierarchy is not edited here, that belongs to the skeleton.
+
+Baking to a static mesh happens in two places sharing one engine function. The asset workspace bakes the pose it previews (the bind pose, or a picked animation frame). A `SkeletalMesh3D` in a world bakes the live pose it is drawn with, from its context menu, since only the scene object has a live pose.
+
+### Skeleton
+
+About the joints, not a mesh: joint tree, a viewport showing the joints with a rotate gizmo on the selected one, joint details (parent, rest translation, rotation, scale). The joints are shown on a preview mesh so they are not floating in space; `ASkeleton` already stores its preview meshes, so Details lists them with add and remove and the viewport shows all of them at once, posed by the same skeleton, so the pieces of a modular character are seen together. With no preview mesh the viewport shows the raw joints alone.
+
+### Animation
+
+A full workspace of its own, not a mode of the skeleton one. Panels: the skeleton's joint tree, viewport, Timeline, an Animations list (every clip on the opened clip's skeleton, picking one switches the clip shown), Details. The preview mesh is picked from the skeleton's preview meshes, the same way the skeleton workspace does it. In the preview the character animates in place, root motion is shown as a read out and not applied (see [[Animation System]]).
+
+Timeline:
+
+- Transport row: the current frame as a field with the length and time beside it on the left, previous key, play and next key centred, loop on the right. No playback rate slider.
+- Channels: one collapsible group per joint, its row showing every key the joint has. Opening a group shows a row per animated channel (Rotation X, Y, Z and so on) with its axis colour and its value at the playhead, like Blender's dope sheet. A filter field above the channel names.
+- An Events lane on top (footstep markers and the like).
+- Details shows the clip (skeleton, length, frame rate, loops), a Selected Key section (channel, frame, value, interpolation) when a key is selected, and the preview mesh.
+
+`animation_editor.html` still has the earlier version that switched between skeleton, skeletal mesh and animation in one workspace. The skeleton and skeletal mesh halves are split out into `skeleton_editor.html` and `skeletal_mesh_editor.html`; the animation half is still to be split into its own mock.
+
+### Texture
+
+Canvas with the image on a checkerboard, channel toggles (R, G, B, A), a mip picker, Fit, 1:1 and Tile, a read out of the texel under the cursor, a column of mip thumbnails when the texture has mips. Details: resolution, format, mips, GPU memory, size on disk; sampling; import settings (colour space, compression, generate mips, flip green on normal maps). Hotbar: Save, Reimport.
+
+### Scripting
+
+A code editor over the project's scripts, not one file:
+
+- Scripts panel: every folder under `content` shows, scripts as the only files. Folders with no scripts below them are dimmed and start collapsed, so a new folder is still reachable. Right click on a folder: New Script, New Folder, Rename, Show in Content Browser. New Script in the hotbar creates in the selected folder. Searching narrows the tree to matching scripts and their folders.
+- Editor: tabs per open script, Lua highlighting, current line, minimap, a status line (problems, line and column, indentation, line endings, language). Find bar, member completion with a doc line, runtime errors pinned to their line.
+- Output and Problems tabs below the editor.
+- Outline panel with collapsible Symbols (locals, functions, connected events) and Run by sections. Run by lists the scene objects running the script, name on the left and class on the right; which world or module one sits in goes in a hover tooltip where it matters.
+
+### Module
+
+Viewport with a Script tab, Scene Objects tree, Properties. The root is marked in the tree and cannot be deleted. Adding objects: Add in the hotbar, or right click a row for Add child and Delete (what `SceneObjectTreePanel` builds today). Components have no place in the tree, so they are added from an Add Component button beside the Properties search and removed from the menu on their section header.
+
+Add Component opens a window of its own (`add_component.html`), moved by dragging its title bar: a search field and a row per component (icon, name, one line description, attached ones greyed out). A click on a row adds it; a small button at the row's end opens a longer description under the row, so reading more never costs an extra click to add. It closes once a component is added, on Escape, and on a click outside it, since it adds to the object that was selected when it opened. Only component sections carry a Component tag and that menu; the object's own sections (Transform, Static Mesh) cannot be removed. Tree rows show small icons for the components attached.
+
+### Project layout
+
+The browser shows `content` only; `blobs` and `.cache` are its siblings and never shown. Inside `content` nothing is enforced. The suggestion is feature folders rather than type folders: a character's skeleton, meshes, clips, materials and textures together, and an import of a rigged glTF lands as one folder holding all of them. Type based views come from queries (the Scripting workspace, the Animations list), not from folders.
 
 ## Order of work
 
@@ -123,6 +181,8 @@ World Editor first, then the Content Browser. Within that, the steps that only c
 Drag and drop feedback, inline rename, number scrubbing, mixed values for multi selection, asset reference fields, empty, loading and error states, notifications, keyboard focus, docking feedback.
 
 ## Still open
+
+- The Events lane stays in principle, what an event holds and how it is authored is not worked out.
 
 - Whether the Object Mode dropdown has a control today, or is new.
 - The Outliner search field is new, not a restyle.

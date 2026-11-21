@@ -27,12 +27,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Scene Graph Composition.md",
+                "file": "plans/Editor Restructure.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Scene Graph Composition"
+              "title": "Editor Restructure"
             }
           }
         ],
@@ -95,8 +95,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300,
-    "collapsed": true
+    "width": 300
   },
   "right": {
     "id": "2a07e0488325ea11",
@@ -203,8 +202,11 @@
   },
   "active": "b438becf4a768732",
   "lastOpenFiles": [
-    "theory/Neovim and RAD Debugger Text Architecture.md",
+    "plans/Entity Types and Authoring Schema.md",
+    "plans/Editor UX Polish Roadmap.md",
+    "plans/Editor Restructure.md",
     "Scene Graph Composition.md",
+    "theory/Neovim and RAD Debugger Text Architecture.md",
     "theory/Neovim and RAD Debugger Text Architecture.md.tmp.3743.2c94902b5ec7",
     "ideas/Entity Types and Authoring Schema.md.tmp.1729.4b1857aac319",
     "ideas/Entity Types and Authoring Schema.md.tmp.1729.af5c6ca9d2fe",
@@ -228,7 +230,6 @@
     "plans/Stochastic Screen-Space Reflections.md",
     "plans/Material Editor Workspace.md",
     "plans/Image-Based Lighting.md",
-    "plans/Editor UX Polish Roadmap.md",
     "plans/Project Serialization.md",
     "plans/Per-node Graph Values.md",
     "Material Graph Nodes.md",
@@ -237,8 +238,6 @@
     "plans/Material Graph Compiler.md",
     "plans/Material System Overhaul.md",
     "systems/Asset.md",
-    "Shadow Maps to SceneRenderData.md",
-    "SceneRenderData.md",
     "Pasted image 20260517113657.png"
   ]
 }

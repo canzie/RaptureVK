@@ -99,3 +99,23 @@ Not "variability *or* own route" — **layer them**:
 5. Long-term, **screen-space denoise / SSGI** masks whatever residual remains and adds the high-frequency detail DDGI structurally cannot.
 
 Bottom line: the disco is **intrinsic** to progressive stochastic GI — it can be shrunk (rays / hysteresis / blue noise / spatial filter), frozen (variability), or hidden downstream (screen-space denoise), but never deleted by tuning alone.
+
+## 7. Runtime experiments, 2026-11-19
+
+Throwaway runtime switches on the Sponza gallery wall, after the viewport stopped being encoded twice and the sun and sky were raised to realistic ratios (sun π, sky about 0.16, exposure about +4 stops). All of the code was reverted afterwards.
+
+| Experiment | Result |
+|---|---|
+| Hysteresis 0.97 → 0.99 | Calmer and slower, never gone. Lower values flicker faster with more blotches. |
+| Rays per probe 256 → 512 → 1024 | Less flicker up to about 512, barely any change past that, especially in the worst spots. Pure sampling noise would keep dropping as 1/√N, so something beyond plain noise remains. |
+| Per-probe ray rotation (decorrelate neighbours) | No visible difference. |
+| Clamp surface radiance to 1 | No difference: with the sun at π a lit surface gives back its albedo, so almost nothing reaches 1. The cap never mattered at these settings. |
+| Ray clamp relative to the texel's own history | Broken by design: feeds back on itself and gets stuck dark (lighthouse at 1×, black at 5-10×). |
+| Ray clamp relative to the probe's mean this frame | Built, not reported on. |
+| Relocation off | No fix. |
+| Classification off | Slightly slower flicker, large fps cost (every probe traces). |
+| Large-change hysteresis drop off | No fix. |
+
+Not tested: switching off the multi-bounce read, so ray hits stop sampling last frame's probes. That would show whether the remaining slow heartbeat is noise circulating through the bounces, which would fit the plateau past 512 rays.
+
+Outcome: DDGI is frozen as a final-image technique. The direction from here is [[Lighting Tiers]].

@@ -12,6 +12,9 @@ Delete an entry when it is done or turns out not to matter. Add the date when so
 
 ## Bugs I found but did not chase
 
+- **2026-11-19 — a GPU test segfaults when a shader fails to compile.** `WindowlessRender.SphereStandsOutWithGlobalIllumination` crashed after `ProbeTrace.cs.glsl` failed, instead of failing cleanly. Looks like a pass carrying on with a pipeline that was never built.
+- **2026-11-19 — `LinearToSRGB` in `Tonemapping.glsl` has the wrong curve.** It computes `pow(rgb * 1.055, 1/2.4) - 0.055` instead of `1.055 * pow(rgb, 1/2.4) - 0.055`. Only runs when composite targets an 8-bit UNORM image, which the editor never does, so nobody has seen it.
+
 - **2026-08-17 — command pools are keyed by `std::this_thread::get_id()`.** That was a valid per-recorder key while one job owned a worker for its whole duration. With fibers migrating and interleaving it is not: two jobs on one worker share a pool, and `CommandPool`'s index, `m_needsReset` and `m_pendingSignals` are all non-atomic. Key it by fiber or hand the recorder a pool through the job context.
 - **2026-08-17 — glTF joint nodes still become `Node3D`s.** A skin's joints are nodes, so a skeleton appears twice: once as the joint list inside the `Skeleton` asset and once as a tree of `Node3D`s that nothing drives. The joint node indices are known in `loadSkin`; the node walk should skip them.
 - **Skinned meshes cull against bind-pose bounds** (`SceneGeometryDraw`, TODO in place). An animated mesh whose joints leave those bounds pops. Cheap fix is per-clip bounds baked at import.
