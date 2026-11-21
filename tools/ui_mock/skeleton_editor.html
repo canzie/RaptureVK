@@ -1,0 +1,68 @@
+<!doctype html>
+<!--
+    Proposal: the Skeleton workspace, the joint tree, a viewport of the joints on a preview mesh and the joint's details.
+    ?joint=<name> is the selected joint, ?menu=joint opens its right click menu.
+    ?preview=none gives the skeleton no preview meshes, the viewport shows the raw joints alone.
+    Render: tools/ui_mock/render.sh skeleton_editor.html "skeleton&menu=joint"
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<script src="icons.js"></script>
+<script src="workspace_chrome.js"></script>
+<script src="skeleton_tree.js"></script>
+<script src="mannequin_stage.js"></script>
+<link rel="stylesheet" href="sweep.css">
+<link rel="stylesheet" href="workspaces.css">
+</head>
+<body>
+<script>
+const selectedJoint = params.get("joint") || "upperarm_r";
+
+// the skeleton's preview meshes, all shown at once: [name, thumb]
+const PREVIEW_MESHES = params.get("preview") === "none" ? [] : [
+    ["SKM_Mannequin", "linear-gradient(135deg, #8C929C, #4A4E55)"],
+    ["SKM_Mannequin_Armored", "linear-gradient(135deg, #7A6A58, #3E352B)"],
+];
+
+function viewportBody() {
+    const stage = mannequinStageSvg(MANNEQUIN_JOINTS, {selected: selectedJoint, bodyOpacity: PREVIEW_MESHES.length > 0 ? 0.18 : 0, ring: true});
+    return `<div class="stage">${stage}</div>${orientationGizmo()}
+        <div class="overlay-toolbar" style="left:14px;top:14px">
+            <div class="tool-button">${icon("TRANSFORM")}Rotate${icon("CHEVRON_DOWN", "caret")}</div>
+            <div class="tool-button">${icon("PERSPECTIVE")}Lit${icon("CHEVRON_DOWN", "caret")}</div></div>
+        <div class="overlay-toolbar" style="left:14px;bottom:14px"><span class="readout">22 joints</span></div>`;
+}
+
+function skeletonBody() {
+    return skeletonTreeBody(MANNEQUIN_JOINTS, {selected: selectedJoint, editable: true, menuOn: params.get("menu") === "joint" ? selectedJoint : ""});
+}
+
+function detailsBody() {
+    const sheet = new PropertySheet(10);
+    sheet.header(selectedJoint, "BONE")
+        .row("Parent", dropdown("clavicle_r"))
+        .row("Translation", vectorFields(["-0.142", "0.000", "0.018"]))
+        .row("Rotation", vectorFields(["0.000", "-12.400", "4.000"]), {changed: true})
+        .row("Scale", vectorFields(["1.000", "1.000", "1.000"]));
+    sheet.header("SK_Mannequin", "SKELETON", false)
+        .row("Joints", readOnly("22"))
+        .row("Root", readOnly("root"));
+    sheet.header("Preview Meshes", "MESH", false);
+    PREVIEW_MESHES.forEach(([name, thumb], i) => {
+        sheet.row(`Mesh ${i}`, assetPicker(thumb, name, "Skeletal mesh"), {height: 52});
+    });
+    sheet.row("", `<div class="add-field">${icon("PLUS")}Add preview mesh</div>`, {height: 40});
+    return sheet.html;
+}
+
+document.body.innerHTML = windowChrome([["SCENE", "world", "DefaultWorld"], ["SKELETON", "skeleton", "SK_Mannequin"]], [
+        hotbarGroup(`<div class="select-button">${icon("CUBE")}Object Mode${icon("CHEVRON_DOWN", "caret")}</div>`),
+        hotbarGroup(`<div class="tool-button">${icon("SAVE")}Save</div>`),
+    ]) +
+    panel("skeleton", [0, 108, 380, 908], [{icon: "SKELETON", label: "Skeleton"}], skeletonBody()) +
+    panel("viewport", [386, 108, 1000, 908], [{icon: "VIEWPORT", label: "Viewport"}], viewportBody()) +
+    panel("details", [1392, 108, 516, 908], [{icon: "PROPERTIES", label: "Details"}], detailsBody()) + bottomBar();
+</script>
+</body>
+</html>

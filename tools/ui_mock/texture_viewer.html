@@ -1,0 +1,208 @@
+<!doctype html>
+<!--
+    Proposal: the Texture workspace, the image on a canvas with channel and mip controls beside its details.
+    ?kind=albedo|normal picks the texture, ?channel=rgba|r|g|b|a the channels shown, ?mip=<level> the mip shown.
+    Render: tools/ui_mock/render.sh texture_viewer.html "texture&kind=normal&mip=3"
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<script src="icons.js"></script>
+<script src="workspace_chrome.js"></script>
+<link rel="stylesheet" href="sweep.css">
+<link rel="stylesheet" href="workspaces.css">
+<style>
+.texture-canvas { position: absolute; inset: 6px; border-radius: 3px; background: #151515; overflow: hidden; }
+.texture-frame { position: absolute; left: 254px; top: 54px; width: 760px; height: 760px; outline: 1px solid var(--border-3);
+    background: repeating-conic-gradient(#2A2A2A 0% 25%, #1F1F1F 0% 50%) 0 0 / 24px 24px; }
+.texture-frame canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+.channel { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: var(--control-radius);
+    font-weight: 700; font-size: var(--small-text-size); color: var(--text-4); }
+.channel:hover { background: rgba(255, 255, 255, 0.10); }
+.channel.on { background: rgba(255, 255, 255, 0.14); }
+.pixel-swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(255, 255, 255, 0.2); margin-left: 6px; }
+.mip-strip { right: 14px; top: 54px; height: auto; padding: 8px 6px; gap: 8px; flex-direction: column; }
+.mip { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.mip canvas { display: block; border-radius: 2px; outline: 1px solid rgba(255, 255, 255, 0.08); image-rendering: pixelated; }
+.mip.on canvas { outline: 2px solid var(--accent); }
+.mip span { font-family: "Plex Mono", monospace; font-size: 10px; color: var(--text-3); }
+.mip.on span { color: var(--text-1); }
+.crosshair { position: absolute; width: 17px; height: 17px; margin: -8px 0 0 -8px; z-index: 6; }
+.crosshair::before, .crosshair::after { content: ""; position: absolute; background: #FFFFFF; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6); }
+.crosshair::before { left: 8px; top: 0; width: 1px; height: 17px; }
+.crosshair::after { top: 8px; left: 0; height: 1px; width: 17px; }
+</style>
+</head>
+<body>
+<script>
+const kind = params.get("kind") || "albedo";
+const channel = params.get("channel") || "rgba";
+const mip = Number(params.get("mip") || 0);
+const SIZE = 512;
+const MIPS = 12;
+const isNormal = kind === "normal";
+const textureName = isNormal ? "T_Brick_Normal" : "T_Brick_Albedo";
+
+function random(seed) {
+    let s = seed;
+    return () => {
+        s = (s * 1664525 + 1013904223) % 4294967296;
+        return s / 4294967296;
+    };
+}
+
+// a running bond brick wall: the height of each texel, and the brick it belongs to
+function brickHeights() {
+    const BRICK = [128, 64];
+    const MORTAR = 6;
+    const rand = random(7);
+    const noise = new Float32Array(SIZE * SIZE).map(() => rand());
+    const heights = new Float32Array(SIZE * SIZE);
+    const brickIds = new Int32Array(SIZE * SIZE);
+    for (let y = 0; y < SIZE; ++y) {
+        const row = Math.floor(y / BRICK[1]);
+        const offset = row % 2 === 0 ? 0 : BRICK[0] / 2;
+        for (let x = 0; x < SIZE; ++x) {
+            const bx = (x + offset) % BRICK[0];
+            const by = y % BRICK[1];
+            const edge = Math.min(bx, BRICK[0] - bx, by, BRICK[1] - by) - MORTAR / 2;
+            const i = y * SIZE + x;
+            heights[i] = edge <= 0 ? 0.1 * noise[i] : Math.min(1, edge / 5) * (0.85 + 0.15 * noise[i]);
+            brickIds[i] = edge <= 0 ? -1 : row * 8 + Math.floor((x + offset) / BRICK[0]);
+        }
+    }
+    return [heights, brickIds, noise];
+}
+
+function drawTexture() {
+    const [heights, brickIds, noise] = brickHeights();
+    const tints = Array.from({length: 128}, (_, i) => {
+        const r = random(i * 31 + 3);
+        return [150 + r() * 50, 70 + r() * 30, 50 + r() * 22];
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = SIZE;
+    const context = canvas.getContext("2d");
+    const image = context.createImageData(SIZE, SIZE);
+    for (let y = 0; y < SIZE; ++y) {
+        for (let x = 0; x < SIZE; ++x) {
+            const i = y * SIZE + x;
+            let color;
+            if (isNormal) {
+                const dx = heights[y * SIZE + (x + 1) % SIZE] - heights[y * SIZE + (x + SIZE - 1) % SIZE];
+                const dy = heights[((y + 1) % SIZE) * SIZE + x] - heights[((y + SIZE - 1) % SIZE) * SIZE + x];
+                const length = Math.hypot(dx * 2.2, dy * 2.2, 1);
+                color = [(-dx * 2.2 / length * 0.5 + 0.5) * 255, (-dy * 2.2 / length * 0.5 + 0.5) * 255, (1 / length * 0.5 + 0.5) * 255];
+            } else if (brickIds[i] < 0) {
+                const m = 150 + noise[i] * 30;
+                color = [m, m * 0.97, m * 0.92];
+            } else {
+                const tint = tints[brickIds[i] & 127];
+                const grain = 0.82 + noise[i] * 0.3;
+                color = tint.map(c => c * grain * (0.75 + heights[i] * 0.25));
+            }
+            image.data.set([color[0], color[1], color[2], 255], i * 4);
+        }
+    }
+    context.putImageData(image, 0, 0);
+    return canvas;
+}
+
+function mipCanvas(source, level, displaySize) {
+    const size = Math.max(1, SIZE >> level);
+    const small = document.createElement("canvas");
+    small.width = small.height = size;
+    const context = small.getContext("2d");
+    context.imageSmoothingQuality = "high";
+    context.drawImage(source, 0, 0, size, size);
+    if (displaySize !== undefined) {
+        small.style.width = small.style.height = `${displaySize}px`;
+    }
+    return small;
+}
+
+function isolateChannels(canvas) {
+    if (channel === "rgba") {
+        return;
+    }
+    const context = canvas.getContext("2d");
+    const image = context.getImageData(0, 0, canvas.width, canvas.height);
+    const index = {r: 0, g: 1, b: 2, a: 3}[channel];
+    for (let i = 0; i < image.data.length; i += 4) {
+        const v = image.data[i + index];
+        image.data[i] = image.data[i + 1] = image.data[i + 2] = v;
+    }
+    context.putImageData(image, 0, 0);
+}
+
+function canvasBody() {
+    const channelButton = (letter, color) => {
+        const on = channel === "rgba" ? letter !== "A" : channel === letter.toLowerCase();
+        return `<span class="channel ${on ? "on" : ""}" style="${on ? `color:${color}` : ""}">${letter}</span>`;
+    };
+    const resolution = SIZE * 4 >> mip;
+    return `<div class="texture-canvas"><div class="texture-frame" id="frame"></div></div>
+        <div class="overlay-toolbar" style="left:14px;top:14px">
+            ${channelButton("R", "var(--axis-x)")}${channelButton("G", "var(--axis-y)")}${channelButton("B", "var(--axis-z)")}${channelButton("A", "var(--text-1)")}
+            <span class="divider"></span>
+            <div class="tool-button">${icon("LAYERS")}Mip ${mip}, ${resolution} x ${resolution}${icon("CHEVRON_DOWN", "caret")}</div></div>
+        <div class="overlay-toolbar" style="right:14px;top:14px">
+            <div class="tool-button on">Fit</div><div class="tool-button">1:1</div><span class="divider"></span>
+            <div class="tool-button">${icon("GRID")}Tile</div></div>
+        <div class="overlay-toolbar" style="left:14px;bottom:14px"><span class="readout">${(1102 >> mip)}, ${(486 >> mip)}</span><span class="divider"></span>
+            <span class="readout" id="pixel"></span><span class="pixel-swatch" id="pixel-swatch"></span><span style="width:6px"></span></div>
+        <div class="overlay-toolbar mip-strip" id="mips"></div>
+        <span class="crosshair" style="left:${260 + 760 * 1102 / 2048}px;top:${60 + 760 * 486 / 2048}px"></span>`;
+}
+
+function detailsBody() {
+    const sheet = new PropertySheet(10);
+    sheet.header(textureName, "LAYERS", false)
+        .row("Resolution", readOnly("2048 x 2048"))
+        .row("Format", readOnly(isNormal ? "BC5, linear" : "BC1, sRGB"))
+        .row("Mips", readOnly(`${MIPS}`))
+        .row("GPU memory", readOnly(isNormal ? "5.3 MB" : "2.7 MB"))
+        .row("Size on disk", readOnly(isNormal ? "3.9 MB" : "1.9 MB"));
+    sheet.header("Sampling", "GRID", false)
+        .row("Filter", dropdown("Trilinear"))
+        .row("Anisotropy", slider("8x", 0.5))
+        .row("Address mode", dropdown("Repeat"));
+    sheet.header("Import", "FOLDER_PLUS", false)
+        .row("Source", `<span class="read-only mono">content/Bricks/${isNormal ? "bricks_normal" : "bricks_albedo"}.png</span>`)
+        .row("Color space", dropdown(isNormal ? "Linear" : "sRGB"))
+        .row("Compression", dropdown(isNormal ? "BC5, normal map" : "BC1, color"))
+        .row("Generate mips", checkbox(true));
+    if (isNormal) {
+        sheet.row("Flip green", checkbox(false));
+    }
+    return sheet.html;
+}
+
+document.body.innerHTML = windowChrome([["SCENE", "world", "DefaultWorld"], ["LAYERS", "texture", textureName]], [
+        hotbarGroup(`<div class="tool-button">${icon("SAVE")}Save</div>`),
+        hotbarGroup(`<div class="tool-button">${icon("REFRESH")}Reimport</div>`),
+    ]) +
+    panel("texture", [0, 108, 1300, 908], [{icon: "LAYERS", label: "Texture"}], canvasBody()) +
+    panel("details", [1306, 108, 602, 908], [{icon: "PROPERTIES", label: "Details"}], detailsBody()) + bottomBar();
+
+const texture = drawTexture();
+const shown = mipCanvas(texture, mip);
+const sample = shown.getContext("2d").getImageData(Math.floor(shown.width * 1102 / 2048), Math.floor(shown.height * 486 / 2048), 1, 1).data;
+isolateChannels(shown);
+document.getElementById("frame").appendChild(shown);
+
+document.getElementById("pixel").textContent = `R ${(sample[0] / 255).toFixed(2)}  G ${(sample[1] / 255).toFixed(2)}  B ${(sample[2] / 255).toFixed(2)}  A ${(sample[3] / 255).toFixed(2)}`;
+document.getElementById("pixel-swatch").style.background = `rgb(${sample[0]}, ${sample[1]}, ${sample[2]})`;
+
+const strip = document.getElementById("mips");
+for (let level = 0; level < 7; ++level) {
+    const entry = document.createElement("div");
+    entry.className = `mip ${level === mip ? "on" : ""}`;
+    entry.appendChild(mipCanvas(texture, level, Math.max(14, 64 - level * 9)));
+    entry.insertAdjacentHTML("beforeend", `<span>${level}</span>`);
+    strip.appendChild(entry);
+}
+strip.insertAdjacentHTML("beforeend", `<div class="mip"><span>+${MIPS - 7}</span></div>`);
+</script>
+</body>
+</html>

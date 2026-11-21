@@ -1,0 +1,317 @@
+<!doctype html>
+<!--
+    Proposal: the Scripting workspace as a code editor over the project's scripts, not a single file.
+    ?find=1 opens the find bar, ?complete=1 the member completion at the cursor, ?error=1 shows a runtime error
+    pinned to its line with the Problems tab in front, ?menu=folder right clicks a folder that holds no scripts yet.
+    Render: tools/ui_mock/render.sh scripting.html "scripting&complete=1"
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<script src="icons.js"></script>
+<script src="workspace_chrome.js"></script>
+<link rel="stylesheet" href="sweep.css">
+<link rel="stylesheet" href="workspaces.css">
+<style>
+:root {
+    --code-keyword: #C792EA;
+    --code-string: #A3BE8C;
+    --code-number: #D8B13A;
+    --code-comment: #6B6F76;
+    --code-call: #7FB4D8;
+    --code-member: #D4D4D4;
+    --code-global: #E0A370;
+}
+.code { position: absolute; left: 0; right: 0; top: 0; bottom: 24px; background: var(--bg-frame); overflow: hidden;
+    font-family: "Plex Mono", monospace; font-size: 13px; }
+.gutter { position: absolute; left: 0; top: 0; bottom: 0; width: 58px; background: var(--bg-frame); border-right: 1px solid var(--bg-window); }
+.line { position: absolute; left: 0; right: 0; height: 20px; display: flex; align-items: center; white-space: pre; color: var(--code-member); }
+.line .number { width: 44px; text-align: right; color: var(--text-4); flex: none; }
+.line .marker { width: 14px; flex: none; display: flex; justify-content: center; }
+.line .marker .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--status-error); }
+.line .text { padding-left: 14px; }
+.line.current { background: rgba(255, 255, 255, 0.035); }
+.line.current .number { color: var(--text-2); }
+.line.errored { background: rgba(191, 97, 106, 0.10); }
+.tok-keyword { color: var(--code-keyword); }
+.tok-string { color: var(--code-string); }
+.tok-number { color: var(--code-number); }
+.tok-comment { color: var(--code-comment); font-style: italic; }
+.tok-call { color: var(--code-call); }
+.tok-global { color: var(--code-global); }
+.tok-match { background: rgba(216, 177, 58, 0.28); outline: 1px solid rgba(216, 177, 58, 0.6); border-radius: 2px; }
+.tok-match.current-match { background: rgba(216, 177, 58, 0.55); }
+.squiggle { text-decoration: underline wavy var(--status-error); text-underline-offset: 3px; }
+.text-caret { display: inline-block; width: 2px; height: 16px; background: var(--text-1); vertical-align: middle; margin-left: -1px; }
+.indent-guide { position: absolute; top: 0; width: 1px; height: 20px; background: #2A2A2A; }
+.minimap { position: absolute; right: 12px; top: 8px; width: 70px; bottom: 8px; opacity: 0.5; }
+.minimap .bar { position: absolute; height: 2px; border-radius: 1px; }
+.minimap .view { position: absolute; left: -4px; right: -4px; background: rgba(255, 255, 255, 0.05); border-radius: 2px; }
+.editor-status { position: absolute; left: 0; right: 0; bottom: 0; height: 24px; display: flex; align-items: center; gap: 18px; padding: 0 12px;
+    background: var(--bg-panel); border-top: 2px solid var(--bg-window); color: var(--text-3); font-size: var(--caption-size); }
+.editor-status .right { margin-left: auto; display: flex; gap: 18px; }
+.editor-status .problems { display: flex; align-items: center; gap: 6px; }
+.editor-status .problems .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--status-error); }
+
+.find-bar { position: absolute; right: 96px; top: 8px; width: 380px; height: 36px; padding: 4px; display: flex; gap: 4px; align-items: center;
+    background: var(--bg-header); border: 1px solid var(--border-4); border-radius: 6px; z-index: 5; }
+.find-bar .search { position: relative; flex: 1; border-color: var(--accent); color: var(--text-1); font-family: "Plex Mono", monospace;
+    font-size: var(--small-text-size); }
+.find-bar .count { color: var(--text-3); font-size: var(--caption-size); padding: 0 6px; white-space: nowrap; }
+.find-bar .nav-button { width: 26px; height: 26px; }
+.find-bar .nav-button .icon { width: 14px; height: 14px; }
+
+.completion { position: absolute; width: 420px; padding: 4px; background: var(--bg-header); border: 1px solid var(--border-4);
+    border-radius: 6px; z-index: 6; font-size: var(--small-text-size); }
+.completion .entry { height: 26px; display: flex; align-items: center; gap: 8px; padding: 0 8px; border-radius: var(--control-radius); }
+.completion .entry.highlighted { background: var(--selection); }
+.completion .kind { width: 16px; height: 16px; border-radius: 3px; display: flex; align-items: center; justify-content: center;
+    font-family: "Plex Mono", monospace; font-size: 10px; font-weight: 700; color: #141414; flex: none; }
+.completion .name { font-family: "Plex Mono", monospace; color: var(--text-1); width: 150px; flex: none; }
+.completion .signature { color: var(--text-3); font-family: "Plex Mono", monospace; font-size: var(--caption-size); }
+.completion .doc { margin-top: 4px; padding: 8px 8px 4px; border-top: 1px solid var(--border-4); color: var(--text-2); line-height: 1.45; }
+.completion .doc code { font-family: "Plex Mono", monospace; color: var(--text-1); font-size: var(--caption-size); }
+
+.file-row .icon { color: var(--text-3); }
+.file-row .script-icon { color: rgb(89, 191, 217); }
+.file-row.open .file-name { color: var(--text-1); }
+.file-row.empty { color: var(--text-4); }
+.file-row.empty .icon { opacity: 0.45; }
+.file-row.hovered { background: var(--row-hover); }
+.menu .separator { height: 1px; margin: 4px 6px; background: var(--border-4); }
+.menu .item .icon { width: 14px; height: 14px; color: var(--text-3); }
+.output-line { position: absolute; left: 0; right: 0; height: 22px; display: flex; align-items: center; gap: 12px; padding: 0 12px;
+    font-family: "Plex Mono", monospace; font-size: var(--caption-size); color: var(--text-2); }
+.output-line .time { color: var(--text-4); }
+.output-line .source { color: var(--text-3); margin-left: auto; }
+.output-line.error { color: #E08891; background: rgba(191, 97, 106, 0.08); }
+.output-line.error .source { color: #C27780; text-decoration: underline; }
+.problem { position: absolute; left: 0; right: 0; height: 26px; display: flex; align-items: center; gap: 10px; padding: 0 12px;
+    font-size: var(--small-text-size); color: var(--text-1); }
+.problem.selected { background: var(--selection); }
+.problem .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--status-error); flex: none; }
+.problem .where { color: var(--text-3); font-family: "Plex Mono", monospace; font-size: var(--caption-size); margin-left: auto; }
+.outline-row .kind { width: 16px; height: 16px; border-radius: 3px; display: flex; align-items: center; justify-content: center;
+    font-family: "Plex Mono", monospace; font-size: 10px; font-weight: 700; color: #141414; flex: none; }
+</style>
+</head>
+<body>
+<script>
+const findOpen = params.get("find") === "1";
+const completing = params.get("complete") === "1";
+const errored = params.get("error") === "1";
+const menu = params.get("menu") || "";
+
+const SOURCE = `-- Drives the possessed puppet from the controller's intent.
+
+local mouseSensitivity = 0.1
+local walkSpeed = 5.0
+
+local controller = script.owner
+local body = nil
+
+local function usePuppet(subject)
+    if not subject then
+        body = nil
+        return
+    end
+
+    body = subject:getComponent("CharacterBody3D")
+    if body then
+        body.walkSpeed = walkSpeed
+    end
+
+    local cameraArm = subject:findFirstDescendantOfType("SpringArm3D")
+    if cameraArm then
+        cameraArm.followsControlRotation = true
+    end
+
+    log("possessed " .. subject.name)
+end
+
+if controller.possessed then
+    usePuppet(controller.possessed)
+end
+controller.onPossess:connect(usePuppet)
+
+controller.onUpdate:connect(function(dt)
+    local subject = controller.possessed
+    if not subject then
+        return
+    end
+
+    local intent = controller.intent
+
+    controller:addYawInput(intent.look.x * mouseSensitivity)
+    controller:addPitchInput(-intent.look.y * mouseSensitivity)
+
+    local walk = controller.controlRight * intent.move.x + controller.controlForward * intent.move.z
+
+    if body then
+        body:move(walk)
+        if intent.jump then
+            body:${errored ? "jmp" : "jump"}()
+        end
+    else
+        subject.position = subject.position + walk * walkSpeed * dt
+    end
+
+    subject:lookAt(subject.position + controller.controlForward)
+end)`.split("\n");
+
+const FIRST_LINE = 30;
+const CURSOR_LINE = completing ? 48 : errored ? 49 : 44;
+if (completing) {
+    SOURCE.splice(47, 0, "        body:");
+}
+
+const KEYWORDS = new Set(["local", "function", "if", "then", "else", "elseif", "end", "return", "not", "and", "or", "nil", "true", "false", "for", "while", "do", "in"]);
+const GLOBALS = new Set(["script", "log"]);
+const escape = text => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+function highlight(line, lineNumber) {
+    const commentAt = line.indexOf("--");
+    const code = commentAt >= 0 ? line.slice(0, commentAt) : line;
+    const comment = commentAt >= 0 ? line.slice(commentAt) : "";
+    let html = code.replace(/("[^"]*")|(\b\d+(?:\.\d+)?\b)|([A-Za-z_][A-Za-z0-9_]*)(\s*\()?/g, (match, string, number, word, call) => {
+        if (string) {
+            return `<span class="tok-string">${escape(string)}</span>`;
+        }
+        if (number) {
+            return `<span class="tok-number">${number}</span>`;
+        }
+        if (KEYWORDS.has(word)) {
+            return `<span class="tok-keyword">${word}</span>${call || ""}`;
+        }
+        if (findOpen && word === "body") {
+            const current = lineNumber === 47 ? "current-match" : "";
+            return `<span class="tok-match ${current}">${word}</span>${call || ""}`;
+        }
+        if (errored && word === "jmp") {
+            return `<span class="tok-call squiggle">${word}</span>${call}`;
+        }
+        if (call) {
+            return `<span class="tok-call">${word}</span>${call}`;
+        }
+        if (GLOBALS.has(word)) {
+            return `<span class="tok-global">${word}</span>`;
+        }
+        return word;
+    });
+    if (comment) {
+        html += `<span class="tok-comment">${escape(comment)}</span>`;
+    }
+    return html;
+}
+
+function editorBody() {
+    const lines = SOURCE.slice(FIRST_LINE - 1).map((line, row) => {
+        const number = FIRST_LINE + row;
+        const guides = Array.from({length: Math.floor((line.length - line.trimStart().length) / 4)}, (_, d) =>
+            `<span class="indent-guide" style="left:${72 + d * 31.2}px"></span>`).join("");
+        const caret = number === CURSOR_LINE && !findOpen ? '<span class="text-caret"></span>' : "";
+        const marker = errored && number === 49 ? '<span class="dot"></span>' : "";
+        const classes = `${number === CURSOR_LINE ? "current" : ""} ${errored && number === 49 ? "errored" : ""}`;
+        return `<div class="line ${classes}" style="top:${8 + row * 20}px">${guides}<span class="number">${number}</span><span class="marker">${marker}</span>
+            <span class="text">${highlight(line, number)}${caret}</span></div>`;
+    }).join("");
+
+    const minimap = SOURCE.map((line, i) => {
+        const indent = line.length - line.trimStart().length;
+        const width = Math.min(66, line.trim().length * 0.9);
+        const color = line.trim().startsWith("--") ? "var(--code-comment)" : /^\s*(local|if|end|return)/.test(line) ? "var(--code-keyword)" : "#8A8A8A";
+        return line.trim() ? `<span class="bar" style="top:${i * 4}px;left:${indent * 1.2}px;width:${width}px;background:${color}"></span>` : "";
+    }).join("");
+
+    const find = findOpen ? `<div class="find-bar"><div class="search">${icon("SEARCH")}body<span class="caret-bar"></span></div>
+        <span class="count">3 of 6</span><span class="nav-button">${icon("CHEVRON_UP")}</span><span class="nav-button">${icon("CHEVRON_DOWN")}</span>
+        <span class="nav-button">${icon("X")}</span></div>` : "";
+
+    const completion = completing ? completionPopup() : "";
+    const problems = errored ? `<span class="problems"><span class="dot"></span>1 problem</span>` : `<span>No problems</span>`;
+    return `<div class="code"><div class="gutter"></div>${lines}<div class="minimap">${minimap}<span class="view" style="top:${(FIRST_LINE - 1) * 4}px;height:${32 * 4}px"></span></div>
+        ${find}${completion}</div>
+        <div class="editor-status">${problems}<div class="right"><span>Ln ${CURSOR_LINE}, Col ${completing ? 14 : 5}</span><span>Spaces: 4</span><span>LF</span><span>Lua</span></div></div>`;
+}
+
+function completionPopup() {
+    const kindBadge = (letter, color) => `<span class="kind" style="background:${color}">${letter}</span>`;
+    const METHOD = ["M", "var(--code-call)"];
+    const PROPERTY = ["P", "var(--code-number)"];
+    const entries = [
+        [METHOD, "move", "(direction: Vec3)"], [METHOD, "jump", "()"], [METHOD, "isOnGround", "(): boolean"],
+        [METHOD, "teleport", "(position: Vec3)"], [PROPERTY, "velocity", "Vec3"], [PROPERTY, "walkSpeed", "number"],
+    ];
+    const rows = entries.map(([kind, name, signature], i) => `<div class="entry ${i === 0 ? "highlighted" : ""}">${kindBadge(...kind)}
+        <span class="name">${name}</span><span class="signature">${signature}</span></div>`).join("");
+    return `<div class="completion" style="left:178px;top:${8 + (48 - FIRST_LINE + 1) * 20}px">${rows}
+        <div class="doc"><code>CharacterBody3D:move(direction)</code><br>Walks the body along a direction for this step, scaled by its walk speed.</div></div>`;
+}
+
+function scriptsBody() {
+    // [depth, kind, name, open, holds scripts]; every folder under content shows, only scripts show as files
+    const files = [[0, "folder", "content", true, true], [1, "folder", "Characters", true, false], [2, "folder", "Mannequin", false, false],
+        [1, "folder", "Environment", true, true], [2, "folder", "Sponza", true, true], [3, "script", "TorchFlicker.lua", false],
+        [1, "folder", "scripts", true, true], [2, "script", "PlayerController.lua", true], [2, "script", "Door.lua", true],
+        [2, "script", "Pickup.lua", true], [2, "script", "Spawner.lua", false], [1, "folder", "Textures", false, false],
+        [1, "folder", "ui", true, true], [2, "script", "HealthBar.lua", false], [2, "script", "PauseMenu.lua", false],
+        [1, "folder", "Worlds", false, false]];
+    const rows = files.map(([depth, kind, name, open, holdsScripts], i) => {
+        const folder = kind === "folder";
+        const glyph = folder ? icon("FOLDER", "", "color:var(--type-folder)") : icon("SCRIPT", "script-icon");
+        const expander = folder ? icon(open ? "CHEVRON_DOWN" : "CARET_RIGHT", "", "width:12px;height:12px;color:var(--text-3)") : '<span style="width:12px"></span>';
+        const classes = `${name === "PlayerController.lua" ? "selected" : ""} ${!folder && open ? "open" : ""} ${folder && !holdsScripts ? "empty" : ""}
+            ${menu === "folder" && name === "Mannequin" ? "hovered" : ""}`;
+        return `<div class="list-row file-row ${classes}" style="top:${40 + i * 26}px;padding-left:${8 + depth * 14}px">${expander}${glyph}
+            <span class="file-name">${name}</span>${!folder && open ? `<span class="trail">open</span>` : ""}</div>`;
+    }).join("");
+    return `<div class="search" style="left:8px;right:40px;top:8px">${icon("SEARCH")}Search scripts</div>
+        <span class="icon-button" style="right:8px;top:9px">${icon("PLUS")}</span>${rows}`;
+}
+
+function folderMenu() {
+    const cursor = [120, 108 + 30 + 40 + 2 * 26 + 13];
+    return `${mouseCursor(cursor)}<div class="menu" style="left:${cursor[0] + 6}px;top:${cursor[1] + 6}px;z-index:15">
+        <div class="item">New Script</div><div class="item">New Folder</div>
+        <div class="separator"></div><div class="item">Rename</div><div class="item">Show in Content Browser</div></div>`;
+}
+
+function outputBody() {
+    if (errored) {
+        return `<div class="problem selected" style="top:8px"><span class="dot"></span>attempt to call a nil value (method 'jmp')
+            <span class="where">PlayerController.lua:49</span></div>`;
+    }
+    const lines = [["12:04:31", "Loaded PlayerController.lua", ""], ["12:04:31", "possessed Mannequin", "PlayerController.lua:25"],
+        ["12:04:33", "Reloaded Door.lua", ""], ["12:04:40", "door opened by Mannequin", "Door.lua:18"]];
+    return lines.map(([time, text, source], i) => `<div class="output-line" style="top:${8 + i * 22}px"><span class="time">${time}</span>${text}
+        <span class="source">${source}</span></div>`).join("");
+}
+
+function outlineBody() {
+    const badge = (letter, color) => `<span class="kind" style="background:${color}">${letter}</span>`;
+    const LOCAL = ["L", "var(--text-3)"];
+    const FUNCTION = ["F", "var(--code-call)"];
+    const HANDLER = ["E", "rgb(242, 209, 77)"];
+    const entries = [[LOCAL, "mouseSensitivity", "3"], [LOCAL, "walkSpeed", "4"], [LOCAL, "controller", "6"], [LOCAL, "body", "7"],
+        [FUNCTION, "usePuppet(subject)", "9"], [HANDLER, "controller.onPossess", "31"], [HANDLER, "controller.onUpdate", "33"]];
+    const rows = entries.map(([kind, name, line], i) => `<div class="list-row outline-row ${name === "controller.onUpdate" ? "selected" : ""}"
+        style="top:${28 + i * 26}px">${badge(...kind)}<span>${name}</span><span class="trail">${line}</span></div>`).join("");
+    const users = [["CONTROLLER", "Player", "PlayerController"], ["CONTROLLER", "Arena Player", "PlayerController"]];
+    const userRows = users.map(([iconName, name, type], i) => `<div class="list-row" style="top:${(28 + entries.length * 26 + 28) + i * 26}px">${icon(iconName)}
+        <span>${name}</span><span class="trail">${type}</span></div>`).join("");
+    const header = (title, iconName, top) => `<div class="component-header" style="top:${top}px">${icon("CHEVRON_DOWN", "chevron")}${icon(iconName)}${title}</div>`;
+    return `${header("Symbols", "SCRIPT", 0)}${rows}${header("Run by", "CONTROLLER", 28 + entries.length * 26)}${userRows}`;
+}
+
+document.body.innerHTML = windowChrome([["SCENE", "world", "DefaultWorld"], ["SCRIPT", "script", "Scripting"]], [
+        hotbarGroup(`<div class="primary-button">${icon("PLUS")}New Script</div>`),
+        hotbarGroup(`<div class="tool-button">${icon("SAVE")}Save</div><div class="tool-button">${icon("SAVE")}Save All</div>`),
+        errored ? statusNote("Runtime error in PlayerController.lua", "var(--status-error)") : statusNote("Reloaded 2 s ago"),
+    ]) +
+    panel("scripts", [0, 108, 320, 908], [{icon: "FOLDER", label: "Scripts"}], scriptsBody()) +
+    panel("editor", [326, 108, 1176, 700], [{icon: "SCRIPT", label: "PlayerController.lua"}, {icon: "SCRIPT", label: "Door.lua"}, {icon: "SCRIPT", label: "Pickup.lua"}], editorBody()) +
+    panel("output", [326, 814, 1176, 202], errored ? [{icon: "X", label: "Problems (1)"}, {icon: "PROPERTIES", label: "Output"}] : [{icon: "PROPERTIES", label: "Output"}, {icon: "CHECK", label: "Problems"}], outputBody()) +
+    panel("outline", [1508, 108, 400, 908], [{icon: "LAYERS", label: "Outline"}], outlineBody()) + bottomBar() + (menu === "folder" ? folderMenu() : "");
+</script>
+</body>
+</html>

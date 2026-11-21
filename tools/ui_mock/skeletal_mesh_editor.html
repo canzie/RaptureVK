@@ -1,0 +1,87 @@
+<!doctype html>
+<!--
+    Proposal: the Skeletal Mesh workspace, the static mesh workspace plus what skinning adds: the bound skeleton's joints read only, a joints overlay and a previewed pose.
+    ?show=joints,wireframe,bounds turns on the viewport's overlays, ?menu=show opens the Show menu.
+    ?pose=Run_Forward previews a frame of that clip instead of the bind pose, ?joint=<name> selects a joint.
+    Render: tools/ui_mock/render.sh skeletal_mesh_editor.html "skeletal&show=joints&pose=Run_Forward"
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<script src="icons.js"></script>
+<script src="workspace_chrome.js"></script>
+<script src="skeleton_tree.js"></script>
+<script src="mannequin_stage.js"></script>
+<link rel="stylesheet" href="sweep.css">
+<link rel="stylesheet" href="workspaces.css">
+</head>
+<body>
+<script>
+const shown = (params.get("show") || "").split(",");
+const pose = params.get("pose") || "";
+const selectedJoint = params.get("joint") || "";
+
+function boundsSvg() {
+    const [x0, y0, x1, y1] = [204 + 70 * 1.45, -30 + 70 * 1.45, 204 + 330 * 1.45, -30 + 538 * 1.45];
+    return `<rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" fill="none" stroke="#D8B13A" stroke-width="1.5" stroke-dasharray="6 4"/>`;
+}
+
+function showMenu() {
+    const check = (label, on) => `<div class="item"><span class="marker"><span class="check">${on ? icon("CHECK") : ""}</span></span>${label}</div>`;
+    return `<div class="menu" style="left:104px;top:48px;z-index:6"><div class="section">Overlays</div>
+        ${check("Grid", true)}${check("Bounds", shown.includes("bounds"))}${check("Wireframe", shown.includes("wireframe"))}
+        ${check("Joints", shown.includes("joints"))}</div>`;
+}
+
+function viewportBody() {
+    const stage = mannequinStageSvg(MANNEQUIN_JOINTS, {selected: selectedJoint, pose: pose ? 3 : 2, bones: shown.includes("joints"),
+        wireframe: shown.includes("wireframe")}).replace("</svg>", `${shown.includes("bounds") ? boundsSvg() : ""}</svg>`);
+    return `<div class="stage">${stage}</div>${orientationGizmo()}
+        <div class="overlay-toolbar" style="left:14px;top:14px">
+            <div class="tool-button">${icon("PERSPECTIVE")}Lit${icon("CHEVRON_DOWN", "caret")}</div>
+            <div class="tool-button ${params.get("menu") === "show" ? "on" : ""}">${icon("EYE")}Show${icon("CHEVRON_DOWN", "caret")}</div></div>
+        ${params.get("menu") === "show" ? showMenu() : ""}
+        <div class="overlay-toolbar" style="left:14px;bottom:14px"><span class="readout">18,640 triangles</span><span class="divider"></span>
+            <span class="readout">10,212 vertices</span><span class="divider"></span><span class="readout">22 joints</span></div>`;
+}
+
+function skeletonBody() {
+    return skeletonTreeBody(MANNEQUIN_JOINTS, {selected: selectedJoint, menuOn: params.get("menu") === "joint" ? selectedJoint : ""});
+}
+
+function detailsBody() {
+    const sheet = new PropertySheet(10);
+    sheet.header("Skinning", "SKELETON", false)
+        .row("Skeleton", assetPicker("linear-gradient(135deg, #5A5A5A, #2E2E2E)", "SK_Mannequin", "Skeleton, 22 joints"), {height: 52})
+        .row("Influences per vertex", readOnly("4"));
+    sheet.header("Material Slots", "MATERIAL", false)
+        .row("Body", assetPicker("linear-gradient(135deg, #A9AEB6, #5C6068)", "M_Mannequin_Body", "Material instance"), {height: 52})
+        .row("Joints", assetPicker("linear-gradient(135deg, #3E4148, #202226)", "M_Mannequin_Joints", "Material instance"), {height: 52});
+    sheet.header("Geometry", "MESH", false)
+        .row("Triangles", readOnly("18,640"))
+        .row("Vertices", readOnly("10,212"))
+        .row("Bind pose bounds", readOnly("0.75 x 1.80 x 0.32 m"));
+    sheet.header("Preview Pose", "PLAY", false)
+        .row("Pose", dropdown(pose || "Bind pose"));
+    if (pose) {
+        sheet.row("Frame", textField("14"));
+    }
+    sheet.header("Import", "FOLDER_PLUS", false)
+        .row("Source", `<span class="read-only mono">content/Mannequin/mannequin.glb</span>`)
+        .row("Mesh in file", readOnly("Mannequin"))
+        .row("Scale", slider("1.000", 0.1))
+        .row("Up axis", dropdown("Y up"));
+    return sheet.html;
+}
+
+document.body.innerHTML = windowChrome([["SCENE", "world", "DefaultWorld"], ["MESH", "mesh", "SKM_Mannequin"]], [
+        hotbarGroup(`<div class="tool-button">${icon("SAVE")}Save</div>`),
+        hotbarGroup(`<div class="tool-button">${icon("REFRESH")}Reimport</div>`),
+        hotbarGroup(`<div class="tool-button">${icon("MESH")}Convert Pose to Static</div>`),
+    ]) +
+    panel("skeleton", [0, 108, 380, 908], [{icon: "SKELETON", label: "Skeleton"}], skeletonBody()) +
+    panel("viewport", [386, 108, 1000, 908], [{icon: "VIEWPORT", label: "Viewport"}], viewportBody()) +
+    panel("details", [1392, 108, 516, 908], [{icon: "PROPERTIES", label: "Details"}], detailsBody()) + bottomBar();
+</script>
+</body>
+</html>

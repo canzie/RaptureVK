@@ -1,0 +1,159 @@
+<!doctype html>
+<!--
+    Proposal: the Static Mesh workspace, a viewport of the mesh beside its details.
+    ?show=wireframe,bounds,sections turns on the viewport's overlays, ?menu=show opens the Show menu.
+    ?section=<index> is the section under the cursor in Details, outlined in the viewport.
+    Render: tools/ui_mock/render.sh mesh_editor.html "mesh&show=sections&section=1"
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<script src="icons.js"></script>
+<script src="workspace_chrome.js"></script>
+<link rel="stylesheet" href="sweep.css">
+<link rel="stylesheet" href="workspaces.css">
+<style>
+.stats-overlay { left: 14px; bottom: 14px; }
+.section-swatch { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+.property-row.hovered { background: #282828; }
+.property-row.hovered .label { color: var(--text-1); }
+.property-row .label .section-swatch { margin-right: 8px; }
+</style>
+</head>
+<body>
+<script>
+const shown = (params.get("show") || "").split(",");
+const hoveredSection = params.get("section");
+
+// a section per material: [name, base colour, section colour, material, material thumb]
+const SECTIONS = [
+    ["Stone", [150, 142, 128], "#C0794A", "M_Stone", "linear-gradient(135deg, #9A9080, #6A6255)"],
+    ["Marble", [196, 192, 184], "#4E7DBF", "M_Marble", "linear-gradient(135deg, #E2DED6, #A9A398 70%)"],
+    ["Bronze", [168, 120, 62], "#5E9E5A", "M_Bronze", "linear-gradient(135deg, #C8904A, #6E4A22)"],
+];
+
+// boxes in metres: [x, y, z, width, height, depth, section]
+const BOXES = [
+    [-0.6, 0.0, -0.6, 1.2, 0.35, 1.2, 0], [-0.5, 0.35, -0.5, 1.0, 0.15, 1.0, 0],
+    [-0.32, 0.5, -0.32, 0.64, 1.6, 0.64, 1], [-0.36, 2.1, -0.36, 0.72, 0.12, 0.72, 2],
+    [-0.32, 2.22, -0.32, 0.64, 1.9, 0.64, 1], [-0.5, 4.12, -0.5, 1.0, 0.18, 1.0, 0], [-0.6, 4.3, -0.6, 1.2, 0.5, 1.2, 0],
+];
+
+const ORIGIN = [600, 760];
+const SCALE = 118;
+const COS30 = Math.cos(Math.PI / 6);
+const SIN30 = 0.5;
+
+function project(x, y, z) {
+    return [ORIGIN[0] + (x - z) * COS30 * SCALE, ORIGIN[1] + (x + z) * SIN30 * SCALE - y * SCALE];
+}
+
+function shade([r, g, b], factor) {
+    return `rgb(${Math.round(r * factor)}, ${Math.round(g * factor)}, ${Math.round(b * factor)})`;
+}
+
+function quad(points, fill, extra = "") {
+    return `<polygon points="${points.map(p => p.join(",")).join(" ")}" fill="${fill}" ${extra}/>`;
+}
+
+// a face's wire lines: the quad split into cells along both edges
+function faceWires(a, b, c, d, cellsU, cellsV) {
+    let lines = "";
+    const lerp = (p, q, t) => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+    for (let i = 0; i <= cellsU; ++i) {
+        const t = i / cellsU;
+        const [p, q] = [lerp(a, b, t), lerp(d, c, t)];
+        lines += `<line x1="${p[0]}" y1="${p[1]}" x2="${q[0]}" y2="${q[1]}"/>`;
+    }
+    for (let i = 0; i <= cellsV; ++i) {
+        const t = i / cellsV;
+        const [p, q] = [lerp(a, d, t), lerp(b, c, t)];
+        lines += `<line x1="${p[0]}" y1="${p[1]}" x2="${q[0]}" y2="${q[1]}"/>`;
+    }
+    return lines;
+}
+
+function boxSvg([x, y, z, w, h, d, section]) {
+    const sectionTint = shown.includes("sections");
+    const base = sectionTint ? SECTIONS[section][2].match(/\w\w/g).map(v => parseInt(v, 16)) : SECTIONS[section][1];
+    const top = [project(x, y + h, z), project(x + w, y + h, z), project(x + w, y + h, z + d), project(x, y + h, z + d)];
+    const left = [project(x, y + h, z + d), project(x + w, y + h, z + d), project(x + w, y, z + d), project(x, y, z + d)];
+    const right = [project(x + w, y + h, z), project(x + w, y + h, z + d), project(x + w, y, z + d), project(x + w, y, z)];
+    let svg = quad(top, shade(base, 1.0)) + quad(left, shade(base, 0.72)) + quad(right, shade(base, 0.52));
+    if (shown.includes("wireframe")) {
+        const cells = Math.max(2, Math.round(h * 4));
+        svg += `<g stroke="rgba(255,255,255,0.35)" stroke-width="1">${faceWires(...top, 4, 4)}${faceWires(...left, 4, cells)}${faceWires(...right, 4, cells)}</g>`;
+    }
+    if (hoveredSection !== null && Number(hoveredSection) === section) {
+        svg += [top, left, right].map(face => quad(face, "none", 'stroke="var(--accent)" stroke-width="2"')).join("");
+    }
+    return svg;
+}
+
+function floorGrid() {
+    let lines = "";
+    for (let i = -5; i <= 5; ++i) {
+        const strong = i === 0 ? "#4A4A4A" : "#303236";
+        const [a, b] = [project(i, 0, -5), project(i, 0, 5)];
+        const [c, d] = [project(-5, 0, i), project(5, 0, i)];
+        lines += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${strong}"/><line x1="${c[0]}" y1="${c[1]}" x2="${d[0]}" y2="${d[1]}" stroke="${strong}"/>`;
+    }
+    return lines;
+}
+
+function boundsSvg() {
+    const [x0, y0, z0, x1, y1, z1] = [-0.6, 0, -0.6, 0.6, 4.8, 0.6];
+    const corners = [[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1], [x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]].map(c => project(...c));
+    const edges = [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]];
+    return `<g stroke="#D8B13A" stroke-width="1.5" stroke-dasharray="6 4">${edges.map(([a, b]) =>
+        `<line x1="${corners[a][0]}" y1="${corners[a][1]}" x2="${corners[b][0]}" y2="${corners[b][1]}"/>`).join("")}</g>`;
+}
+
+function showMenu() {
+    const check = (label, on) => `<div class="item"><span class="marker"><span class="check">${on ? icon("CHECK") : ""}</span></span>${label}</div>`;
+    return `<div class="menu" style="left:104px;top:48px;z-index:6"><div class="section">Overlays</div>
+        ${check("Grid", true)}${check("Bounds", shown.includes("bounds"))}${check("Wireframe", shown.includes("wireframe"))}
+        ${check("Section colors", shown.includes("sections"))}</div>`;
+}
+
+function viewportBody() {
+    const shadow = `<ellipse cx="${ORIGIN[0]}" cy="${ORIGIN[1] + 4}" rx="190" ry="70" fill="rgba(0,0,0,0.28)"/>`;
+    const scene = `<svg width="1288" height="866">${floorGrid()}${shadow}${BOXES.map(boxSvg).join("")}${shown.includes("bounds") ? boundsSvg() : ""}</svg>`;
+    return `<div class="stage">${scene}</div>${orientationGizmo()}
+        <div class="overlay-toolbar" style="left:14px;top:14px">
+            <div class="tool-button">${icon("PERSPECTIVE")}Lit${icon("CHEVRON_DOWN", "caret")}</div>
+            <div class="tool-button ${params.get("menu") === "show" ? "on" : ""}">${icon("EYE")}Show${icon("CHEVRON_DOWN", "caret")}</div></div>
+        ${params.get("menu") === "show" ? showMenu() : ""}
+        <div class="overlay-toolbar stats-overlay"><span class="readout">24,512 triangles</span><span class="divider"></span>
+            <span class="readout">13,208 vertices</span><span class="divider"></span><span class="readout">1.20 x 4.80 x 1.20 m</span></div>`;
+}
+
+function detailsBody() {
+    const sheet = new PropertySheet(10);
+    sheet.header("Material Slots", "MATERIAL", false);
+    SECTIONS.forEach(([name, , color, material, thumb], i) => {
+        const swatch = shown.includes("sections") ? `<span class="section-swatch" style="background:${color}"></span>` : "";
+        sheet.row(`${swatch}${name}`, assetPicker(thumb, material, "Material instance"), {height: 52, cls: String(i) === hoveredSection ? "hovered" : ""});
+    });
+    sheet.header("Geometry", "MESH", false)
+        .row("Triangles", readOnly("24,512"))
+        .row("Vertices", readOnly("13,208"))
+        .row("Bounds", readOnly("1.20 x 4.80 x 1.20 m"))
+        .row("Ray tracing", checkbox(true));
+    sheet.header("Import", "FOLDER_PLUS", false)
+        .row("Source", `<span class="read-only mono">content/Sponza/pillar.glb</span>`)
+        .row("Mesh in file", readOnly("pillar_01"))
+        .row("Scale", slider("1.000", 0.1))
+        .row("Up axis", dropdown("Y up"));
+    return sheet.html;
+}
+
+document.body.innerHTML = windowChrome([["SCENE", "world", "DefaultWorld"], ["MESH", "mesh", "SM_Pillar"]], [
+        hotbarGroup(`<div class="tool-button">${icon("SAVE")}Save</div>`),
+        hotbarGroup(`<div class="tool-button">${icon("REFRESH")}Reimport</div>`),
+    ]) +
+    panel("viewport", [0, 108, 1300, 908], [{icon: "VIEWPORT", label: "Viewport"}], viewportBody()) +
+    panel("details", [1306, 108, 602, 908], [{icon: "PROPERTIES", label: "Details"}], detailsBody()) + bottomBar();
+</script>
+</body>
+</html>

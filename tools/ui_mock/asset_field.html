@@ -1,0 +1,166 @@
+<!doctype html>
+<!--
+    Proposal: the asset field, the property row an asset is picked in.
+    It shows the asset's preview with its type indicator under it, its name and its type; it removes the asset, finds it in the
+    content browser, and opens the picker to choose another.
+    The first column is the Details panel at its real width, the second wider, the third with the picker open.
+    Render: tools/ui_mock/render.sh asset_field.html fields
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<script src="icons.js"></script>
+<script src="workspace_chrome.js"></script>
+<link rel="stylesheet" href="sweep.css">
+<link rel="stylesheet" href="workspaces.css">
+<style>
+.property-row .fields { right: 12px; }
+
+/* the preview, drawn rather than rendered, always square, with the type indicator under it */
+.preview { display: flex; flex-direction: column; gap: 3px; flex: none; }
+.preview .art { position: relative; width: 56px; height: 56px; border-radius: 4px; overflow: hidden;
+    background: repeating-conic-gradient(var(--bg-input) 0% 25%, var(--bg-frame) 0% 50%) 0 0 / 25% 25%; }
+.preview .art > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.preview .art::after, .drag-ghost::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--input-border); pointer-events: none; }
+.preview .art.empty { background: #363636; display: flex; align-items: center; justify-content: center; color: var(--text-1); }
+.preview .art.empty .icon { width: 24px; height: 24px; }
+.preview .art.empty .icon svg { stroke-width: 2.2; }
+.asset-field .type.expected { color: var(--text-2); }
+.preview .art.missing { background: repeating-linear-gradient(135deg, rgba(191, 97, 106, 0.55) 0 6px, rgba(191, 97, 106, 0.18) 6px 12px); }
+.preview .indicator { height: 3px; border-radius: 2px; }
+.preview .indicator.dim { opacity: 0.35; }
+
+.asset-field { flex: 1; height: 100%; display: flex; align-items: center; gap: 12px; padding: 4px 6px; min-width: 0; box-sizing: border-box;
+    border-radius: 6px; position: relative; }
+.asset-field.hover { background: #2E2E2E; }
+.asset-field.open { background: #2E2E2E; box-shadow: 0 0 0 1px var(--accent); }
+.asset-field.drop { background: #353535; }
+.drag-ghost { position: absolute; right: 54px; top: 18px; width: 40px; height: 40px; border-radius: 4px; overflow: hidden;
+    background: repeating-conic-gradient(var(--bg-input) 0% 25%, var(--bg-frame) 0% 50%) 0 0 / 25% 25%;
+    opacity: 0.85; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55); z-index: 5; }
+.drag-ghost svg { width: 100%; height: 100%; }
+.asset-field .words { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.asset-field .name { color: var(--text-1); font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.asset-field .name.missing { color: #D98A92; }
+.asset-field .type { color: var(--text-3); font-size: var(--caption-size); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.asset-field .buttons { display: flex; align-items: center; gap: 1px; flex: none; }
+.asset-field .buttons span { width: 24px; height: 24px; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: var(--text-4); }
+.asset-field.hover .buttons span, .asset-field.open .buttons span { color: var(--text-2); }
+.asset-field .buttons span.pressed { background: var(--hover); color: var(--text-1); }
+.asset-field .buttons .icon { width: 13px; height: 13px; }
+
+.add-row { flex: 1; height: 28px; background: #2D2D2D; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: var(--text-3); }
+.add-row .icon { width: 13px; height: 13px; }
+
+/* the picker the field opens to choose another */
+.picker { position: absolute; z-index: 10; background: var(--bg-header); border: 1px solid var(--border-4); border-radius: 6px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+.picker .search { position: relative; height: 28px; border-color: var(--accent); color: var(--text-1); margin-bottom: 4px; padding-right: 8px; }
+.picker .search .count { margin-left: auto; color: var(--text-3); font-size: var(--caption-size); }
+.picker .choice { height: 50px; display: flex; align-items: center; gap: 10px; padding: 0 8px 0 4px; border-radius: 5px; }
+.picker .choice .preview .art { width: 40px; height: 40px; }
+.picker .choice .words { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.picker .choice .name { color: var(--text-1); font-size: var(--small-text-size); }
+.picker .choice .type { color: var(--text-3); font-size: var(--caption-size); }
+.picker .choice.highlighted { background: var(--hover); }
+.picker .choice.current { background: rgba(71, 114, 179, 0.2); }
+.picker .choice .check { margin-left: auto; width: 13px; height: 13px; color: var(--accent); }
+.picker mark { background: rgba(71, 114, 179, 0.35); color: var(--text-1); border-radius: 2px; }
+
+.design-title { position: absolute; left: 14px; right: 14px; color: var(--text-2); font-size: var(--small-text-size); line-height: 1.5; }
+.design-title b { color: var(--text-1); }
+</style>
+</head>
+<body>
+<script>
+const MATERIAL_COLOR = "rgb(173, 115, 242)";
+const MESH_COLOR = ASSET_COLORS.mesh;
+
+// materials as lit balls: [base, shadow, highlight strength]
+const MATERIALS = {
+    SkinnedDummy: ["#D8CBB8", "#4E4438", 0.9], M_Mannequin_Body: ["#BFC5CE", "#3E434B", 0.8], Material_0: ["#C9774B", "#3E1D0C", 0.6],
+    Material_1: ["#6E9BD6", "#16304F", 0.9], Material_10: ["#8DBB64", "#26401A", 0.5], Material_11: ["#E0B65A", "#5A3E0E", 1.0],
+};
+
+let svgCount = 0;
+function ballSvg(name) {
+    const [base, shadow, spec] = MATERIALS[name] || ["#999", "#333", 0.5];
+    const id = `m${svgCount++}`;
+    return `<svg viewBox="0 0 100 100"><defs>
+        <radialGradient id="b${id}" cx="0.38" cy="0.34" r="0.7"><stop offset="0" stop-color="${base}"/><stop offset="0.55" stop-color="${shadow}"/><stop offset="1" stop-color="#050505"/></radialGradient>
+        <radialGradient id="s${id}" cx="0.36" cy="0.3" r="0.18"><stop offset="0" stop-color="#FFF" stop-opacity="${spec}"/><stop offset="1" stop-color="#FFF" stop-opacity="0"/></radialGradient></defs>
+        <circle cx="50" cy="50" r="38" fill="url(#b${id})"/><circle cx="50" cy="50" r="38" fill="url(#s${id})"/></svg>`;
+}
+
+function figureSvg(name) {
+    const body = name === "SKM_Helmet" ? "#9C7E58" : "#A9AFB9";
+    const shape = name === "SKM_Helmet" ? `<path d="M26 68 Q26 22 50 20 Q74 22 74 68 L66 72 L66 54 L34 54 L34 72 Z" fill="${body}"/><rect x="34" y="54" width="32" height="6" fill="#2A2116"/>`
+        : `<circle cx="50" cy="17" r="9" fill="${body}"/><path d="M38 29 L62 29 L66 55 L59 55 L58 91 L52 91 L50 59 L48 91 L42 91 L41 55 L34 55 Z" fill="${body}"/>
+           <path d="M38 30 L28 53 L32 55 L41 37 Z M62 30 L72 53 L68 55 L59 37 Z" fill="${body}"/>`;
+    return `<svg viewBox="0 0 100 100">${shape}</svg>`;
+}
+
+const isMesh = name => name.startsWith("SKM_");
+const picture = name => isMesh(name) ? figureSvg(name) : ballSvg(name);
+
+const MATERIAL = {type: "Material instance", color: MATERIAL_COLOR, kindIcon: "MATERIAL"};
+const MESH = {type: "Skeletal mesh", color: MESH_COLOR, kindIcon: "MESH"};
+
+
+function preview(asset, state, kind) {
+    const inner = state === "empty" ? `<div class="art empty">${icon("PLUS")}</div>` : state === "missing" ? `<div class="art missing"></div>` : `<div class="art">${picture(asset)}</div>`;
+    return `<div class="preview">${inner}<span class="indicator" style="background:${kind.color}"></span></div>`;
+}
+
+function assetField(asset, state, kind) {
+    const words = state === "empty" ? `<span class="type expected">${kind.type}</span>` : `<span class="name ${state === "missing" ? "missing" : ""}">${asset}</span><span class="type">${kind.type}</span>`;
+    const find = state === "empty" || state === "missing" || state === "drop" ? "" : `<span>${icon("FOLDER")}</span>`;
+    const remove = state === "empty" || state === "drop" ? "" : `<span>${icon("X")}</span>`;
+    const ghost = state === "drop" ? `<div class="drag-ghost">${picture("Material_1")}</div>${mouseCursor([0, 0]).replace('style="left:0px;top:0px', 'style="right:44px;top:40px;left:auto')}` : "";
+    return `<div class="asset-field ${state}">${preview(asset, state, kind)}<div class="words">${words}</div><div class="buttons">${find}${remove}</div>${ghost}</div>`;
+}
+
+// [label, asset, state]
+const SLOTS = [["Body", "SkinnedDummy", "filled"], ["Hair", "M_Mannequin_Body", "hover"], ["Eyes", "", "empty"], ["Teeth", "M_Old_Skin", "missing"],
+    ["Cloth", "SkinnedDummy", "drop"]];
+const MESHES = [["Mesh 0", "SKM_Mannequin", "filled"], ["Mesh 1", "SKM_Helmet", "hover"]];
+const ROW = 80;
+
+function fieldsBody() {
+    const sheet = new PropertySheet(10);
+    sheet.header("Material Slots", "MATERIAL", false);
+    SLOTS.forEach(([label, asset, state]) => sheet.row(label, assetField(asset, state, MATERIAL), {height: ROW}));
+    sheet.header("Preview Meshes", "MESH", false);
+    MESHES.forEach(([label, asset, state]) => sheet.row(label, assetField(asset, state, MESH), {height: ROW}));
+    sheet.row("", `<div class="add-row">${icon("PLUS")}</div>`, {height: 38});
+    return sheet.html;
+}
+
+function pickerBody(width) {
+    const sheet = new PropertySheet(10);
+    sheet.header("Material Slots", "MATERIAL", false);
+    sheet.row("Body", assetField("SkinnedDummy", "open", MATERIAL), {height: ROW});
+    const top = sheet.top + 2;
+    const choice = (asset, {current = false, highlighted = false} = {}) => {
+        const shown = asset.replace(/^(Mat)/, "<mark>$1</mark>");
+        const inner =             `<div class="preview"><div class="art">${picture(asset)}</div><span class="indicator" style="background:${MATERIAL_COLOR}"></span></div>`;
+        return `<div class="choice ${current ? "current" : ""} ${highlighted ? "highlighted" : ""}">${inner}
+            <div class="words"><span class="name">${shown}</span><span class="type">Material instance</span></div>
+            ${current ? icon("CHECK", "check") : ""}</div>`;
+    };
+    const list = choice("SkinnedDummy", {current: true}) + choice("M_Mannequin_Body") + choice("Material_0") +
+        choice("Material_1", {highlighted: true}) + choice("Material_10") + choice("Material_11");
+    return sheet.html + `<div class="picker" style="left:240px;top:${top}px;width:${width - 252}px">
+        <div class="search">${icon("SEARCH")}<span>mat</span><span class="count">48 of 52</span></div>${list}</div>`;
+}
+
+document.body.innerHTML =
+    panel("real", [0, 0, 516, 1048], [{icon: "PROPERTIES", label: "Details, 516 px"}], fieldsBody() +
+        `<div class="design-title" style="bottom:12px">The Details panel at the width the workspaces give it.</div>`) +
+    panel("wide", [522, 0, 700, 1048], [{icon: "PROPERTIES", label: "Details, 700 px"}], fieldsBody() +
+        `<div class="design-title" style="bottom:12px">Wider, the name and type have room; nothing else grows.</div>`) +
+    panel("open", [1228, 0, 680, 1048], [{icon: "PROPERTIES", label: "Picker open"}], pickerBody(680) +
+        `<div class="design-title" style="bottom:12px">Clicking the field opens the picker under it: search, the current one checked.</div>`);
+</script>
+</body>
+</html>

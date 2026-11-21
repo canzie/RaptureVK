@@ -1,0 +1,73 @@
+/* What the asset workspace mocks share on top of sweep.css */
+.status-note { gap: 8px; color: var(--text-3); font-size: var(--small-text-size); }
+.status-note .dot { width: 8px; height: 8px; border-radius: 50%; }
+.read-only { color: var(--text-2); font-size: var(--small-text-size); padding-left: 2px; }
+.read-only.mono { font-family: "Plex Mono", monospace; font-size: var(--caption-size); }
+
+.asset-field { flex: 1; height: 44px; display: flex; align-items: center; gap: 10px; }
+.asset-field .thumb { width: 40px; height: 40px; border-radius: 4px; border: 1px solid var(--input-border); flex: none; }
+.asset-field .name { color: var(--text-1); font-size: var(--small-text-size); }
+.asset-field .kind { color: var(--text-3); font-size: var(--caption-size); }
+.asset-field .actions { margin-left: auto; display: flex; gap: 2px; }
+.asset-field .actions .nav-button { width: 26px; height: 26px; }
+.asset-field .actions .icon { width: 14px; height: 14px; }
+
+/* a toolbar floating over a viewport or canvas */
+.overlay-toolbar { position: absolute; height: 30px; display: flex; align-items: center; gap: 2px; padding: 2px;
+    background: var(--overlay-background); border-radius: 6px; z-index: 5; }
+.overlay-toolbar .tool-button { height: 26px; padding: 0 9px; font-size: var(--small-text-size); color: var(--text-1); }
+.overlay-toolbar .tool-button:hover { background: rgba(255, 255, 255, 0.10); }
+.overlay-toolbar .tool-button.on { background: rgba(255, 255, 255, 0.14); }
+.overlay-toolbar .caret { width: 9px; height: 9px; color: var(--text-3); }
+.overlay-toolbar .divider { width: 1px; height: 16px; background: rgba(255, 255, 255, 0.12); margin: 0 2px; }
+.overlay-toolbar .readout { padding: 0 8px; font-family: "Plex Mono", monospace; font-size: var(--caption-size); color: var(--text-2); }
+
+/* a viewport drawn in the mock rather than captured */
+.stage { position: absolute; inset: 6px; border-radius: 3px; overflow: hidden;
+    background: radial-gradient(ellipse at 50% 40%, #34363A 0%, #232427 55%, #1B1C1E 100%); }
+.stage svg { position: absolute; inset: 0; }
+
+/* segmented buttons in the hotbar, one per asset the workspace switches between */
+.segmented { height: 30px; display: flex; gap: 2px; padding: 2px; background: var(--bg-input); border: 1px solid var(--input-border);
+    border-radius: 6px; }
+.segmented .segment { height: 24px; display: flex; align-items: center; gap: 7px; padding: 0 10px; border-radius: var(--control-radius);
+    color: var(--text-3); font-size: var(--small-text-size); }
+.segmented .segment:hover { background: var(--hover); color: var(--text-1); }
+.segmented .segment.on { background: var(--bg-buttons); color: var(--text-1); }
+.segmented .segment .icon { width: 14px; height: 14px; }
+.segmented .segment.missing { color: var(--text-4); }
+
+/* a plain list of rows inside a panel, the asset lists and outlines use it */
+.list-row { position: absolute; left: 0; right: 0; height: 26px; display: flex; align-items: center; gap: 8px; padding: 0 10px;
+    color: var(--text-2); font-size: var(--small-text-size); }
+.list-row:hover { background: var(--row-hover); color: var(--text-1); }
+.list-row.selected { background: var(--selection); color: var(--text-1); }
+.list-row .icon { width: 14px; height: 14px; }
+.list-row .trail { margin-left: auto; color: var(--text-3); font-size: var(--caption-size); }
+.list-row.selected .trail { color: var(--text-2); }
+.panel-section { position: absolute; left: 0; right: 0; height: 26px; display: flex; align-items: center; gap: 8px; padding: 0 10px;
+    color: var(--text-3); font-size: var(--caption-size); letter-spacing: 0.05em; text-transform: uppercase; }
+.panel-section::after { content: ""; flex: 1; height: 1px; background: var(--border-4); }
+
+/* the entries a right click menu adds on top of sweep.css */
+.menu .item .submenu { margin-left: auto; width: 10px; height: 10px; color: var(--text-3); }
+.menu .item.danger { color: #E08891; }
+.menu .separator { height: 1px; margin: 4px 6px; background: var(--border-4); }
+
+/* the Skeleton panel, skeleton_tree.js */
+.joint-row .icon { color: var(--text-3); }
+.joint-row.selected .icon { color: var(--text-1); }
+.joint-row .keyed { width: 6px; height: 6px; transform: rotate(45deg); background: var(--text-3); margin-left: auto; flex: none; }
+.joint-row.selected .keyed { background: var(--text-1); }
+.joint-row .joint-trail { margin-left: auto; font-family: "Plex Mono", monospace; font-size: var(--caption-size); color: var(--text-3); }
+.joint-row.selected .joint-trail { color: var(--text-2); }
+.read-only-lock { color: var(--text-4); }
+
+/* the orientation gizmo in a viewport's corner, workspace_chrome.js */
+.gizmo { position: absolute; right: 16px; top: 14px; }
+
+/* a property row that adds an entry to the list above it */
+.add-field { flex: 1; height: 30px; display: flex; align-items: center; gap: 8px; padding: 0 10px; border: 1px dashed var(--border-4);
+    border-radius: var(--control-radius); color: var(--text-3); font-size: var(--small-text-size); }
+.add-field:hover { border-color: var(--text-3); color: var(--text-1); }
+.add-field .icon { width: 13px; height: 13px; }

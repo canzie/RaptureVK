@@ -1,0 +1,180 @@
+<!doctype html>
+<!--
+    Proposal: the Module workspace, a subtree of scene objects authored on its own and placed in worlds as one.
+    ?select=<name> picks the scene object shown in Properties: Flame (default) or Lantern, the root.
+    ?menu=add-component opens Add Component, ?menu=component a component's menu, ?menu=tree the tree's right click menu.
+    Render: tools/ui_mock/render.sh module_editor.html "module&select=Lantern"
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<script src="icons.js"></script>
+<script src="workspace_chrome.js"></script>
+<link rel="stylesheet" href="sweep.css">
+<link rel="stylesheet" href="workspaces.css">
+<style>
+.gizmo { position: absolute; right: 16px; top: 14px; }
+.root-chip { margin-left: 8px; height: 16px; padding: 0 6px; border-radius: 3px; display: flex; align-items: center;
+    font-size: 10px; color: var(--text-1); background: rgba(128, 128, 242, 0.35); }
+.tree-row .tree-icon.module { color: rgb(128, 128, 242); }
+.tree-row.selected .tree-icon { color: var(--text-1); }
+.tree-row .components { display: flex; gap: 4px; margin-left: 10px; }
+.tree-row .components .icon { width: 12px; height: 12px; color: var(--text-3); }
+.tree-row.selected .components .icon { color: var(--text-2); }
+.properties-bar { position: absolute; left: 8px; right: 8px; top: 8px; height: 26px; display: flex; gap: 6px; }
+.properties-bar .search { position: relative; flex: 1; }
+.properties-bar .tool-button { height: 26px; padding: 0 9px; background: var(--bg-buttons); border: 1px solid var(--border-4); color: var(--text-1);
+    font-size: var(--small-text-size); }
+.properties-bar .tool-button.open { background: var(--hover); }
+.component-header .tag { margin-left: 4px; font-weight: 400; font-size: var(--caption-size); color: var(--text-3); }
+.add-component { position: absolute; width: 360px; padding: 6px; background: var(--bg-header); border: 1px solid var(--border-4); border-radius: 6px; z-index: 15; }
+.add-component .search { position: relative; margin-bottom: 4px; border-color: var(--accent); }
+.add-component .entry { height: 30px; display: flex; align-items: center; gap: 10px; padding: 0 8px; border-radius: var(--control-radius); }
+.add-component .entry.highlighted { background: var(--selection); }
+.add-component .entry .icon { width: 14px; height: 14px; color: var(--text-2); }
+.add-component .entry .name { width: 110px; flex: none; color: var(--text-1); }
+.add-component .entry .description { color: var(--text-3); font-size: var(--caption-size); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.add-component .entry.attached .name, .add-component .entry.attached .icon { color: var(--text-4); }
+.add-component .entry.attached .description { color: var(--text-4); }
+</style>
+</head>
+<body>
+<script>
+const selected = params.get("select") || "Flame";
+const rootSelected = selected === "Lantern";
+
+const menu = params.get("menu") || "";
+
+// [depth, expanded (null for a leaf), icon, name, class, icons of the components attached]
+const TREE = [[0, true, "MESH", "Lantern", "StaticMesh3D", ["CUBE", "SCRIPT"]], [1, null, "MESH", "Glass", "StaticMesh3D", []],
+    [1, null, "LIGHT", "Flame", "PointLight3D", []], [1, null, "MESH", "Handle", "StaticMesh3D", []]];
+
+function lanternSvg() {
+    const cx = 640, floor = 690;
+    const grid = Array.from({length: 17}, (_, i) => i - 8).map(i =>
+        `<line x1="${cx + i * 60}" y1="${floor - 60}" x2="${cx + i * 160}" y2="${floor + 260}" stroke="#2E3034"/>`).join("") +
+        Array.from({length: 6}, (_, r) => `<line x1="0" y1="${floor - 60 + r * r * 12 + r * 16}" x2="1300" y2="${floor - 60 + r * r * 12 + r * 16}" stroke="#2E3034"/>`).join("");
+    const glow = `<radialGradient id="glow"><stop offset="0" stop-color="rgba(255, 190, 110, 0.55)"/><stop offset="1" stop-color="rgba(255, 190, 110, 0)"/></radialGradient>
+        <radialGradient id="flame"><stop offset="0" stop-color="#FFF4D6"/><stop offset="0.5" stop-color="#FFC266"/><stop offset="1" stop-color="#E07A2E"/></radialGradient>`;
+    const metal = "#3A3D42", metalLight = "#55595F";
+    const flameSelected = selected === "Flame";
+    return `<svg width="1288" height="866"><defs>${glow}</defs>${grid}
+        <ellipse cx="${cx}" cy="${floor}" rx="170" ry="30" fill="rgba(0,0,0,0.35)"/>
+        <ellipse cx="${cx}" cy="${floor - 10}" rx="320" ry="90" fill="url(#glow)" opacity="0.6"/>
+        <circle cx="${cx}" cy="430" r="300" fill="url(#glow)"/>
+        <rect x="${cx - 110}" y="${floor - 40}" width="220" height="40" rx="4" fill="${metal}"/>
+        <rect x="${cx - 110}" y="${floor - 40}" width="220" height="8" rx="3" fill="${metalLight}"/>
+        <rect x="${cx - 86}" y="300" width="172" height="350" fill="rgba(255, 214, 160, 0.16)" stroke="rgba(255, 230, 190, 0.35)"/>
+        <rect x="${cx - 98}" y="300" width="16" height="350" fill="${metal}"/><rect x="${cx + 82}" y="300" width="16" height="350" fill="${metal}"/>
+        <ellipse cx="${cx}" cy="560" rx="22" ry="44" fill="url(#flame)"/>
+        <rect x="${cx - 12}" y="596" width="24" height="54" fill="#D8D2C4"/>
+        <polygon points="${cx - 130},300 ${cx + 130},300 ${cx + 70},236 ${cx - 70},236" fill="${metal}"/>
+        <polygon points="${cx - 130},300 ${cx + 130},300 ${cx + 124},292 ${cx - 124},292" fill="${metalLight}"/>
+        <rect x="${cx - 30}" y="214" width="60" height="22" rx="3" fill="${metal}"/>
+        <circle cx="${cx}" cy="180" r="34" fill="none" stroke="${metal}" stroke-width="9"/>
+        ${flameSelected ? `<circle cx="${cx}" cy="560" r="230" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="7 5"/>
+            <g stroke-width="3"><line x1="${cx}" y1="560" x2="${cx + 90}" y2="560" stroke="var(--axis-x)"/>
+            <line x1="${cx}" y1="560" x2="${cx}" y2="470" stroke="var(--axis-y)"/><line x1="${cx}" y1="560" x2="${cx - 52}" y2="600" stroke="var(--axis-z)"/></g>
+            <polygon points="${cx + 98},560 ${cx + 86},553 ${cx + 86},567" fill="var(--axis-x)"/><polygon points="${cx},462 ${cx - 7},474 ${cx + 7},474" fill="var(--axis-y)"/>` : ""}
+        ${rootSelected ? `<rect x="${cx - 140}" y="140" width="280" height="${floor - 140}" fill="none" stroke="var(--accent)" stroke-width="1.5"/>` : ""}</svg>`;
+}
+
+function orientationGizmo() {
+    const center = [60, 60];
+    const axes = [["X", [36, -14], "--axis-x"], ["Y", [0, -40], "--axis-y"], ["Z", [26, 24], "--axis-z"]];
+    let negatives = "", positives = "";
+    for (const [label, [dx, dy], color] of axes) {
+        negatives += `<circle cx="${center[0] - dx}" cy="${center[1] - dy}" r="7" fill="#1E1E1E" stroke="var(${color})" stroke-width="2"/>`;
+        positives += `<line x1="${center[0]}" y1="${center[1]}" x2="${center[0] + dx}" y2="${center[1] + dy}" stroke="var(${color})" stroke-width="2"/>
+            <circle cx="${center[0] + dx}" cy="${center[1] + dy}" r="9" fill="var(${color})"/>
+            <text x="${center[0] + dx}" y="${center[1] + dy + 4}" text-anchor="middle" font-size="11" font-weight="700" fill="#141414">${label}</text>`;
+    }
+    return `<svg class="gizmo" width="120" height="120" viewBox="0 0 120 120">${negatives}${positives}</svg>`;
+}
+
+function viewportBody() {
+    return `<div class="stage">${lanternSvg()}</div>${orientationGizmo()}
+        <div class="overlay-toolbar" style="left:14px;top:14px">
+            <div class="tool-button">${icon("TRANSFORM")}Transform${icon("CHEVRON_DOWN", "caret")}</div>
+            <div class="tool-button">${icon("PERSPECTIVE")}Lit${icon("CHEVRON_DOWN", "caret")}</div></div>`;
+}
+
+function treeBody() {
+    const header = `<div class="tree-header" style="top:40px"><span class="column" style="left:48px">Name</span>
+        <span class="divider" style="left:400px"></span><span class="column" style="left:408px">Type</span></div>`;
+    const rows = TREE.map(([depth, expanded, iconName, name, type, components], r) => {
+        const guides = Array.from({length: depth}, (_, d) => `<span class="guide" style="left:${17 + d * 16}px"></span>`).join("");
+        const expander = icon(expanded === null ? "CARET_RIGHT" : "CHEVRON_DOWN", `expander ${expanded === null ? "leaf" : ""}`);
+        const glyph = icon(iconName, `tree-icon ${depth === 0 ? "module" : ""}`);
+        const chip = depth === 0 ? '<span class="root-chip">Root</span>' : "";
+        return `<div class="tree-row ${name === selected ? "selected" : ""}" style="top:${64 + r * 24}px">${guides}
+            <span style="width:${10 + depth * 16}px;flex:none"></span>${expander}${glyph}<span>${name}</span>${chip}<span class="components">${components.map(c => icon(c)).join("")}</span><span class="type">${type}</span></div>`;
+    }).join("");
+    return `<div class="search" style="left:8px;right:8px;top:8px">${icon("SEARCH")}Search</div>${header}${rows}
+        <div class="tree-fill" style="top:${64 + TREE.length * 24}px"></div>`;
+}
+
+function propertiesBody() {
+    const sheet = new PropertySheet(42);
+    sheet.html = `<div class="properties-bar"><div class="search">${icon("SEARCH")}Search properties</div>
+        <div class="tool-button ${menu === "add-component" ? "open" : ""}">${icon("PLUS")}Add Component</div></div>`;
+    // the object's own sections cannot be taken off it, only components carry the menu that removes them
+    const component = (title, iconName) => sheet.header(title, iconName, true, "Component");
+    sheet.header("Transform", "TRANSFORM", false)
+        .row("Translation", vectorFields(rootSelected ? ["0.000", "0.000", "0.000"] : ["0.000", "0.220", "0.000"]))
+        .row("Rotation", vectorFields(["0.000", "0.000", "0.000"]))
+        .row("Scale", vectorFields(["1.000", "1.000", "1.000"]));
+    if (rootSelected) {
+        sheet.header("Static Mesh", "MESH", false)
+            .row("Mesh", assetPicker("linear-gradient(135deg, #55595F, #2A2C30)", "SM_Lantern", "Static mesh"), {height: 52});
+        component("Rigid Body", "CUBE").row("Mass", slider("2.400 kg", 0.24), {changed: true});
+        component("Script", "SCRIPT").row("Script", assetPicker("linear-gradient(135deg, #2E4A52, #1E2C30)", "TorchFlicker.lua", "Script"), {height: 52});
+    } else {
+        sheet.header("Light", "LIGHT", false)
+            .row("Color", `<div class="swatch" style="background:#FFC27A"></div><span class="swatch-hex">#FFC27A</span>`, {changed: true})
+            .row("Intensity", slider("4.200", 0.21), {changed: true})
+            .row("Range", slider("3.500 m", 0.35))
+            .row("Casts Shadow", checkbox(true));
+    }
+    return sheet.html;
+}
+
+function addComponentPopup() {
+    const entries = [["CUBE", "Rigid Body", "Moved by physics, pushed by forces and collisions", true],
+        ["CONTROLLER", "Character Body", "Walks, jumps and collides, moved by a controller", false],
+        ["SCRIPT", "Script", "Runs a Lua script with this object as its owner", true],
+        ["EYE", "Visibility", "Where this object is shown", false],
+        ["TAG", "Attributes", "Named values put on this object", false]];
+    const rows = entries.map(([iconName, name, description, attached], i) => `<div class="entry ${attached ? "attached" : ""} ${i === 1 ? "highlighted" : ""}">
+        ${icon(iconName)}<span class="name">${name}</span><span class="description">${attached ? "Already attached" : description}</span></div>`).join("");
+    return `<div class="add-component" style="left:${1306 + 602 - 8 - 360}px;top:${474 + 30 + 38}px">
+        <div class="search">${icon("SEARCH")}<span class="caret-bar"></span></div>${rows}</div>`;
+}
+
+function componentMenu() {
+    return `<div class="menu" style="left:${1306 + 602 - 252 - 8}px;top:${474 + 30 + 248}px;z-index:15">
+        <div class="item">Reset to defaults</div><div class="separator"></div><div class="item danger">Remove Component</div></div>`;
+}
+
+function treeMenu() {
+    const cursor = [1420, 108 + 30 + 64 + 2 * 24 + 12];
+    return `${mouseCursor(cursor)}<div class="menu" style="left:${cursor[0] + 6}px;top:${cursor[1] + 6}px;z-index:15">
+        <div class="section">Add child</div>
+        <div class="item">${icon("CAMERA")}Camera3D</div><div class="item">${icon("TRANSFORM")}SpringArm3D</div>
+        <div class="item">${icon("MESH")}Mesh3D${icon("CARET_RIGHT", "submenu")}</div><div class="item">${icon("LIGHT")}Light3D${icon("CARET_RIGHT", "submenu")}</div>
+        <div class="separator"></div><div class="item danger">Delete</div></div>`;
+}
+
+const menus = {"add-component": addComponentPopup, "component": componentMenu, "tree": treeMenu};
+
+document.body.innerHTML = windowChrome([["SCENE", "world", "DefaultWorld"], ["CUBE", "module", "Lantern"]], [
+        hotbarGroup(`<div class="primary-button">${icon("PLUS")}Add</div>`),
+        hotbarGroup(`<div class="tool-button">${icon("SAVE")}Save</div>`),
+    ]) +
+    panel("viewport", [0, 108, 1300, 908], [{icon: "VIEWPORT", label: "Viewport"}, {icon: "SCRIPT", label: "Script"}], viewportBody()) +
+    panel("tree", [1306, 108, 602, 360], [{icon: "LAYERS", label: "Scene Objects"}], treeBody()) +
+    panel("properties", [1306, 474, 602, 542], [{icon: "PROPERTIES", label: "Properties"}], propertiesBody()) + bottomBar() +
+    (menus[menu] ? menus[menu]() : "");
+</script>
+</body>
+</html>

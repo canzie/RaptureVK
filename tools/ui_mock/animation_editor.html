@@ -1,0 +1,293 @@
+<!doctype html>
+<!--
+    Proposal: one workspace for a skeleton and everything posed against it. The hotbar switches between the skeleton,
+    a skeletal mesh bound to it and an animation on it; the panels stay where they are and only what the asset needs changes.
+    ?asset=skeleton|mesh|animation picks the asset in front, ?joint=<name> the selected joint, ?menu=joint opens its right click menu.
+    Render: tools/ui_mock/render.sh animation_editor.html "anim&asset=animation"
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<script src="icons.js"></script>
+<script src="workspace_chrome.js"></script>
+<script src="skeleton_tree.js"></script>
+<link rel="stylesheet" href="sweep.css">
+<link rel="stylesheet" href="workspaces.css">
+<style>
+
+.timeline-transport { position: absolute; left: 0; right: 0; top: 0; height: 38px; display: flex; align-items: center;
+    border-bottom: 2px solid var(--bg-window); }
+.timeline-transport .hotbar-group { gap: 2px; padding: 0 8px; }
+.timeline-transport .nav-button .icon { width: 15px; height: 15px; }
+.timeline-transport .nav-button.on { background: var(--bg-buttons); color: var(--text-1); }
+.timeline-transport .play-button { color: var(--status-success); }
+.timeline-transport .centre { position: absolute; left: 50%; transform: translateX(-50%); display: flex; gap: 2px; }
+.timeline-transport .right { margin-left: auto; display: flex; height: 100%; align-items: center; }
+.frame-field { width: 64px; height: 26px; justify-content: center; font-family: "Plex Mono", monospace; flex: none; }
+.time-readout { font-family: "Plex Mono", monospace; font-size: var(--caption-size); color: var(--text-3); padding-left: 8px; }
+
+.channel-names { position: absolute; left: 0; top: 40px; bottom: 0; width: 260px; border-right: 2px solid var(--bg-window); overflow: hidden; }
+.channel-area { position: absolute; left: 262px; right: 0; top: 40px; bottom: 0; overflow: hidden; }
+.ruler { position: absolute; left: 0; right: 0; top: 0; height: 24px; background: var(--bg-frame); border-bottom: 1px solid var(--bg-window);
+    display: flex; align-items: center; padding: 0 6px; }
+.ruler .tick { position: absolute; bottom: 0; width: 1px; background: var(--text-4); }
+.ruler .label { position: absolute; top: 3px; font-family: "Plex Mono", monospace; font-size: 10px; color: var(--text-3); }
+.ruler .search { position: relative; flex: 1; height: 18px; font-size: var(--caption-size); }
+.ruler .search .icon { width: 11px; height: 11px; }
+.channel-name { position: absolute; left: 0; right: 0; height: 22px; display: flex; align-items: center; gap: 6px; padding: 0 10px 0 6px;
+    color: var(--text-2); font-size: var(--small-text-size); }
+.channel-name .icon { width: 12px; height: 12px; color: var(--text-3); }
+.channel-name .value { margin-left: auto; font-family: "Plex Mono", monospace; font-size: var(--caption-size); color: var(--text-3); }
+.channel-name.group { background: var(--bg-header); color: var(--text-1); border-top: 1px solid var(--bg-window); }
+.channel-name.group.selected { background: var(--selection); }
+.channel-name.group.selected .icon { color: var(--text-1); }
+.channel-name .axis-bar { width: 3px; height: 12px; border-radius: 2px; margin-left: 28px; flex: none; }
+.channel-name.events { color: var(--text-1); }
+.channel-row { position: absolute; left: 0; right: 0; height: 22px; }
+.channel-row.group { background: rgba(47, 47, 47, 0.55); border-top: 1px solid var(--bg-window); }
+.channel-row.group.selected { background: rgba(71, 114, 179, 0.18); }
+.channel-row.chosen-channel { background: rgba(71, 114, 179, 0.10); }
+.key { position: absolute; top: 6px; width: 9px; height: 9px; margin-left: -4.5px; transform: rotate(45deg); background: var(--text-2);
+    border: 1px solid #141414; }
+.channel-row.group .key { background: var(--text-3); width: 8px; height: 8px; top: 7px; }
+.key.chosen { background: var(--accent) !important; border-color: #FFFFFF; }
+.event { position: absolute; top: 2px; height: 18px; display: flex; align-items: center; gap: 5px; padding: 0 7px 0 4px;
+    border-radius: 3px; background: var(--bg-buttons); border-left: 2px solid rgb(242, 209, 77); font-size: var(--caption-size); color: var(--text-1); }
+.playhead { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--playing); }
+.playhead .grip { position: absolute; top: 0; left: -6px; width: 13px; height: 14px; background: var(--playing);
+    clip-path: polygon(0 0, 100% 0, 100% 60%, 50% 100%, 0 60%); }
+.anim-thumb { width: 26px; height: 18px; border-radius: 3px; background: var(--bg-frame); border: 1px solid var(--border-3); display: flex;
+    align-items: center; justify-content: center; flex: none; }
+.anim-thumb .icon { width: 10px !important; height: 10px !important; color: rgb(242, 209, 77) !important; }
+.gizmo-legend { position: absolute; right: 14px; bottom: 14px; }
+</style>
+</head>
+<body>
+<script>
+const asset = params.get("asset") || "animation";
+const selectedJoint = params.get("joint") || "upperarm_r";
+const animating = asset === "animation";
+
+const JOINTS = MANNEQUIN_JOINTS;
+const jointByName = Object.fromEntries(JOINTS.map(j => [j[0], j]));
+const jointPosition = name => animating ? jointByName[name][3] : jointByName[name][2];
+
+// the body the mesh draws: [from joint, to joint, thickness]
+const LIMBS = [
+    ["pelvis", "spine_02", 58], ["spine_02", "neck", 50], ["neck", "head", 16],
+    ["clavicle_l", "upperarm_l", 20], ["upperarm_l", "lowerarm_l", 20], ["lowerarm_l", "hand_l", 17],
+    ["clavicle_r", "upperarm_r", 20], ["upperarm_r", "lowerarm_r", 20], ["lowerarm_r", "hand_r", 17],
+    ["thigh_l", "calf_l", 27], ["calf_l", "foot_l", 22], ["foot_l", "ball_l", 15],
+    ["thigh_r", "calf_r", 27], ["calf_r", "foot_r", 22], ["foot_r", "ball_r", 15],
+];
+
+const STAGE_OFFSET = animating ? [330, -5] : [204, -30];
+const STAGE_SCALE = animating ? 0.82 : 1.45;
+
+function toStage([x, y]) {
+    return [STAGE_OFFSET[0] + x * STAGE_SCALE, STAGE_OFFSET[1] + y * STAGE_SCALE];
+}
+
+function figureSvg() {
+    const meshOpacity = asset === "skeleton" ? 0.18 : 1.0;
+    let body = "";
+    for (const pass of [["#1A1B1D", 4], ["#8C929C", 0]]) {
+        for (const [a, b, thickness] of LIMBS) {
+            const [p, q] = [toStage(jointPosition(a)), toStage(jointPosition(b))];
+            body += `<line x1="${p[0]}" y1="${p[1]}" x2="${q[0]}" y2="${q[1]}" stroke="${pass[0]}" stroke-width="${(thickness + pass[1]) * STAGE_SCALE}" stroke-linecap="round"/>`;
+        }
+        const head = toStage(jointPosition("head"));
+        body += `<circle cx="${head[0]}" cy="${head[1] - 18 * STAGE_SCALE}" r="${(26 + pass[1] / 2) * STAGE_SCALE}" fill="${pass[0]}"/>`;
+    }
+
+    let bones = "";
+    if (asset !== "mesh" || params.get("bones") === "1") {
+        for (const [name, parent] of JOINTS) {
+            if (parent === null) {
+                continue;
+            }
+            const [p, q] = [toStage(jointPosition(parent)), toStage(jointPosition(name))];
+            const chosen = name === selectedJoint;
+            bones += `<line x1="${p[0]}" y1="${p[1]}" x2="${q[0]}" y2="${q[1]}" stroke="${chosen ? "var(--accent)" : "#D9DCE1"}" stroke-width="${chosen ? 3 : 1.5}" opacity="0.9"/>`;
+        }
+        for (const [name] of JOINTS) {
+            const [x, y] = toStage(jointPosition(name));
+            const chosen = name === selectedJoint;
+            bones += `<circle cx="${x}" cy="${y}" r="${chosen ? 6 : 4}" fill="${chosen ? "var(--accent)" : "#1A1B1D"}" stroke="${chosen ? "#FFFFFF" : "#D9DCE1"}" stroke-width="1.5"/>`;
+        }
+    }
+
+    const [jx, jy] = toStage(jointPosition(selectedJoint));
+    const ring = asset === "mesh" ? "" : `<g fill="none" stroke-width="2" opacity="0.95">
+        <ellipse cx="${jx}" cy="${jy}" rx="54" ry="54" stroke="var(--axis-z)"/>
+        <ellipse cx="${jx}" cy="${jy}" rx="54" ry="16" stroke="var(--axis-y)"/>
+        <ellipse cx="${jx}" cy="${jy}" rx="16" ry="54" stroke="var(--axis-x)"/></g>`;
+
+    const [fx, fy] = toStage([200, 530]);
+    const floor = `<ellipse cx="${fx}" cy="${fy + 6}" rx="${150 * STAGE_SCALE}" ry="${26 * STAGE_SCALE}" fill="rgba(0,0,0,0.3)"/>`;
+    let grid = "";
+    for (let i = -8; i <= 8; ++i) {
+        grid += `<line x1="${fx + i * 70}" y1="${fy - 40}" x2="${fx + i * 150}" y2="${fy + 300}" stroke="#2E3034"/>`;
+    }
+    for (let r = 0; r < 6; ++r) {
+        const y = fy - 40 + r * r * 12 + r * 14;
+        grid += `<line x1="0" y1="${y}" x2="1400" y2="${y}" stroke="#2E3034"/>`;
+    }
+    return `<svg width="1000" height="900">${grid}${floor}<g opacity="${meshOpacity}">${body}</g>${bones}${ring}</svg>`;
+}
+
+function viewportBody() {
+    const toolbar = `<div class="overlay-toolbar" style="left:14px;top:14px">
+        <div class="tool-button">${icon("TRANSFORM")}Rotate${icon("CHEVRON_DOWN", "caret")}</div>
+        <div class="tool-button">${icon("PERSPECTIVE")}Lit${icon("CHEVRON_DOWN", "caret")}</div>
+        <div class="tool-button">${icon("EYE")}Show${icon("CHEVRON_DOWN", "caret")}</div></div>`;
+    const note = asset === "skeleton" ? `<div class="overlay-toolbar" style="right:14px;top:14px"><span class="readout">Previewed on SKM_Mannequin</span></div>` : "";
+    const readout = animating ? `<div class="overlay-toolbar" style="left:14px;bottom:14px"><span class="readout">Root motion 3.92 m/s</span></div>` : `<div class="overlay-toolbar" style="left:14px;bottom:14px"><span class="readout">22 joints</span>
+        ${asset === "mesh" ? `<span class="divider"></span><span class="readout">18,640 triangles</span><span class="divider"></span><span class="readout">4 influences</span>` : ""}</div>`;
+    return `<div class="stage">${figureSvg()}</div>${toolbar}${note}${readout}`;
+}
+
+function skeletonBody() {
+    const keyed = new Set(["pelvis", "spine_01", "spine_02", "upperarm_l", "lowerarm_l", "upperarm_r", "lowerarm_r", "thigh_l", "calf_l", "thigh_r", "calf_r", "foot_l", "foot_r"]);
+    return skeletonTreeBody(JOINTS, {selected: selectedJoint, editable: asset === "skeleton", marked: name => animating && keyed.has(name),
+        menuOn: params.get("menu") === "joint" ? selectedJoint : ""});
+}
+
+function animationsBody() {
+    const clips = [["Idle", "2.00 s"], ["Walk_Forward", "1.07 s"], ["Run_Forward", "1.00 s"], ["Jump_Start", "0.43 s"], ["Jump_Loop", "0.67 s"], ["Land", "0.53 s"]];
+    return `<div class="search" style="left:8px;right:8px;top:8px">${icon("SEARCH")}Search animations on SK_Mannequin</div>` +
+        clips.map(([name, length], i) => `<div class="list-row ${name === "Run_Forward" ? "selected" : ""}" style="top:${42 + i * 26}px">
+            <span class="anim-thumb">${icon("PLAY")}</span>${name}<span class="trail">${length}</span></div>`).join("");
+}
+
+function timelineBody() {
+    const FRAMES = 30;
+    const AREA = 738;
+    const frameX = f => 16 + f / FRAMES * (AREA - 32);
+    const transport = `<div class="timeline-transport">
+        <div class="hotbar-group"><div class="field frame-field">14</div><span class="time-readout">/ 30, 0.467 s</span></div>
+        <div class="centre"><span class="nav-button">${icon("NAV_BACK")}</span><span class="nav-button play-button">${icon("PLAY")}</span>
+            <span class="nav-button">${icon("NAV_FORWARD")}</span></div>
+        <div class="right"><div class="hotbar-group"><span class="nav-button on">${icon("REFRESH")}</span></div></div></div>`;
+
+    // [kind, label, keyed frames, value at the playhead, axis colour]; a group is one joint, its channels follow it while it is open
+    const CHANNELS = [
+        ["events", "Events"],
+        ["group", "pelvis", [0, 4, 8, 15, 19, 23, 30], "", false],
+        ["group", "spine_01", [0, 8, 15, 23, 30], "", false],
+        ["group", "spine_02", [0, 8, 15, 23, 30], "", false],
+        ["group", "upperarm_r", [0, 4, 8, 15, 19, 23, 30], "", true],
+        ["channel", "Rotation X", [0, 8, 15, 23, 30], "37.900", "--axis-x"],
+        ["channel", "Rotation Y", [0, 15, 30], "-6.100", "--axis-y"],
+        ["channel", "Rotation Z", [0, 4, 8, 15, 19, 23, 30], "11.400", "--axis-z"],
+        ["group", "lowerarm_r", [0, 8, 15, 23, 30], "", false],
+        ["group", "thigh_l", [0, 4, 15, 19, 30], "", false],
+        ["group", "calf_l", [0, 4, 15, 19, 30], "", false],
+        ["group", "thigh_r", [0, 4, 15, 19, 30], "", false],
+        ["group", "calf_r", [0, 4, 15, 19, 30], "", false],
+    ];
+    const ROW = 22;
+    const names = CHANNELS.map(([kind, label, , value, extra], i) => {
+        const top = 24 + i * ROW;
+        if (kind === "events") {
+            return `<div class="channel-name events" style="top:${top}px">${icon("TAG")}${label}</div>`;
+        }
+        if (kind === "group") {
+            const open = extra === true;
+            return `<div class="channel-name group ${label === selectedJoint ? "selected" : ""}" style="top:${top}px">
+                ${icon(open ? "CHEVRON_DOWN" : "CARET_RIGHT")}${icon("BONE")}${label}</div>`;
+        }
+        return `<div class="channel-name" style="top:${top}px"><span class="axis-bar" style="background:var(${extra})"></span>${label}<span class="value">${value}</span></div>`;
+    }).join("");
+
+    let ruler = "";
+    for (let f = 0; f <= FRAMES; ++f) {
+        const major = f % 5 === 0;
+        ruler += `<span class="tick" style="left:${frameX(f)}px;height:${major ? 9 : 5}px"></span>`;
+        if (major) {
+            ruler += `<span class="label" style="left:${frameX(f) + 3}px">${f}</span>`;
+        }
+    }
+
+    const rows = CHANNELS.map(([kind, label, frames], i) => {
+        const top = 24 + i * ROW;
+        if (kind === "events") {
+            const event = (frame, name) => `<span class="event" style="left:${frameX(frame)}px">${icon("TAG", "", "width:10px;height:10px;color:rgb(242, 209, 77)")}${name}</span>`;
+            return `<div class="channel-row" style="top:${top}px">${event(4, "Footstep_L")}${event(19, "Footstep_R")}</div>`;
+        }
+        const chosen = kind === "channel" && label === "Rotation X";
+        const keys = frames.map(f => `<span class="key ${chosen && f === 15 ? "chosen" : ""}" style="left:${frameX(f)}px"></span>`).join("");
+        const classes = `${kind === "group" ? "group" : ""} ${kind === "group" && label === selectedJoint ? "selected" : ""} ${chosen ? "chosen-channel" : ""}`;
+        return `<div class="channel-row ${classes}" style="top:${top}px">${keys}</div>`;
+    }).join("");
+
+    const playhead = `<div class="playhead" style="left:${frameX(14)}px"><span class="grip"></span></div>`;
+    return `${transport}<div class="channel-names"><div class="ruler"><div class="search">${icon("SEARCH")}Filter channels</div></div>${names}</div>
+        <div class="channel-area"><div class="ruler">${ruler}</div>${rows}${playhead}</div>`;
+}
+
+function detailsBody() {
+    const sheet = new PropertySheet(10);
+    if (asset === "skeleton") {
+        sheet.header(selectedJoint, "BONE")
+            .row("Parent", dropdown("clavicle_r"))
+            .row("Translation", vectorFields(["-0.142", "0.000", "0.018"]))
+            .row("Rotation", vectorFields(["0.000", "-12.400", "4.000"]), {changed: true})
+            .row("Scale", vectorFields(["1.000", "1.000", "1.000"]));
+        sheet.header("SK_Mannequin", "SKELETON", false)
+            .row("Joints", readOnly("22"))
+            .row("Preview mesh", assetPicker("linear-gradient(135deg, #8C929C, #4A4E55)", "SKM_Mannequin", "Skeletal mesh"), {height: 52});
+    } else if (asset === "mesh") {
+        sheet.header("SKM_Mannequin", "MESH", false)
+            .row("Skeleton", assetPicker("linear-gradient(135deg, #5A5A5A, #2E2E2E)", "SK_Mannequin", "Skeleton, 22 joints"), {height: 52})
+            .row("Triangles", readOnly("18,640"))
+            .row("Influences per vertex", readOnly("4"));
+        sheet.header("Material Slots", "MATERIAL", false)
+            .row("Body", assetPicker("linear-gradient(135deg, #A9AEB6, #5C6068)", "M_Mannequin_Body", "Material instance"), {height: 52})
+            .row("Joints", assetPicker("linear-gradient(135deg, #3E4148, #202226)", "M_Mannequin_Joints", "Material instance"), {height: 52});
+        sheet.header("Preview", "PLAY", false)
+            .row("Pose", dropdown("Rest pose"))
+            .row("Show joints", checkbox(false));
+    } else {
+        sheet.header("Run_Forward", "PLAY", false)
+            .row("Skeleton", assetPicker("linear-gradient(135deg, #5A5A5A, #2E2E2E)", "SK_Mannequin", "Skeleton, 22 joints"), {height: 52})
+            .row("Length", readOnly("1.000 s, 30 frames"))
+            .row("Frame rate", readOnly("30 fps"))
+            .row("Loops", checkbox(true))
+            .row("Root motion", dropdown("Extract to root"), {changed: true});
+        sheet.header("Selected Key", "BONE")
+            .row("Channel", readOnly(`${selectedJoint}, Rotation X`))
+            .row("Frame", textField("15"))
+            .row("Value", textField("38.200"))
+            .row("Interpolation", dropdown("Smooth"));
+        sheet.header("Preview", "MESH", false)
+            .row("Mesh", assetPicker("linear-gradient(135deg, #8C929C, #4A4E55)", "SKM_Mannequin", "Skeletal mesh"), {height: 52})
+            .row("Show joints", checkbox(true));
+    }
+    return sheet.html;
+}
+
+const ASSETS = {skeleton: ["SKELETON", "skeleton", "SK_Mannequin"], mesh: ["MESH", "mesh", "SKM_Mannequin"], animation: ["PLAY", "animation", "Run_Forward"]};
+const switcher = `<div class="segmented">${Object.entries(ASSETS).map(([key, [iconName, kind, label]]) =>
+    `<div class="segment ${key === asset ? "on" : ""}">${icon(iconName, "", `color:${ASSET_COLORS[kind]}`)}${label}</div>`).join("")}</div>`;
+const hotbar = [hotbarGroup(switcher), hotbarGroup(`<div class="tool-button">${icon("SAVE")}Save</div>`)];
+if (asset === "mesh") {
+    hotbar.push(hotbarGroup(`<div class="tool-button">${icon("MESH")}Convert Pose to Static</div>`));
+}
+
+const [tabIcon, tabKind, tabLabel] = ASSETS[asset];
+let layout;
+if (animating) {
+    layout = panel("skeleton", [0, 108, 380, 560], [{icon: "SKELETON", label: "Skeleton"}], skeletonBody()) +
+        panel("animations", [0, 674, 380, 342], [{icon: "PLAY", label: "Animations"}], animationsBody()) +
+        panel("viewport", [386, 108, 1000, 500], [{icon: "VIEWPORT", label: "Viewport"}], viewportBody()) +
+        panel("timeline", [386, 614, 1000, 402], [{icon: "PLAY", label: "Timeline"}], timelineBody());
+} else {
+    layout = panel("skeleton", [0, 108, 380, 908], [{icon: "SKELETON", label: "Skeleton"}], skeletonBody()) +
+        panel("viewport", [386, 108, 1000, 908], [{icon: "VIEWPORT", label: "Viewport"}], viewportBody());
+}
+document.body.innerHTML = windowChrome([["SCENE", "world", "DefaultWorld"], [tabIcon, tabKind, tabLabel]], hotbar) + layout +
+    panel("details", [1392, 108, 516, 908], [{icon: "PROPERTIES", label: "Details"}], detailsBody()) + bottomBar();
+</script>
+</body>
+</html>
