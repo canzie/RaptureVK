@@ -7,6 +7,8 @@
 #include <rapture/assets/skeletons/ASkeleton.h>
 #include <rapture/assets/textures/ATexture.h>
 #include <rapture/core/utils/Log.h>
+#include <rapture/scene/instances/Bone3D.h>
+#include <rapture/scene/instances/SkeletonPose.h>
 
 #include <cstdio>
 #include <iterator>
@@ -235,52 +237,118 @@ static bool s_meshUsesSkeleton(Rapture::AssetHandle mesh, Rapture::AssetHandle s
     return asset != nullptr && asset->skeleton() == skeleton;
 }
 
+static AssetPickerConfig s_previewMeshPickerConfig(Rapture::AssetHandle skeleton)
+{
+    return AssetPickerConfig{
+        .types = {Rapture::ASSET_SKELETAL_MESH},
+        .predicate =
+            [skeleton](Rapture::AssetHandle mesh, const Rapture::AssetMetadata &metadata) {
+                (void)metadata;
+                return s_meshUsesSkeleton(mesh, skeleton);
+            },
+        .allowsEmpty = true,
+    };
+}
+
 void SkeletonPreviewAssetEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
 {
+    // the skeleton decides how many rows there are, so they are built against the open asset
+    const Rapture::ASkeleton *asset = s_assetAs<Rapture::ASkeleton>(m_handle);
+    m_meshPickers.clear();
+    m_meshPickers.resize(asset != nullptr ? asset->previewMeshes().size() : 0);
+
     fieldTable(ch, [this](Amethyst::TableScope &t) {
-        AssetPickerConfig config{
-            .types = {Rapture::ASSET_SKELETAL_MESH},
-            .predicate =
-                [this](Rapture::AssetHandle mesh, const Rapture::AssetMetadata &metadata) {
-                    (void)metadata;
-                    return s_meshUsesSkeleton(mesh, m_handle);
-                },
-        };
-        rowAssetPicker(t, "Mesh", m_meshPicker, std::move(config), [this](Rapture::AssetHandle mesh) { applyPreviewMesh(mesh); });
+        for (uint32_t index = 0; index < m_meshPickers.size(); index++) {
+            rowAssetPicker(t, "Mesh " + std::to_string(index), m_meshPickers[index], s_previewMeshPickerConfig(m_handle),
+                           [this, index](Rapture::AssetHandle mesh) {
+                               if (mesh == Rapture::INVALID_ASSET_HANDLE) {
+                                   removePreviewMesh(index);
+                               } else {
+                                   replacePreviewMesh(index, mesh);
+                               }
+                           });
+        }
+        rowAssetPicker(t, "Mesh " + std::to_string(m_meshPickers.size()), m_addMeshPicker, s_previewMeshPickerConfig(m_handle),
+                       [this](Rapture::AssetHandle mesh) { addPreviewMesh(mesh); });
     });
 }
 
-void SkeletonPreviewAssetEditor::applyPreviewMesh(Rapture::AssetHandle mesh)
+void SkeletonPreviewAssetEditor::replacePreviewMesh(uint32_t index, Rapture::AssetHandle mesh)
+{
+    Rapture::ASkeleton *asset = s_assetAs<Rapture::ASkeleton>(m_handle);
+    if (asset == nullptr || index >= asset->previewMeshes().size()) {
+        return;
+    }
+
+    std::vector<Rapture::AssetHandle> meshes(asset->previewMeshes().begin(), asset->previewMeshes().end());
+    std::vector<Rapture::AssetHandle> shown = meshes;
+    meshes[index] = mesh;
+
+    for (Rapture::AssetHandle previous : shown) {
+        asset->removePreviewMesh(previous);
+    }
+    for (Rapture::AssetHandle kept : meshes) {
+        asset->addPreviewMesh(kept);
+    }
+
+    savePreviewMeshes();
+}
+
+void SkeletonPreviewAssetEditor::removePreviewMesh(uint32_t index)
+{
+    Rapture::ASkeleton *asset = s_assetAs<Rapture::ASkeleton>(m_handle);
+    if (asset == nullptr || index >= asset->previewMeshes().size()) {
+        return;
+    }
+
+    if (asset->removePreviewMesh(asset->previewMeshes()[index])) {
+        savePreviewMeshes();
+    }
+}
+
+void SkeletonPreviewAssetEditor::addPreviewMesh(Rapture::AssetHandle mesh)
 {
     Rapture::ASkeleton *asset = s_assetAs<Rapture::ASkeleton>(m_handle);
     if (asset == nullptr) {
         return;
     }
 
-    std::vector<Rapture::AssetHandle> shown(asset->previewMeshes().begin(), asset->previewMeshes().end());
-    for (Rapture::AssetHandle previous : shown) {
-        asset->removePreviewMesh(previous);
+    if (asset->addPreviewMesh(mesh)) {
+        savePreviewMeshes();
     }
+}
 
-    if (!asset->addPreviewMesh(mesh)) {
-        return;
-    }
-
+void SkeletonPreviewAssetEditor::savePreviewMeshes()
+{
     const Rapture::AssetMetadata &metadata = Rapture::AssetManager::getAssetMetadata(m_handle);
     if (!Rapture::AssetManager::saveAsset(m_handle, metadata.assetPath.parent_path())) {
-        RP_ERROR("could not write '{}' back, its preview mesh is only set for this run", metadata.getName());
+        RP_ERROR("could not write '{}' back, its preview meshes are only set for this run", metadata.getName());
     }
 }
 
 void SkeletonPreviewAssetEditor::sync(Rapture::AssetHandle handle)
 {
     const Rapture::ASkeleton *asset = s_assetAs<Rapture::ASkeleton>(handle);
-    if (asset == nullptr || !m_meshPicker) {
+    if (asset == nullptr) {
         return;
     }
 
     std::span<const Rapture::AssetHandle> shown = asset->previewMeshes();
-    m_meshPicker->setAsset(shown.empty() ? Rapture::INVALID_ASSET_HANDLE : shown.front());
+    if (shown.size() != m_meshPickers.size()) {
+        if (requestRefresh) {
+            requestRefresh();
+        }
+        return;
+    }
+
+    for (uint32_t index = 0; index < m_meshPickers.size(); index++) {
+        if (m_meshPickers[index].has_value()) {
+            m_meshPickers[index]->setAsset(shown[index]);
+        }
+    }
+    if (m_addMeshPicker.has_value()) {
+        m_addMeshPicker->setAsset(Rapture::INVALID_ASSET_HANDLE);
+    }
 }
 
 void SkeletonAssetEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
@@ -312,6 +380,81 @@ void SkeletonAssetEditor::sync(Rapture::AssetHandle handle)
     }
     if (m_rootCount != nullptr) {
         m_rootCount->setText(std::to_string(roots));
+    }
+}
+
+static constexpr double JOINT_TRANSLATION_LIMIT = 100000.0;
+static constexpr double JOINT_SCALE_LIMIT = 1000.0;
+
+void SkeletonJointAssetEditor::setBone(Rapture::Bone3D *bone)
+{
+    m_subjectChanged = m_subjectChanged || bone != m_bone;
+    m_bone = bone;
+    m_jointName = bone != nullptr ? std::string(bone->name()) : std::string();
+}
+
+void SkeletonJointAssetEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
+{
+    fieldTable(ch, [this](Amethyst::TableScope &t) {
+        // TODO: pick the parent here once a pose rebuilds its bones when its skeleton's hierarchy changes
+        m_parentName = rowText(t, "Parent", "");
+        rowAxesVec3(t, "Translation", m_values[0], 0.01, -JOINT_TRANSLATION_LIMIT, JOINT_TRANSLATION_LIMIT,
+                    [this]() { applyRestTransform(); });
+        rowAxesVec3(t, "Rotation", m_values[1], 0.5, -360.0, 360.0, [this]() { applyRestTransform(); });
+        rowAxesVec3(t, "Scale", m_values[2], 0.01, -JOINT_SCALE_LIMIT, JOINT_SCALE_LIMIT, [this]() { applyRestTransform(); });
+    });
+}
+
+void SkeletonJointAssetEditor::applyRestTransform()
+{
+    Rapture::ASkeleton *asset = s_assetAs<Rapture::ASkeleton>(m_handle);
+    if (asset == nullptr || m_bone == nullptr) {
+        return;
+    }
+
+    const glm::vec3 euler(static_cast<float>(m_values[1][0]), static_cast<float>(m_values[1][1]), static_cast<float>(m_values[1][2]));
+
+    Rapture::Skeleton::JointTransform rest;
+    rest.position = glm::vec3(static_cast<float>(m_values[0][0]), static_cast<float>(m_values[0][1]), static_cast<float>(m_values[0][2]));
+    rest.rotation = glm::quat(glm::radians(euler));
+    rest.scale = glm::vec3(static_cast<float>(m_values[2][0]), static_cast<float>(m_values[2][1]), static_cast<float>(m_values[2][2]));
+    m_shownRotation = rest.rotation;
+
+    const Rapture::Skeleton::JointIndex joint = m_bone->getJoint();
+    asset->skeleton().setRestTransform(joint, rest);
+    if (m_bone->getPose() != nullptr) {
+        m_bone->getPose()->setJointLocal(joint, rest);
+    }
+}
+
+void SkeletonJointAssetEditor::sync(Rapture::AssetHandle handle)
+{
+    const Rapture::ASkeleton *asset = s_assetAs<Rapture::ASkeleton>(handle);
+    if (asset == nullptr || m_bone == nullptr || m_bone->getJoint() == Rapture::Skeleton::INVALID_JOINT_INDEX) {
+        return;
+    }
+
+    const Rapture::Skeleton &skeleton = asset->skeleton();
+    const Rapture::Skeleton::JointIndex joint = m_bone->getJoint();
+    const Rapture::Skeleton::JointTransform &rest = skeleton.getRestPose().joints[joint];
+
+    if (subjectChanged() && m_parentName != nullptr) {
+        const Rapture::Skeleton::JointIndex parent = skeleton.getParent(joint);
+        m_parentName->setText(parent == Rapture::Skeleton::INVALID_JOINT_INDEX ? "None" : skeleton.getNames()[parent]);
+    }
+
+    for (int axis = 0; axis < 3; ++axis) {
+        m_values[0][axis] = rest.position[axis];
+        m_values[2][axis] = rest.scale[axis];
+    }
+
+    // the angles are only read back when the rotation changed elsewhere, so the ones typed in are not rewritten
+    if (subjectChanged() || rest.rotation != m_shownRotation) {
+        const glm::vec3 euler = glm::degrees(glm::eulerAngles(rest.rotation));
+        for (int axis = 0; axis < 3; ++axis) {
+            m_values[1][axis] = euler[axis];
+        }
+        m_shownRotation = rest.rotation;
     }
 }
 

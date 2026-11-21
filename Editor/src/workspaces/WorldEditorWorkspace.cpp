@@ -12,12 +12,14 @@
 #include "ui/ControlTooltip.h"
 #include "ui/controls/IconButton.h"
 #include "ui/controls/IconLabelButton.h"
+#include "ui/controls/ModeDropdown.h"
 #include "ui/menus/ContextMenuItems.h"
 
 #include <components/extensions/ui_list_layout.h>
 #include <components/ui_scope.h>
 #include <rapture/app/Application.h>
 #include <rapture/app/Layer.h>
+#include <rapture/core/utils/Log.h>
 #include <rapture/core/utils/rp_assert.h>
 #include <rapture/scene/Scene.h>
 #include <rapture/scene/instances/Camera3D.h>
@@ -26,6 +28,10 @@
 #include <array>
 
 static constexpr std::string_view ADD_BUTTON_CLASS = "hotbar-primary-button";
+
+static constexpr float MODE_DROPDOWN_WIDTH = 120.0f;
+
+static constexpr EditorMode OFFERED_MODES[] = {EDITOR_MODE_OBJECT, EDITOR_MODE_EDIT, EDITOR_MODE_POSE};
 
 static constexpr float PLAY_BUTTON_WIDTH = 44.0f;
 static constexpr float PLAY_BUTTON_HEIGHT = 28.0f;
@@ -143,6 +149,12 @@ void WorldEditorWorkspace::build()
 
 void WorldEditorWorkspace::buildHotbar()
 {
+    // TODO: give the world editor modes that change what the viewport edits
+    addHotbarItem(MODE_DROPDOWN_WIDTH, [](Amethyst::UIScope &slot) {
+        ModeDropdown_add(slot.get(), OFFERED_MODES,
+                         [](EditorMode mode) { RP_TRACE("{} chosen, the world editor does nothing with it yet", EDITOR_MODE_LABELS[mode]); });
+    });
+    addHotbarSeparator();
     m_addButton = addHotbarButton("Add", Icons::SVG_PLUS, ADD_BUTTON_CLASS, [this]() { showAddMenu(*m_addButton); });
     ControlTooltip_attach(*m_addButton, WORLD_EDITOR_TOOLTIPS[WORLD_EDITOR_TOOLTIP_ADD], m_editor);
     addHotbarSeparator();

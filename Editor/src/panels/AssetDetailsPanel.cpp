@@ -2,7 +2,13 @@
 
 #include "Icons.h"
 
+#include "EntitySelection.h"
+
 #include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/scene/Scene.h>
+#include <rapture/scene/instances/Bone3D.h>
+
+#include <utility>
 
 AssetDetailsPanel::AssetDetailsPanel(const WorkspaceContext &context, Rapture::AssetHandle handle)
     : Panel("Details", context), m_handle(handle)
@@ -20,6 +26,14 @@ void AssetDetailsPanel::build(Amethyst::UIScope &scope)
 {
     (void)scope;
     setupSectionView();
+
+    if (m_selection != nullptr) {
+        m_selectionChangedConn = m_selection->onChanged.connect([this](Rapture::ecs::EntityAccessor entity) {
+            (void)entity;
+            m_selectionChanged = true;
+        });
+    }
+
     refresh();
 }
 
@@ -47,6 +61,11 @@ void AssetDetailsPanel::refresh()
         const Rapture::AssetType type = Rapture::AssetManager::getAssetMetadata(m_handle).assetType;
         const bool isMesh = type == Rapture::ASSET_STATIC_MESH || type == Rapture::ASSET_SKELETAL_MESH;
 
+        Rapture::Bone3D *bone = type == Rapture::ASSET_SKELETON ? selectedBone() : nullptr;
+        m_sections->ensurePrepared<SkeletonJointAssetEditor>(bone != nullptr, [this, bone](SkeletonJointAssetEditor &editor) {
+            editor.setSubject(m_handle);
+            editor.setBone(bone);
+        });
         ensure<MeshAssetEditor>(isMesh);
         if (m_bakeTransform != nullptr) {
             m_sections->ensurePrepared<MeshTransformAssetEditor>(
@@ -67,9 +86,25 @@ void AssetDetailsPanel::onUpdate(float dt)
 {
     (void)dt;
 
-    if (m_sections->consumeRefreshRequest()) {
+    const bool selectionChanged = std::exchange(m_selectionChanged, false);
+    if (selectionChanged) {
+        // the joint's name is its section's title, so another joint gets a section of its own
+        m_sections->ensure<SkeletonJointAssetEditor>(false);
+    }
+
+    if (m_sections->consumeRefreshRequest() || selectionChanged) {
         refresh();
     }
 
     m_sections->sync();
+}
+
+Rapture::Bone3D *AssetDetailsPanel::selectedBone() const
+{
+    if (m_selection == nullptr || !m_selection->has() || m_context.scene == nullptr) {
+        return nullptr;
+    }
+
+    Rapture::SceneObject *object = m_context.scene->instanceFor(m_selection->entity().getEntity());
+    return object != nullptr ? object->as<Rapture::Bone3D>() : nullptr;
 }

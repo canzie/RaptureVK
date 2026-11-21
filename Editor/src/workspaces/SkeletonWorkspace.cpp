@@ -1,5 +1,6 @@
 #include "SkeletonWorkspace.h"
 
+#include "Icons.h"
 #include "panels/AssetDetailsPanel.h"
 #include "panels/SkeletonHierarchyPanel.h"
 #include "panels/ViewportPanel.h"
@@ -18,9 +19,9 @@
 
 static constexpr std::string_view PREVIEW_SCENE_NAME = "SkeletonPreview";
 
-static constexpr float DETAILS_SPLIT = 0.75f;
+static constexpr float HIERARCHY_SPLIT = 0.2f;
 
-static constexpr float HIERARCHY_SPLIT = 0.45f;
+static constexpr float DETAILS_SPLIT = 0.66f;
 
 static constexpr float MODE_DROPDOWN_WIDTH = 120.0f;
 
@@ -49,13 +50,13 @@ void SkeletonWorkspace::build()
     Amethyst::TabBar *detailsTabBar = nullptr;
     Amethyst::DockScope(*m_contentDock)
         .split(
-            Amethyst::SplitAxis::VERTICAL, DETAILS_SPLIT,
-            [&](Amethyst::DockScope &l) { l.panel([&](Amethyst::TabBarScope &tb) { viewportTabBar = &tb.component; }); },
+            Amethyst::SplitAxis::VERTICAL, HIERARCHY_SPLIT,
+            [&](Amethyst::DockScope &l) { l.panel([&](Amethyst::TabBarScope &tb) { hierarchyTabBar = &tb.component; }); },
             [&](Amethyst::DockScope &r) {
                 r.split(
-                    Amethyst::SplitAxis::HORIZONTAL, HIERARCHY_SPLIT,
-                    [&](Amethyst::DockScope &t) { t.panel([&](Amethyst::TabBarScope &tb) { hierarchyTabBar = &tb.component; }); },
-                    [&](Amethyst::DockScope &b) { b.panel([&](Amethyst::TabBarScope &tb) { detailsTabBar = &tb.component; }); });
+                    Amethyst::SplitAxis::VERTICAL, DETAILS_SPLIT,
+                    [&](Amethyst::DockScope &v) { v.panel([&](Amethyst::TabBarScope &tb) { viewportTabBar = &tb.component; }); },
+                    [&](Amethyst::DockScope &d) { d.panel([&](Amethyst::TabBarScope &tb) { detailsTabBar = &tb.component; }); });
             });
 
     auto viewport = std::make_unique<ViewportPanel>(m_context, ViewportOverlays{.toolbar = true, .orientationGizmo = true});
@@ -73,6 +74,9 @@ void SkeletonWorkspace::buildHotbar()
     addHotbarItem(MODE_DROPDOWN_WIDTH, [this](Amethyst::UIScope &slot) {
         ModeDropdown_add(slot.get(), OFFERED_MODES, [this](EditorMode mode) { setMode(mode); });
     });
+    addHotbarSeparator();
+    addHotbarButton("Save", Icons::SVG_SAVE, [this]() { saveOpenAsset(); });
+    addHotbarSeparator();
 }
 
 void SkeletonWorkspace::onUpdate(float dt)

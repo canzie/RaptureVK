@@ -10,9 +10,14 @@
 #include "panels/Panel.h"
 
 #include <rapture/assets/asset_manager/AssetCommon.h>
+#include <rapture/core/events/EventSignal.h>
 
 #include <concepts>
 #include <optional>
+
+namespace Rapture {
+class Bone3D;
+} // namespace Rapture
 
 /**
  * @brief The fields of the one asset a workspace has open.
@@ -54,10 +59,18 @@ class AssetDetailsPanel : public Panel {
 
     void refresh();
 
+    /**
+     * @brief The bone selected in the workspace
+     * @return The bone, or nullptr when nothing or something other than a bone is selected
+     */
+    Rapture::Bone3D *selectedBone() const;
+
   private:
     std::optional<PropertySectionList> m_sections;
     Rapture::AssetHandle m_handle = Rapture::INVALID_ASSET_HANDLE;
     MeshBakeTransform *m_bakeTransform = nullptr;
+    Rapture::EventConnection m_selectionChangedConn;
+    bool m_selectionChanged = false;
 };
 
 #endif // RAPTURE__ASSET_DETAILS_PANEL_H

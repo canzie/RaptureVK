@@ -41,6 +41,11 @@ class AssetWorkspace : public Workspace {
      */
     std::string dockLayoutName() const override;
 
+    /**
+     * @brief Writes the open asset back to its asset file
+     */
+    void saveOpenAsset();
+
   protected:
     Rapture::AssetHandle m_handle = Rapture::INVALID_ASSET_HANDLE;
 };

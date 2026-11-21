@@ -26,6 +26,8 @@ class Bone3D : public Node3D {
 
     Skeleton::JointIndex getJoint() const { return m_joint; }
 
+    SkeletonPose *getPose() const { return m_pose; }
+
     /**
      * @brief Binds this bone to the joint it stands for
      * @param pose The pose holding that joint

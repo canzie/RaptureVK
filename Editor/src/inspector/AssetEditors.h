@@ -4,9 +4,17 @@
 #include "Icons.h"
 #include "inspector/AssetEditorBase.h"
 
+#include <glm/gtc/quaternion.hpp>
+
 #include <functional>
 #include <optional>
+#include <string>
 #include <string_view>
+#include <vector>
+
+namespace Rapture {
+class Bone3D;
+} // namespace Rapture
 
 /**
  * @brief The geometry an open mesh asset holds
@@ -143,13 +151,62 @@ class SkeletonPreviewAssetEditor : public AssetEditorBase {
 
   private:
     /**
-     * @brief Shows the open skeleton on a mesh in place of whatever it was shown on
-     * @param mesh The skeletal mesh to show it on
+     * @brief Shows the open skeleton on a different mesh in place of one it is shown on
+     * @param index Which of the preview meshes to replace
+     * @param mesh The skeletal mesh to show it on instead
      */
-    void applyPreviewMesh(Rapture::AssetHandle mesh);
+    void replacePreviewMesh(uint32_t index, Rapture::AssetHandle mesh);
+
+    /**
+     * @brief Stops showing the open skeleton on one of its preview meshes
+     * @param index Which of the preview meshes to drop
+     */
+    void removePreviewMesh(uint32_t index);
+
+    /**
+     * @brief Shows the open skeleton on one more mesh
+     * @param mesh The skeletal mesh to add
+     */
+    void addPreviewMesh(Rapture::AssetHandle mesh);
+
+    /**
+     * @brief Writes the open skeleton's preview meshes back to its asset file
+     */
+    void savePreviewMeshes();
 
   private:
-    std::optional<AssetPicker> m_meshPicker;
+    std::vector<std::optional<AssetPicker>> m_meshPickers;
+    std::optional<AssetPicker> m_addMeshPicker;
+};
+
+/**
+ * @brief Where one joint of an open skeleton asset rests and what it hangs from
+ */
+class SkeletonJointAssetEditor : public AssetEditorBase {
+  public:
+    const char *title() const override { return m_jointName.c_str(); }
+    const char *icon() const override { return Icons::SVG_BONE; }
+    void buildBody(Amethyst::CollapsibleHeaderScope &ch) override;
+    void sync(Rapture::AssetHandle handle) override;
+
+    /**
+     * @brief Points this editor at the joint a bone stands for, before its body is built
+     * @param bone The bone whose joint is edited
+     */
+    void setBone(Rapture::Bone3D *bone);
+
+  private:
+    /**
+     * @brief Writes the fields into the joint's rest transform and shows it on the pose
+     */
+    void applyRestTransform();
+
+  private:
+    Rapture::Bone3D *m_bone = nullptr;
+    std::string m_jointName;
+    Amethyst::TextLabel *m_parentName = nullptr;
+    double m_values[3][3] = {};
+    glm::quat m_shownRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 };
 
 /**

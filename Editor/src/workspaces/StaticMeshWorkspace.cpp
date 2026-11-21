@@ -5,8 +5,6 @@
 #include "panels/ViewportPanel.h"
 #include "ui/AssetVisuals.h"
 
-#include <rapture/assets/asset_manager/AssetManager.h>
-#include <rapture/core/utils/Log.h>
 #include <rapture/scene/Scene.h>
 #include <rapture/scene/instances/StaticMesh3D.h>
 
@@ -84,10 +82,7 @@ void StaticMeshWorkspace::buildHotbar()
 void StaticMeshWorkspace::save()
 {
     // TODO: bake m_bakeTransform into the mesh's geometry before it is written
-    const Rapture::AssetMetadata &metadata = Rapture::AssetManager::getAssetMetadata(handle());
-    if (!Rapture::AssetManager::saveAsset(handle(), metadata.assetPath.parent_path())) {
-        RP_ERROR("could not save '{}'", metadata.getName());
-    }
+    saveOpenAsset();
 }
 
 void StaticMeshWorkspace::reimport()
