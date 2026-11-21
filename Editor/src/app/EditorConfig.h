@@ -40,6 +40,9 @@ enum EditorConfigKey {
 
     EDITOR_CONFIG_COMMAND_SOCKET,
 
+    EDITOR_CONFIG_UNDO_STEP_LIMIT,
+    EDITOR_CONFIG_UNDO_MEMORY_LIMIT_MB,
+
     EDITOR_CONFIG_COUNT
 };
 
@@ -71,6 +74,9 @@ constexpr std::array<EditorConfigEntry, EDITOR_CONFIG_COUNT> EDITOR_CONFIG_TABLE
     {"tabIconGap", CONFIG_VALUE_FLOAT, 6.0},
 
     {"commandSocket", CONFIG_VALUE_BOOL, true},
+
+    {"undoStepLimit", CONFIG_VALUE_INT, static_cast<int64_t>(200)},
+    {"undoMemoryLimitMb", CONFIG_VALUE_INT, static_cast<int64_t>(256)},
 }};
 
 /**

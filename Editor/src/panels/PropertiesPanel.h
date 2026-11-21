@@ -50,6 +50,7 @@ class PropertiesPanel : public Panel {
     {
         m_sections->ensurePrepared<T>(present, [this](T &editor) {
             editor.setSelection(m_selection);
+            editor.onBeforeEdit = [this]() { recordSelectedObjectChange(); };
             editor.setSubject(m_scene, m_selectedEntity);
         });
     }
@@ -58,6 +59,11 @@ class PropertiesPanel : public Panel {
     void showEntity(const Rapture::ecs::EntityAccessor &entity);
     void showPlaceholder(void);
     void clearSelection(void);
+
+    /**
+     * @brief Records how the selected object looks before an edit from this panel changes it
+     */
+    void recordSelectedObjectChange();
 
   private:
     Amethyst::TextLabel *m_placeholderText = nullptr;
@@ -69,6 +75,7 @@ class PropertiesPanel : public Panel {
     Rapture::Scene *m_scene = nullptr;
     Rapture::ecs::EntityAccessor m_selectedEntity;
     Rapture::EventConnection m_selectionChangedConn;
+    Rapture::EventConnection m_undoStepAppliedConn;
 };
 
 #endif // RAPTURE__PROPERTIES_PANEL_H

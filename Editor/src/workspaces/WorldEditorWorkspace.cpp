@@ -7,6 +7,7 @@
 #include "panels/PropertiesPanel.h"
 #include "panels/ViewportPanel.h"
 #include "panels/WorldSettingsPanel.h"
+#include "scene/EditedScene.h"
 #include "scene/EditorCamera.h"
 #include "ui/AssetVisuals.h"
 #include "ui/ControlTooltip.h"
@@ -14,6 +15,7 @@
 #include "ui/controls/IconLabelButton.h"
 #include "ui/controls/ModeDropdown.h"
 #include "ui/menus/ContextMenuItems.h"
+#include "undo/UndoHistory.h"
 
 #include <components/extensions/ui_list_layout.h>
 #include <components/ui_scope.h>
@@ -79,6 +81,7 @@ WorldEditorWorkspace::WorldEditorWorkspace(const EditorContext &context, Rapture
     m_context.world = m_world.operator->();
     m_context.scene = m_world->getScene();
     setupViewport();
+    makeSceneEditable(*m_context.scene->root());
 }
 
 WorldEditorWorkspace::~WorldEditorWorkspace()
@@ -310,6 +313,9 @@ void WorldEditorWorkspace::startPlay()
         m_playLayer->attach();
     }
 
+    // stopping throws away what playing changed, so none of it is a step
+    m_context.undoHistory->setFrozen(true);
+
     syncPlayButtons();
     syncPlayingIndicators();
 }
@@ -328,6 +334,8 @@ void WorldEditorWorkspace::stopPlay()
         editor->attach();
     }
 
+    m_context.undoHistory->setFrozen(false);
+
     syncPlayButtons();
     syncPlayingIndicators();
 }
@@ -338,7 +346,7 @@ void WorldEditorWorkspace::showShapeMenu(Amethyst::TextButton &button)
         return;
     }
 
-    m_shapeMenu->setItems(AddSceneObjectMenu_buildShapeItems(m_world->getScene()->root(), m_selection, SCENE_OBJECT_SCOPE_LEVEL));
+    m_shapeMenu->setItems(AddSceneObjectMenu_buildShapeItems(*m_context.editedScene, m_context.editedScene->contentRoot(), SCENE_OBJECT_SCOPE_LEVEL));
     m_shapeMenu->showAt({button.absolutePosition.x, button.absolutePosition.y + button.absoluteSize.y});
 }
 

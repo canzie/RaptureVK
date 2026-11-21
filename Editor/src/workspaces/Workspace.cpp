@@ -1,6 +1,7 @@
 #include "Workspace.h"
 
 #include "app/EditorConfig.h"
+#include "scene/EditedScene.h"
 #include "ui/chrome/TabLabels.h"
 #include "ui/controls/IconLabelButton.h"
 
@@ -8,6 +9,8 @@
 #include <components/ui_scope.h>
 #include <parsers/config/layout_config.h>
 #include <rapture/core/utils/rp_assert.h>
+#include <rapture/input/Input.h>
+#include <rapture/scene/Scene.h>
 
 static constexpr std::string_view WORKSPACE_CLASS = "workspace";
 static constexpr std::string_view PANEL_TAB_CLASS = "panel-tab";
@@ -36,6 +39,63 @@ void Workspace::destroyPanels()
     m_panels.clear();
 }
 
+void Workspace::makeSceneEditable(Rapture::SceneObject &contentRoot)
+{
+    RP_ASSERT(m_context.scene != nullptr, "a workspace can only author the scene it has");
+    RP_ASSERT(m_editedScene == nullptr, "a workspace's scene is made editable once");
+
+    const UndoHistoryLimits limits = {
+        .maxSteps = static_cast<size_t>(config().getInt(EDITOR_CONFIG_UNDO_STEP_LIMIT)),
+        .maxBytes = static_cast<size_t>(config().getInt(EDITOR_CONFIG_UNDO_MEMORY_LIMIT_MB)) * 1024 * 1024,
+    };
+
+    m_editedScene = std::make_unique<EditedScene>(*m_context.scene, contentRoot, m_selection, *m_editor.sceneObjectClipboard, limits);
+    m_context.editedScene = m_editedScene.get();
+    m_context.undoHistory = &m_editedScene->undoHistory();
+}
+
+void Workspace::setupEditShortcuts()
+{
+    ShortcutRegistry &shortcuts = *m_editor.shortcuts;
+
+    if (UndoHistory *history = m_context.undoHistory) {
+        shortcuts.registerShortcut(EDITOR_COMMAND_UNDO, {Rapture::KEY_Z, SHORTCUT_MOD_CONTROL}, m_container, [history]() { history->undo(); });
+        shortcuts.registerShortcut(EDITOR_COMMAND_REDO, {Rapture::KEY_Z, SHORTCUT_MOD_CONTROL | SHORTCUT_MOD_SHIFT}, m_container,
+                                   [history]() { history->redo(); });
+    }
+
+    EditedScene *editedScene = m_context.editedScene;
+    if (editedScene == nullptr) {
+        return;
+    }
+
+    shortcuts.registerShortcut(EDITOR_COMMAND_DUPLICATE_SELECTION, {Rapture::KEY_D, SHORTCUT_MOD_CONTROL}, m_container, [this, editedScene]() {
+        if (Rapture::SceneObject *selected = selectedSceneObject()) {
+            editedScene->duplicate(*selected);
+        }
+    });
+    shortcuts.registerShortcut(EDITOR_COMMAND_COPY_SELECTION, {Rapture::KEY_C, SHORTCUT_MOD_CONTROL}, m_container, [this, editedScene]() {
+        if (Rapture::SceneObject *selected = selectedSceneObject()) {
+            editedScene->copy(*selected);
+        }
+    });
+    shortcuts.registerShortcut(EDITOR_COMMAND_CUT_SELECTION, {Rapture::KEY_X, SHORTCUT_MOD_CONTROL}, m_container, [this, editedScene]() {
+        if (Rapture::SceneObject *selected = selectedSceneObject()) {
+            editedScene->cut(*selected);
+        }
+    });
+    shortcuts.registerShortcut(EDITOR_COMMAND_PASTE, {Rapture::KEY_V, SHORTCUT_MOD_CONTROL}, m_container,
+                               [this, editedScene]() { editedScene->paste(selectedSceneObject()); });
+}
+
+Rapture::SceneObject *Workspace::selectedSceneObject() const
+{
+    if (m_context.scene == nullptr || !m_selection.has()) {
+        return nullptr;
+    }
+    return m_context.scene->instanceFor(m_selection.entity().getEntity());
+}
+
 const EditorConfig &Workspace::config() const
 {
     RP_ASSERT(m_editor.config != nullptr, "a workspace was built without a config");
@@ -58,6 +118,7 @@ void Workspace::attach(Amethyst::TabBar &tabBar)
     buildContainer(*container);
     buildHotbar();
     build();
+    setupEditShortcuts();
     resolveLayout();
     restoreDockLayout();
 }
@@ -175,6 +236,14 @@ void Workspace::onUpdate(float dt)
 
     for (auto &panel : m_panels) {
         panel->onUpdate(dt);
+    }
+
+    if (m_context.undoHistory != nullptr && m_editor.input != nullptr) {
+        const Rapture::Input &input = *m_editor.input;
+        const bool mouseButtonHeld = input.isMouseButtonPressed(Rapture::MOUSE_BUTTON_1) ||
+                                     input.isMouseButtonPressed(Rapture::MOUSE_BUTTON_2) ||
+                                     input.isMouseButtonPressed(Rapture::MOUSE_BUTTON_3);
+        m_context.undoHistory->commitOnceMouseReleased(mouseButtonHeld);
     }
 }
 

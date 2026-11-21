@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <string>
 #include <string_view>
 
 namespace Amethyst {
@@ -17,6 +18,7 @@ class AmVulkanBackend;
 } // namespace Amethyst
 
 namespace Rapture {
+class Input;
 class Project;
 class Sampler;
 class Scene;
@@ -32,6 +34,8 @@ class EditorConfig;
 class WindowManager;
 class WorkspaceManager;
 class EntitySelection;
+class EditedScene;
+class UndoHistory;
 
 /**
  * @brief Hands engine textures to the UI and takes them back
@@ -75,6 +79,13 @@ struct EditorCameraInput {
 };
 
 /**
+ * @brief The scene object last copied in the editor
+ */
+struct SceneObjectClipboard {
+    std::string copiedSubtree;
+};
+
+/**
  * @brief What every part of the editor can reach, held by the shell and handed down by reference.
  */
 struct EditorContext {
@@ -86,6 +97,8 @@ struct EditorContext {
     EditorConfig *config = nullptr;
     Rapture::Project *project = nullptr;
     EditorCameraInput *cameraInput = nullptr;
+    const Rapture::Input *input = nullptr;
+    SceneObjectClipboard *sceneObjectClipboard = nullptr;
     EditorCommands *commands = nullptr;
     std::function<void(Rapture::AssetHandle)> showAssetInContentBrowser;
 };
@@ -106,6 +119,10 @@ struct WorkspaceContext {
     /// Owned by the workspace, so what one workspace selects never reaches the panels of another
     EntitySelection *selection = nullptr;
     Amethyst::DockingLayer *contentDock = nullptr;
+    /// Set only by a workspace whose edits can be undone
+    UndoHistory *undoHistory = nullptr;
+    /// Set only by a workspace that edits its scene
+    EditedScene *editedScene = nullptr;
 };
 
 #endif // RAPTURE__EDITOR_CONTEXT_H

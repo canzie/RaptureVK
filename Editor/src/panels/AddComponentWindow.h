@@ -41,6 +41,11 @@ class AddComponentWindow {
 
   public:
     /**
+     * @brief Called before a component is attached to the target
+     */
+    std::function<void()> onBeforeComponentAdded;
+
+    /**
      * @brief Called after a component was attached to the target
      */
     std::function<void()> onComponentAdded;

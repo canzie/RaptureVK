@@ -89,6 +89,12 @@ class AmethystLayer : public Rapture::Layer {
     void updateShortcuts();
 
     /**
+     * @brief The undo history of the workspace in front
+     * @return The history, nullptr when that workspace has none
+     */
+    UndoHistory *activeWorkspaceUndoHistory() const;
+
+    /**
      * @brief Reads this frame's editor camera controls
      */
     void readEditorCameraInput();
@@ -117,6 +123,7 @@ class AmethystLayer : public Rapture::Layer {
     Amethyst::MenuBar *m_menuBar = nullptr;
     Amethyst::TabBar *m_workspaceTabBar = nullptr;
     ShortcutRegistry m_shortcutRegistry;
+    SceneObjectClipboard m_sceneObjectClipboard;
     std::unique_ptr<Rapture::Input> m_input;
 
     EditorConfig m_config;

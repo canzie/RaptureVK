@@ -415,7 +415,7 @@ void Scene::serialize(WriteNode node) const
 
     WriteNode instances = node.addArray(KEY_INSTANCES);
     for (const auto &child : m_root->children()) {
-        child->serialize(instances.appendObject());
+        child->serializeSubtree(instances.appendObject());
     }
 }
 

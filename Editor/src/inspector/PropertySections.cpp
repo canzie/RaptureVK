@@ -157,21 +157,22 @@ static void s_rowVec3(Amethyst::TableScope &t, std::string_view label, double (&
 void PropertySection::rowVec3(Amethyst::TableScope &t, std::string_view label, double (&values)[3], double speed, double min,
                               double max, const std::function<void(void)> &onChanged)
 {
-    s_rowVec3(t, label, values, speed, min, max, onChanged, {});
+    s_rowVec3(t, label, values, speed, min, max, callBeforeEditFirst(onChanged), {});
 }
 
 void PropertySection::rowAxesVec3(Amethyst::TableScope &t, std::string_view label, double (&values)[3], double speed, double min,
                                   double max, const std::function<void(void)> &onChanged)
 {
-    s_rowVec3(t, label, values, speed, min, max, onChanged, AXIS_BAR_CLASSES);
+    s_rowVec3(t, label, values, speed, min, max, callBeforeEditFirst(onChanged), AXIS_BAR_CLASSES);
 }
 
 void PropertySection::rowSlider(Amethyst::TableScope &t, std::string_view label, float *value, float min, float max,
                                 const std::function<void(float)> &onChanged, std::string format)
 {
+    const std::function<void(float)> edit = callBeforeEditFirst(onChanged);
     t.row([&](Amethyst::TableRowScope &tr) {
         tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
-        tr.cell([value, min, max, onChanged, format](Amethyst::UIScope &cell) {
+        tr.cell([value, min, max, edit, format](Amethyst::UIScope &cell) {
             cell.sliderFloat(
                 {
                     .classes = {"property-input-field", "property-slider"},
@@ -183,13 +184,7 @@ void PropertySection::rowSlider(Amethyst::TableScope &t, std::string_view label,
                     .max = max,
                     .value = value,
                 },
-                [onChanged](Amethyst::SliderFloatScope &s) {
-                    s.component.onValueChanged = [onChanged](float v) {
-                        if (onChanged) {
-                            onChanged(v);
-                        }
-                    };
-                });
+                [edit](Amethyst::SliderFloatScope &s) { s.component.onValueChanged = edit; });
         });
     });
 }
@@ -221,13 +216,7 @@ void PropertySection::fieldCheckbox(Amethyst::UIScope &cell, bool *value, const 
                             .position = Amethyst::UDim2(0.0f, CONTROL_HPAD, 0.5f, 0.0f),
                             .size = Amethyst::UDim2::fromOffset(18.0f, 18.0f)},
                    .value = value},
-                  [onChanged](Amethyst::CheckboxScope &c) {
-                      c.component.onValueChanged = [onChanged](bool b) {
-                          if (onChanged) {
-                              onChanged(b);
-                          }
-                      };
-                  });
+                  [edit = callBeforeEditFirst(onChanged)](Amethyst::CheckboxScope &c) { c.component.onValueChanged = edit; });
 }
 
 void PropertySection::rowCheckbox(Amethyst::TableScope &t, std::string_view label, bool *value,
@@ -235,7 +224,7 @@ void PropertySection::rowCheckbox(Amethyst::TableScope &t, std::string_view labe
 {
     t.row([&](Amethyst::TableRowScope &tr) {
         tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
-        tr.cell([value, onChanged](Amethyst::UIScope &cell) { fieldCheckbox(cell, value, onChanged); });
+        tr.cell([this, value, onChanged](Amethyst::UIScope &cell) { fieldCheckbox(cell, value, onChanged); });
     });
 }
 
@@ -255,7 +244,10 @@ void PropertySection::rowColor(Amethyst::TableScope &t, std::string_view label, 
                 [&](Amethyst::FrameScope &wrap) {
                     out.emplace(wrap, Amethyst::Color3(initial.x, initial.y, initial.z),
                                 std::vector<std::string>{"property-input-field"});
-                    out->onColorChanged = [onChanged](const Amethyst::Color4 &c) {
+                    out->onColorChanged = [this, onChanged](const Amethyst::Color4 &c) {
+                        if (onBeforeEdit) {
+                            onBeforeEdit();
+                        }
                         if (onChanged) {
                             onChanged(glm::vec3(c.r, c.g, c.b));
                         }
@@ -270,7 +262,7 @@ void PropertySection::rowAssetPicker(Amethyst::TableScope &t, std::string_view l
 {
     t.row(PICKER_ROW_HEIGHT, [&](Amethyst::TableRowScope &tr) {
         tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
-        tr.cell([&](Amethyst::UIScope &cell) { s_assetPickerCell(cell, out, std::move(config), onSelected); });
+        tr.cell([&](Amethyst::UIScope &cell) { s_assetPickerCell(cell, out, std::move(config), callBeforeEditFirst(onSelected)); });
     });
 }
 
@@ -290,7 +282,7 @@ void PropertySection::rowInstancePicker(Amethyst::TableScope &t, std::string_vie
                 },
                 [&](Amethyst::FrameScope &wrap) {
                     out.emplace(wrap, type);
-                    out->onInstanceSelected = onSelected;
+                    out->onInstanceSelected = callBeforeEditFirst(onSelected);
                 });
         });
     });
@@ -315,7 +307,10 @@ Amethyst::Dropdown *PropertySection::rowDropdown(Amethyst::TableScope &t, std::s
                 [&](Amethyst::DropdownScope &d) {
                     dropdown = &d.component;
                     for (size_t i = 0; i < options.size(); ++i) {
-                        d.action(options[i], [onSelect, i]() {
+                        d.action(options[i], [this, onSelect, i]() {
+                            if (onBeforeEdit) {
+                                onBeforeEdit();
+                            }
                             if (onSelect) {
                                 onSelect(static_cast<int>(i));
                             }
@@ -342,19 +337,13 @@ void PropertySection::fieldDragFloat(Amethyst::UIScope &cell, double *value, dou
             .max = max,
             .value = value,
         },
-        [onChanged](Amethyst::DragFloatScope &d) {
-            d.component.onValueChanged = [onChanged](double v) {
-                if (onChanged) {
-                    onChanged(v);
-                }
-            };
-        });
+        [edit = callBeforeEditFirst(onChanged)](Amethyst::DragFloatScope &d) { d.component.onValueChanged = edit; });
 }
 
 void PropertySection::fieldVec3(Amethyst::UIScope &cell, double (&values)[3], double speed, double min, double max,
                                 const std::function<void(void)> &onChanged)
 {
-    s_vec3Fields(cell, values, speed, min, max, onChanged, AXIS_BAR_CLASSES);
+    s_vec3Fields(cell, values, speed, min, max, callBeforeEditFirst(onChanged), AXIS_BAR_CLASSES);
 }
 
 void PropertySection::rowDragFloat(Amethyst::TableScope &t, std::string_view label, double *value, double speed, double min,
@@ -362,7 +351,7 @@ void PropertySection::rowDragFloat(Amethyst::TableScope &t, std::string_view lab
 {
     t.row([&](Amethyst::TableRowScope &tr) {
         tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
-        tr.cell([value, speed, min, max, format, onChanged](Amethyst::UIScope &cell) {
+        tr.cell([this, value, speed, min, max, format, onChanged](Amethyst::UIScope &cell) {
             fieldDragFloat(cell, value, speed, min, max, format, onChanged);
         });
     });
@@ -372,7 +361,7 @@ void PropertySection::rowRemovable(Amethyst::TableScope &t, std::string_view lab
                                    const std::function<void(Amethyst::UIScope &)> &fillField)
 {
     t.row([&](Amethyst::TableRowScope &tr) {
-        tr.cell([label, onRemove](Amethyst::UIScope &cell) { s_removableLabelCell(cell, label, onRemove); });
+        tr.cell([label, remove = callBeforeEditFirst(onRemove)](Amethyst::UIScope &cell) { s_removableLabelCell(cell, label, remove); });
         tr.cell([fillField](Amethyst::UIScope &cell) { fillField(cell); });
     });
 }
@@ -382,7 +371,7 @@ void PropertySection::rowFloatFields(Amethyst::TableScope &t, std::string_view l
 {
     t.row([&](Amethyst::TableRowScope &tr) {
         tr.cell([label](Amethyst::UIScope &cell) { s_labelCell(cell, label); });
-        tr.cell([values, wholeNumbers, onChanged](Amethyst::UIScope &cell) {
+        tr.cell([values, wholeNumbers, edit = callBeforeEditFirst(onChanged)](Amethyst::UIScope &cell) {
             const size_t count = values.size();
             const float share = 1.0f / static_cast<float>(count);
             for (size_t i = 0; i < count; ++i) {
@@ -399,13 +388,9 @@ void PropertySection::rowFloatFields(Amethyst::TableScope &t, std::string_view l
                         .format = wholeNumbers ? "%.0f" : "%.3f",
                         .speed = wholeNumbers ? 1.0 : 0.01,
                     },
-                    [&values, i, onChanged](Amethyst::DragFloatScope &d) {
+                    [&values, i, edit](Amethyst::DragFloatScope &d) {
                         d.component.valueF = &values[i];
-                        d.component.onValueChanged = [onChanged](double) {
-                            if (onChanged) {
-                                onChanged();
-                            }
-                        };
+                        d.component.onValueChanged = [edit](double) { edit(); };
                     });
             }
         });
@@ -435,6 +420,9 @@ void PropertySectionList::showRemoveMenu(PropertySection &section, Amethyst::UIO
 
     std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items;
     items.push_back(Amethyst::makeActionItem("Delete", [this, &section]() {
+        if (section.onBeforeEdit) {
+            section.onBeforeEdit();
+        }
         section.remove();
         m_refreshRequested = true;
     }));

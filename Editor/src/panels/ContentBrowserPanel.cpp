@@ -984,7 +984,7 @@ void ContentBrowserPanel::createModule(const Rapture::TypeInfo &type, std::strin
     authoring.root()->addChild(std::unique_ptr<Rapture::SceneObject>(root));
 
     auto document = std::make_unique<Rapture::SerialDocument>();
-    root->serialize(document->root());
+    root->serializeSubtree(document->root());
     document->freeze();
 
     Rapture::AssetImportDataRequest request;

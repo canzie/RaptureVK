@@ -14,7 +14,7 @@
 inline std::unique_ptr<Rapture::SerialDocument> SceneDocument_writeSubtree(const Rapture::SceneObject &object)
 {
     Rapture::SerialDocument builder;
-    object.serialize(builder.root());
+    object.serializeSubtree(builder.root());
     return std::make_unique<Rapture::SerialDocument>(Rapture::SerialDocument::parse(builder.toText()));
 }
 

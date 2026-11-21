@@ -173,6 +173,46 @@ bool SceneObject::setParent(SceneObject *parent)
     return true;
 }
 
+size_t SceneObject::siblingIndex() const
+{
+    if (m_parent == nullptr) {
+        return 0;
+    }
+
+    const bool includeInternal = true;
+    std::span<const std::unique_ptr<SceneObject>> siblings = m_parent->children(includeInternal);
+    auto found = std::find_if(siblings.begin(), siblings.end(), [this](const std::unique_ptr<SceneObject> &sibling) { return sibling.get() == this; });
+    const size_t index = static_cast<size_t>(found - siblings.begin());
+
+    return isInternal() ? index - (m_parent->m_children.size() - m_parent->m_internalCount) : index;
+}
+
+void SceneObject::setSiblingIndex(size_t index)
+{
+    if (m_parent == nullptr) {
+        return;
+    }
+
+    std::vector<std::unique_ptr<SceneObject>> &siblings = m_parent->m_children;
+    const size_t authoredCount = siblings.size() - m_parent->m_internalCount;
+    const size_t first = isInternal() ? authoredCount : 0;
+    const size_t last = isInternal() ? siblings.size() - 1 : authoredCount - 1;
+
+    const size_t from = first + siblingIndex();
+    const size_t to = std::min(first + index, last);
+    if (from == to) {
+        return;
+    }
+
+    auto fromIt = siblings.begin() + static_cast<ptrdiff_t>(from);
+    auto toIt = siblings.begin() + static_cast<ptrdiff_t>(to);
+    if (from < to) {
+        std::rotate(fromIt, fromIt + 1, toIt + 1);
+    } else {
+        std::rotate(toIt, fromIt, fromIt + 1);
+    }
+}
+
 bool SceneObject::isInSubtreeOf(const SceneObject &root) const
 {
     for (const SceneObject *walk = this; walk != nullptr; walk = walk->m_parent) {
@@ -313,6 +353,12 @@ void SceneObject::serialize(WriteNode node) const
         }
     }
 
+}
+
+void SceneObject::serializeSubtree(WriteNode node) const
+{
+    serialize(node);
+
     if (m_children.empty()) {
         return;
     }
@@ -322,7 +368,7 @@ void SceneObject::serialize(WriteNode node) const
         if (!child->isSerialized()) {
             continue;
         }
-        child->serialize(children.appendObject());
+        child->serializeSubtree(children.appendObject());
     }
 }
 

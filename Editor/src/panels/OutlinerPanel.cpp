@@ -3,11 +3,13 @@
 #include "Icons.h"
 #include "panels/AddSceneObjectMenu.h"
 #include "scene/EditorCamera.h"
+#include "scene/EditedScene.h"
 #include "ui/AssetVisuals.h"
 #include "ui/controls/IconLabelButton.h"
 #include "ui/controls/SearchField.h"
 #include "ui/menus/ContextMenuItems.h"
 #include <rapture/assets/asset_manager/AssetManager.h>
+#include <rapture/core/utils/rp_assert.h>
 #include <rapture/core/ecs/entity_accessor.h>
 #include <rapture/scene/World.h>
 #include <rapture/scene/instances/Mesh3D.h>
@@ -125,6 +127,7 @@ static void s_nameLabel(Amethyst::UIScope &s, const std::string &text, std::stri
 
 OutlinerPanel::OutlinerPanel(const WorkspaceContext &context) : Panel("Outliner", context)
 {
+    RP_ASSERT(context.editedScene != nullptr, "the outliner edits its scene, so it needs a workspace that authors one");
     m_icon = Icons::SVG_LAYERS;
 }
 
@@ -163,13 +166,35 @@ void OutlinerPanel::setupSearchBar(Amethyst::UIScope &scope)
         });
 }
 
+std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> OutlinerPanel::buildAddMenuItems() const
+{
+    EditedScene &editedScene = *m_context.editedScene;
+    return AddSceneObjectMenu_buildItems(editedScene, editedScene.contentRoot(), SCENE_OBJECT_SCOPE_LEVEL);
+}
+
 void OutlinerPanel::showAddMenu(Amethyst::vec2 pos)
 {
     if (m_scene == nullptr || m_selection == nullptr) {
         return;
     }
 
-    showContextMenu(pos, AddSceneObjectMenu_buildItems(m_scene->root(), *m_selection, SCENE_OBJECT_SCOPE_LEVEL));
+    showContextMenu(pos, buildAddMenuItems());
+}
+
+void OutlinerPanel::showEmptySpaceMenu(Amethyst::vec2 pos)
+{
+    if (m_scene == nullptr || m_selection == nullptr) {
+        return;
+    }
+
+    std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items = buildAddMenuItems();
+
+    if (m_context.editedScene->canPaste()) {
+        items.push_back(SeparatorMenuItem::create());
+        items.push_back(Amethyst::makeActionItem("Paste", [this]() { m_context.editedScene->paste(nullptr); }));
+    }
+
+    showContextMenu(pos, std::move(items));
 }
 
 void OutlinerPanel::build(Amethyst::UIScope &scope)
@@ -199,7 +224,11 @@ void OutlinerPanel::build(Amethyst::UIScope &scope)
 
     m_treeView->onRowClicked = [this](uint32_t row) { onRowClicked(row); };
     m_treeView->onRowRightClicked = [this](uint32_t row, Amethyst::vec2 pos) { onRowRightClicked(row, pos); };
-    m_treeView->onEmptySpaceRightClicked = [this](Amethyst::vec2 pos) { showAddMenu(pos); };
+    m_treeView->onEmptySpaceRightClicked = [this](Amethyst::vec2 pos) { showEmptySpaceMenu(pos); };
+
+    if (m_selection != nullptr) {
+        m_selectionChangedConn = m_selection->onChanged.connect([this](Rapture::ecs::EntityAccessor entity) { selectRowFor(entity); });
+    }
 
     m_contextMenu = m_root->add<Amethyst::ContextMenu>();
     m_contextMenu->setContextMenuProperties({.itemHoverBackground = COL_MENU_HOVER});
@@ -319,14 +348,41 @@ void OutlinerPanel::refresh()
         tvScope.row([this, instance](Amethyst::TreeRowScope &row) { buildInstanceTree(instance, row); });
     }
 
-    if (m_builtWithFilter) {
-        return;
-    }
-    for (uint32_t row = 0; row < m_rowInstances.size(); row++) {
-        if (m_collapsedInstances.contains(m_rowInstances[row])) {
-            m_treeView->collapse(row);
+    if (!m_builtWithFilter) {
+        for (uint32_t row = 0; row < m_rowInstances.size(); row++) {
+            if (m_collapsedInstances.contains(m_rowInstances[row])) {
+                m_treeView->collapse(row);
+            }
         }
     }
+
+    if (m_selection != nullptr) {
+        selectRowFor(m_selection->entity());
+    }
+}
+
+void OutlinerPanel::selectRowFor(Rapture::ecs::EntityAccessor entity)
+{
+    if (m_treeView == nullptr) {
+        return;
+    }
+
+    int32_t found = Amethyst::TreeView::NO_ROW_SELECTION;
+    if (entity.isValid()) {
+        for (uint32_t row = 0; row < m_rowInstances.size(); row++) {
+            if (m_rowInstances[row]->entity() == entity.getEntity()) {
+                found = static_cast<int32_t>(row);
+                break;
+            }
+        }
+    }
+
+    if (m_treeView->selectedRow == found) {
+        return;
+    }
+
+    m_treeView->selectedRow = found;
+    m_treeView->markDirty();
 }
 
 void OutlinerPanel::buildInstanceTree(Rapture::SceneObject *instance, Amethyst::TreeRowScope &rowScope)
@@ -400,6 +456,18 @@ void OutlinerPanel::onRowRightClicked(uint32_t row, Amethyst::vec2 pos)
     }
 
     items.push_back(SeparatorMenuItem::create());
+    EditedScene *editedScene = m_context.editedScene;
+    items.push_back(Amethyst::makeActionItem("Duplicate", [editedScene, instance]() { editedScene->duplicate(*instance); }));
+    items.push_back(Amethyst::makeActionItem("Copy", [editedScene, instance]() { editedScene->copy(*instance); }));
+    items.push_back(Amethyst::makeActionItem("Cut", [this, editedScene, instance]() {
+        editedScene->copy(*instance);
+        requestDelete(instance, false);
+    }));
+    if (editedScene->canPaste()) {
+        items.push_back(Amethyst::makeActionItem("Paste", [editedScene, instance]() { editedScene->paste(instance); }));
+    }
+
+    items.push_back(SeparatorMenuItem::create());
     items.push_back(Amethyst::makeActionItem("Delete", [this, instance]() { requestDelete(instance, false); }));
     if (hasChildren) {
         items.push_back(Amethyst::makeActionItem("Delete (keep children)", [this, instance]() { requestDelete(instance, true); }));
@@ -421,25 +489,15 @@ void OutlinerPanel::applyPendingDelete()
     m_pendingDeleteInstance = nullptr;
     m_pendingDeleteKeepChildren = false;
 
-    if (m_scene == nullptr || instance == nullptr) {
+    if (instance == nullptr) {
         return;
     }
 
-    if (m_selection != nullptr && m_selection->entity().getEntity() == instance->entity()) {
-        m_selection->clear();
-    }
-
     if (keepChildren) {
-        Rapture::SceneObject *parent = instance->parent();
-        while (parent != nullptr && !instance->children().empty()) {
-            Rapture::SceneObject *child = instance->children().front().get();
-            if (!child->setParent(parent)) {
-                break;
-            }
-        }
+        m_context.editedScene->destroyKeepingChildren(*instance);
+    } else {
+        m_context.editedScene->destroy(*instance);
     }
-
-    m_scene->destroyInstance(instance);
 
     m_treeView->selectedRow = Amethyst::TreeView::NO_ROW_SELECTION;
     refresh();
@@ -526,9 +584,7 @@ void OutlinerPanel::applyPendingRename()
         return;
     }
 
-    if (!m_pendingRenameName.empty()) {
-        instance->setName(m_pendingRenameName);
-    }
+    m_context.editedScene->rename(*instance, m_pendingRenameName);
 
     buildNameCell(row, instance, std::string(instance->name()), false);
 }

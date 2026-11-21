@@ -5,6 +5,8 @@
 #include "commands/EditorCommands.h"
 #include "context/WindowManager.h"
 #include "context/WorkspaceManager.h"
+#include "undo/UndoHistory.h"
+#include "workspaces/Workspace.h"
 #include <rapture/app/Application.h>
 #include <rapture/core/utils/EnginePaths.h>
 #include <rapture/core/utils/Log.h>
@@ -207,6 +209,8 @@ void AmethystLayer::setupEditorContext()
         .config = &m_config,
         .project = &Rapture::Application::getInstance().getProject(),
         .cameraInput = &m_cameraInput,
+        .input = m_input.get(),
+        .sceneObjectClipboard = &m_sceneObjectClipboard,
         .showAssetInContentBrowser =
             [this](Rapture::AssetHandle handle) {
                 if (m_bottomBar != nullptr) {
@@ -376,9 +380,17 @@ void AmethystLayer::setupMenuBar()
                 d.separator();
                 d.action("Exit", [] { Rapture::Application::getInstance().close(); });
             });
-            mb.menuItem("Edit", [](Amethyst::DropdownScope &d) {
-                d.action("Undo", [] {});
-                d.action("Redo", [] {});
+            mb.menuItem("Edit", [this](Amethyst::DropdownScope &d) {
+                d.action("Undo", [this] {
+                    if (UndoHistory *history = activeWorkspaceUndoHistory()) {
+                        history->undo();
+                    }
+                });
+                d.action("Redo", [this] {
+                    if (UndoHistory *history = activeWorkspaceUndoHistory()) {
+                        history->redo();
+                    }
+                });
                 d.separator();
                 d.action("Cut", [] {});
                 d.action("Copy", [] {});
@@ -542,6 +554,14 @@ void AmethystLayer::onResize(const Rapture::SwapChain &swapChain)
     if (m_workspaceManager != nullptr) {
         placeWorkspaceContent(m_window.absoluteSize);
     }
+}
+
+UndoHistory *AmethystLayer::activeWorkspaceUndoHistory() const
+{
+    if (m_workspaceManager == nullptr || m_workspaceManager->activeWorkspace() == nullptr) {
+        return nullptr;
+    }
+    return m_workspaceManager->activeWorkspace()->getContext().undoHistory;
 }
 
 void AmethystLayer::updateShortcuts()

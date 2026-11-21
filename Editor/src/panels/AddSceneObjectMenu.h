@@ -10,7 +10,7 @@ namespace Rapture {
 class SceneObject;
 }
 
-class EntitySelection;
+class EditedScene;
 
 /**
  * @brief Where a scene object may be added, one bit per place a menu is built for
@@ -23,22 +23,22 @@ enum SceneObjectScope {
 
 /**
  * @brief Builds the context menu items that create a scene object, each adding its object under a parent
- * @param parent The scene object new objects are parented to
- * @param selection The selection the newly added object becomes
+ * @param editedScene The scene the objects are added to
+ * @param parent The object new objects are added under
  * @param scope The scope the menu is built for, which admits the entries carrying its bit
  * @return The items, ready to hand to a ContextMenu
  */
 std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>>
-AddSceneObjectMenu_buildItems(Rapture::SceneObject *parent, EntitySelection &selection, SceneObjectScope scope);
+AddSceneObjectMenu_buildItems(EditedScene &editedScene, Rapture::SceneObject &parent, SceneObjectScope scope);
 
 /**
  * @brief Builds the context menu items that create one of the built-in shapes under a parent
- * @param parent The scene object new shapes are parented to
- * @param selection The selection the newly added shape becomes
+ * @param editedScene The scene the shapes are added to
+ * @param parent The object new shapes are added under
  * @param scope The scope the menu is built for
  * @return The items, ready to hand to a ContextMenu
  */
 std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>>
-AddSceneObjectMenu_buildShapeItems(Rapture::SceneObject *parent, EntitySelection &selection, SceneObjectScope scope);
+AddSceneObjectMenu_buildShapeItems(EditedScene &editedScene, Rapture::SceneObject &parent, SceneObjectScope scope);
 
 #endif // RAPTURE__ADD_SCENE_OBJECT_MENU_H

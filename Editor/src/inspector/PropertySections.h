@@ -224,7 +224,7 @@ class PropertySection {
      * @param format printf-style format for the readout, empty for the field's default.
      * @param onChanged Called with the new value on change.
      */
-    static void fieldDragFloat(Amethyst::UIScope &cell, double *value, double speed, double min, double max, std::string format,
+    void fieldDragFloat(Amethyst::UIScope &cell, double *value, double speed, double min, double max, std::string format,
                                const std::function<void(double)> &onChanged);
 
     /**
@@ -233,7 +233,7 @@ class PropertySection {
      * @param value The value the checkbox is bound to.
      * @param onChanged Called with the new value on change.
      */
-    static void fieldCheckbox(Amethyst::UIScope &cell, bool *value, const std::function<void(bool)> &onChanged);
+    void fieldCheckbox(Amethyst::UIScope &cell, bool *value, const std::function<void(bool)> &onChanged);
 
     /**
      * @brief Fills a value column with three drag fields for the X, Y and Z axes, each edged in its axis color.
@@ -244,8 +244,26 @@ class PropertySection {
      * @param max Upper bound of every axis.
      * @param onChanged Called after any axis changes.
      */
-    static void fieldVec3(Amethyst::UIScope &cell, double (&values)[3], double speed, double min, double max,
+    void fieldVec3(Amethyst::UIScope &cell, double (&values)[3], double speed, double min, double max,
                           const std::function<void(void)> &onChanged);
+
+    /**
+     * @brief Wraps a field's callback so the subject is announced as about to change before it runs
+     * @param onChanged The callback the field runs on change
+     * @return The callback to hand the field
+     */
+    template <typename... Args>
+    std::function<void(Args...)> callBeforeEditFirst(const std::function<void(Args...)> &onChanged)
+    {
+        return [this, onChanged](Args... args) {
+            if (onBeforeEdit) {
+                onBeforeEdit();
+            }
+            if (onChanged) {
+                onChanged(args...);
+            }
+        };
+    }
 
   public:
     /// Height of the bar a section is collapsed down to
@@ -273,6 +291,11 @@ class PropertySection {
      * section holding another section's header.
      */
     std::function<void(PropertySection &, Amethyst::UIObject &)> requestRemoveMenu;
+
+    /**
+     * @brief Called before any field of this section, or its removal, changes the subject
+     */
+    std::function<void()> onBeforeEdit;
 
   protected:
     float m_bodyHeight = 0.0f;

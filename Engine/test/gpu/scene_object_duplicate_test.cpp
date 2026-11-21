@@ -124,3 +124,41 @@ TEST_F(SceneObjectDuplicate, CopyOfACopyIsItsOwnObject)
     EXPECT_EQ(scene.findObjectById(second->id()), second);
     EXPECT_EQ(scene.findObjectById(first->id()), first);
 }
+
+TEST_F(SceneObjectDuplicate, SiblingIndexMovesAnObjectBothWaysAndStopsAtTheEnd)
+{
+    Rapture::Scene scene("SceneObjectDuplicate");
+    Rapture::SceneObject *parent = scene.root()->add<Rapture::Folder>("Parent");
+    auto *first = parent->add<Rapture::Node3D>("First");
+    auto *second = parent->add<Rapture::Node3D>("Second");
+    auto *third = parent->add<Rapture::Node3D>("Third");
+
+    first->setSiblingIndex(2);
+    EXPECT_EQ(second->siblingIndex(), 0u);
+    EXPECT_EQ(third->siblingIndex(), 1u);
+    EXPECT_EQ(first->siblingIndex(), 2u);
+
+    first->setSiblingIndex(0);
+    EXPECT_EQ(first->siblingIndex(), 0u);
+    EXPECT_EQ(second->siblingIndex(), 1u);
+    EXPECT_EQ(third->siblingIndex(), 2u);
+
+    second->setSiblingIndex(100);
+    EXPECT_EQ(second->siblingIndex(), 2u);
+    EXPECT_EQ(third->siblingIndex(), 1u);
+}
+
+TEST_F(SceneObjectDuplicate, SerializeLeavesChildrenOutAndSerializeSubtreeKeepsThem)
+{
+    Rapture::Scene scene("SceneObjectDuplicate");
+    auto *parent = scene.root()->add<Rapture::Node3D>("Parent");
+    parent->add<Rapture::Node3D>("Child");
+
+    Rapture::SerialDocument ownState;
+    parent->serialize(ownState.root());
+    Rapture::SerialDocument readOwnState = Rapture::SerialDocument::parse(ownState.toText());
+    EXPECT_EQ(Rapture::SceneObject::readHeader(readOwnState.rootView()).children.size(), 0u);
+
+    std::unique_ptr<Rapture::SerialDocument> subtree = SceneDocument_writeSubtree(*parent);
+    EXPECT_EQ(Rapture::SceneObject::readHeader(subtree->rootView()).children.size(), 1u);
+}

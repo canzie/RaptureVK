@@ -928,7 +928,7 @@ void glTF2Loader::buildModule(Scene *scene)
     buildSkeletonPoses(*root);
 
     SerialDocument document;
-    root->serialize(document.root());
+    root->serializeSubtree(document.root());
     document.freeze();
 
     AssetRef ref = AssetManager::importAsset(

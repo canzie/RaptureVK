@@ -6,6 +6,7 @@
 #include "scene/EditorCamera.h"
 #include "ui/controls/IconLabelButton.h"
 #include "ui/menus/ContextMenuItems.h"
+#include "scene/EditedScene.h"
 #include <rapture/gpu/render_targets/SceneRenderTarget.h>
 #include <rapture/renderer/viewport/Viewport.h>
 #include <rapture/scene/Scene.h>
@@ -843,5 +844,8 @@ void ViewportPanel::updateGizmo()
         return;
     }
 
+    if (m_context.editedScene != nullptr) {
+        m_context.editedScene->recordChange(*node);
+    }
     node->setWorldTransform(delta * objectTransform);
 }

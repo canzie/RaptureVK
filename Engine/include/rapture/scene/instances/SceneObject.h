@@ -94,6 +94,18 @@ class SceneObject : public Instance {
     bool setParent(SceneObject *parent);
 
     /**
+     * @brief Where this object sits among its parent's children of the same kind, internal or authored
+     * @return The index, 0 for an object without a parent
+     */
+    size_t siblingIndex() const;
+
+    /**
+     * @brief Moves this object to another place among its parent's children of the same kind
+     * @param index The place to move to, past the last moving it to the end
+     */
+    void setSiblingIndex(size_t index);
+
+    /**
      * @brief Whether this object is a subtree's root or sits below it
      * @param root The root of the subtree
      * @return True if the object is in the subtree
@@ -227,10 +239,16 @@ class SceneObject : public Instance {
     void removeComponent(SceneComponent *component);
 
     /**
-     * @brief Writes this object, its components and its subtree
+     * @brief Writes this object and its components, leaving its children out
      * @param node Cursor to write this object's object into
      */
     void serialize(WriteNode node) const override;
+
+    /**
+     * @brief Writes this object, its components and every serialized object below it
+     * @param node Cursor to write this object's object into
+     */
+    void serializeSubtree(WriteNode node) const;
 
     /**
      * @brief Reads this object's own fields back, leaving its components and children to the load

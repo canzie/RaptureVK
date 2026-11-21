@@ -399,6 +399,10 @@ void AddComponentWindow::addComponentToTarget(std::string_view className)
         return;
     }
 
+    if (onBeforeComponentAdded != nullptr) {
+        onBeforeComponentAdded();
+    }
+
     std::unique_ptr<Rapture::SceneComponent> component = Rapture::InstanceRegistry::createComponent(className, *target->scene(), className);
     Rapture::SceneComponent *added = target->addComponent(std::move(component));
     if (added != nullptr) {

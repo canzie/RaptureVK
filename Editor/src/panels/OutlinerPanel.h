@@ -50,6 +50,18 @@ class OutlinerPanel : public Panel {
     void showAddMenu(Amethyst::vec2 pos);
 
     /**
+     * @brief Opens the menu for the empty space below the rows, adding at the root of the scene or pasting there
+     * @param pos Where the menu opens
+     */
+    void showEmptySpaceMenu(Amethyst::vec2 pos);
+
+    /**
+     * @brief The items that add a scene object at the root of the scene
+     * @return The items, ready to hand to a ContextMenu
+     */
+    std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> buildAddMenuItems() const;
+
+    /**
      * @brief Moves the editor camera so the selected object fills the view
      */
     void focusOnSelection();
@@ -70,6 +82,12 @@ class OutlinerPanel : public Panel {
     void applyPendingRename(void);
 
     Rapture::SceneObject *instanceForRow(uint32_t row) const;
+
+    /**
+     * @brief Highlights the row of an entity, or no row when it has none
+     * @param entity The entity whose row is highlighted
+     */
+    void selectRowFor(Rapture::ecs::EntityAccessor entity);
 
   private:
     Amethyst::TreeView *m_treeView = nullptr;
@@ -96,6 +114,7 @@ class OutlinerPanel : public Panel {
     bool m_pendingDeleteKeepChildren = false;
 
     Rapture::EventConnection m_hierarchyChangedConn;
+    Rapture::EventConnection m_selectionChangedConn;
     bool m_pendingRefresh = false;
 };
 

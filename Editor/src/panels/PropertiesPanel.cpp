@@ -4,6 +4,8 @@
 #include "inspector/ComponentEditors.h"
 #include "ui/controls/IconLabelButton.h"
 #include "ui/controls/SearchField.h"
+#include "scene/EditedScene.h"
+#include "undo/UndoHistory.h"
 
 #include <rapture/scene/World.h>
 #include <rapture/scene/components/Components.h>
@@ -38,7 +40,16 @@ void PropertiesPanel::build(Amethyst::UIScope &scope)
     setupEntityView();
 
     m_addComponentWindow.emplace(*m_root);
+    m_addComponentWindow->onBeforeComponentAdded = [this]() { recordSelectedObjectChange(); };
     m_addComponentWindow->onComponentAdded = [this]() { refresh(); };
+
+    if (m_context.undoHistory != nullptr) {
+        m_undoStepAppliedConn = m_context.undoHistory->onStepApplied.connect([this]() {
+            if (m_selectedEntity.isValid()) {
+                refresh();
+            }
+        });
+    }
 
     if (m_selection != nullptr) {
         m_selectionChangedConn = m_selection->onChanged.connect([this](Rapture::ecs::EntityAccessor entity) {
@@ -180,6 +191,17 @@ void PropertiesPanel::refresh()
         ensure<VisibilityEditor>(true);
         ensure<AttributesEditor>(true);
     });
+}
+
+void PropertiesPanel::recordSelectedObjectChange()
+{
+    if (m_context.editedScene == nullptr || m_scene == nullptr || !m_selectedEntity.isValid()) {
+        return;
+    }
+
+    if (const Rapture::SceneObject *object = m_scene->instanceFor(m_selectedEntity.getEntity())) {
+        m_context.editedScene->recordChange(*object);
+    }
 }
 
 void PropertiesPanel::setScene(Rapture::Scene *scene)

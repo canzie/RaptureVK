@@ -14,7 +14,12 @@
 #include <string_view>
 #include <vector>
 
+class EditedScene;
 class IconLabelButton;
+
+namespace Rapture {
+class SceneObject;
+} // namespace Rapture
 
 /**
  * @brief What an edit made in a viewport acts on
@@ -185,6 +190,12 @@ class Workspace {
     void destroyPanels();
 
     /**
+     * @brief Makes this workspace's scene editable, with undo
+     * @param contentRoot The object everything authored in the scene sits under
+     */
+    void makeSceneEditable(Rapture::SceneObject &contentRoot);
+
+    /**
      * @brief Adds a button to the end of the hotbar, as wide as the text it holds
      * @param label Text on the button
      * @param onClick What to run when the button is pressed
@@ -269,6 +280,7 @@ class Workspace {
     EditorContext m_editor;
     WorkspaceContext m_context;
     EntitySelection m_selection;
+    std::unique_ptr<EditedScene> m_editedScene;
     EditorMode m_mode = EDITOR_MODE_OBJECT;
 
     Amethyst::Frame *m_container = nullptr;
@@ -280,6 +292,17 @@ class Workspace {
     uint32_t m_nextPanelId = 1;
 
   private:
+    /**
+     * @brief Registers the undo, redo and scene edit shortcuts this workspace supports
+     */
+    void setupEditShortcuts();
+
+    /**
+     * @brief The selected scene object, for a shortcut to act on
+     * @return The object, nullptr while nothing is selected
+     */
+    Rapture::SceneObject *selectedSceneObject() const;
+
     /**
      * @brief Fills a tab's content frame with the hotbar and content dock every workspace has
      * @param container The tab content frame this workspace fills

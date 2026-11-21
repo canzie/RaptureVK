@@ -3,9 +3,11 @@
 #include "EntitySelection.h"
 #include "Icons.h"
 #include "panels/AddSceneObjectMenu.h"
+#include "scene/EditedScene.h"
 #include "ui/AssetVisuals.h"
 #include "ui/controls/SearchField.h"
 #include "ui/menus/ContextMenuItems.h"
+#include <rapture/core/utils/rp_assert.h>
 #include <rapture/scene/Scene.h>
 #include <rapture/scene/instances/SceneObject.h>
 
@@ -74,6 +76,7 @@ static constexpr std::string_view COMPONENT_ICON_CLASS = "scene-object-component
 SceneObjectTreePanel::SceneObjectTreePanel(const WorkspaceContext &context, Rapture::SceneObject *root)
     : Panel("Scene Objects", context), m_scene(context.scene), m_rootObject(root)
 {
+    RP_ASSERT(context.editedScene != nullptr, "a scene object tree edits its scene, so it needs a workspace that authors one");
     m_icon = Icons::SVG_LAYERS;
 }
 
@@ -329,7 +332,7 @@ void SceneObjectTreePanel::onRowRightClicked(uint32_t row, Amethyst::vec2 pos)
     }
 
     std::vector<std::unique_ptr<Amethyst::ContextMenu::ItemData>> items =
-        AddSceneObjectMenu_buildItems(instance, *m_selection, SCENE_OBJECT_SCOPE_ASSET);
+        AddSceneObjectMenu_buildItems(*m_context.editedScene, *instance, SCENE_OBJECT_SCOPE_ASSET);
 
     // the root is what the asset is authored into, so it stays
     if (instance != m_rootObject) {
@@ -355,11 +358,7 @@ void SceneObjectTreePanel::applyPendingDelete()
         return;
     }
 
-    if (m_selection != nullptr && m_selection->entity().getEntity() == instance->entity()) {
-        m_selection->clear();
-    }
-
-    m_scene->destroyInstance(instance);
+    m_context.editedScene->destroy(*instance);
 
     m_treeView->selectedRow = Amethyst::TreeView::NO_ROW_SELECTION;
     refresh();

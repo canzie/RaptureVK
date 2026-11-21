@@ -77,6 +77,9 @@ void ModuleEditorWorkspace::setupScene()
     sun->setCastsShadow(true);
 
     m_moduleRoot = spawnModuleRoot();
+    if (m_moduleRoot != nullptr) {
+        makeSceneEditable(*m_moduleRoot);
+    }
 
     m_editorCamera = std::make_unique<EditorCamera>(*m_scene);
 
@@ -155,11 +158,11 @@ Rapture::SceneObject *ModuleEditorWorkspace::getAddTarget() const
 void ModuleEditorWorkspace::showAddMenu()
 {
     Rapture::SceneObject *target = getAddTarget();
-    if (m_addMenu == nullptr || target == nullptr) {
+    if (m_addMenu == nullptr || target == nullptr || m_context.editedScene == nullptr) {
         return;
     }
 
-    m_addMenu->setItems(AddSceneObjectMenu_buildItems(target, m_selection, SCENE_OBJECT_SCOPE_ASSET));
+    m_addMenu->setItems(AddSceneObjectMenu_buildItems(*m_context.editedScene, *target, SCENE_OBJECT_SCOPE_ASSET));
     m_addMenu->showAt({m_addButton->absolutePosition.x, m_addButton->absolutePosition.y + m_addButton->absoluteSize.y});
 }
 
@@ -170,7 +173,7 @@ void ModuleEditorWorkspace::save()
     }
 
     Rapture::SerialDocument authored;
-    m_moduleRoot->serialize(authored.root());
+    m_moduleRoot->serializeSubtree(authored.root());
     authored.freeze();
     *m_document = std::move(authored);
 

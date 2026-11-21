@@ -467,6 +467,9 @@ void PhysicsEditor::buildBody(Amethyst::CollapsibleHeaderScope &ch)
             return;
         }
 
+        if (onBeforeEdit) {
+            onBeforeEdit();
+        }
         s_setPhysicsBody(m_owner, kind);
     };
 }
@@ -503,6 +506,11 @@ void PhysicsEditor::buildPhysicsSubEditor(PhysicsBodyKind kind)
     }
     }
 
+    m_physicsSubEditor->onBeforeEdit = [this]() {
+        if (onBeforeEdit) {
+            onBeforeEdit();
+        }
+    };
     m_physicsSubEditor->setSubject(m_scene, m_entity);
 
     Amethyst::CollapsibleHeaderScope scope(*header);
