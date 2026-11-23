@@ -38,6 +38,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cmath>
 #include <functional>
 #include <limits>
 #include <span>
@@ -68,6 +69,12 @@ static constexpr float WIRE_BEND = 70.0f;
 
 static constexpr float CANVAS_INSET = 6.0f;
 static constexpr Amethyst::vec2 INITIAL_PAN = {40.0f, 40.0f};
+static constexpr float MIN_ZOOM = 0.2f;
+static constexpr float MAX_ZOOM = 2.5f;
+static constexpr float WHEEL_ZOOM_STEP = 1.1f;
+static constexpr float DOT_LAYER_RATIO = 4.0f;
+static constexpr float DOT_FADED_OUT_SPACING = 8.0f;
+static constexpr float DOT_FADED_IN_SPACING = 16.0f;
 static constexpr float OVERLAY_MARGIN = 12.0f;
 static constexpr float OVERLAY_HEIGHT = 30.0f;
 static constexpr float OVERLAY_PADDING = 2.0f;
@@ -369,7 +376,8 @@ NodeEditorPanel::~NodeEditorPanel() = default;
 void NodeEditorPanel::onRootDestroyed()
 {
     m_canvas = nullptr;
-    m_canvasDots = nullptr;
+    m_canvasFineDots = nullptr;
+    m_canvasCoarseDots = nullptr;
     m_content = nullptr;
     m_wireLayer = nullptr;
     m_nodeMenu = nullptr;
@@ -416,14 +424,25 @@ void NodeEditorPanel::setupCanvas()
                 },
         },
         [this](Amethyst::FrameScope &canvas) { m_canvas = &canvas.component; });
+    m_canvas->consume(Amethyst::INTERACTION_CATEGORY_SCROLL);
 
-    Amethyst::UIScope(*m_canvas).frame(
-        {
-            .classes = {"graph-canvas-dots"},
-            .base = {.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
-        },
-        [this](Amethyst::FrameScope &dots) { m_canvasDots = &dots.component; });
-    m_canvasDots->ignore(Amethyst::INTERACTION_CATEGORY_ALL);
+    Amethyst::UIScope(*m_canvas)
+        .frame(
+            {
+                .classes = {"graph-canvas-dots"},
+                .base = {.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
+            },
+            [this](Amethyst::FrameScope &dots) { m_canvasCoarseDots = &dots.component; })
+        .frame(
+            {
+                .classes = {"graph-canvas-dots"},
+                .base = {.size = Amethyst::UDim2::fromScale(1.0f, 1.0f)},
+            },
+            [this](Amethyst::FrameScope &dots) { m_canvasFineDots = &dots.component; });
+    m_canvasCoarseDots->ignore(Amethyst::INTERACTION_CATEGORY_ALL);
+    m_canvasFineDots->ignore(Amethyst::INTERACTION_CATEGORY_ALL);
+    m_canvasDotStep = m_canvasFineDots->getBaseStyleProperties().backgroundStep;
+    updateCanvasDotSpacing();
 
     Amethyst::UIScope(*m_canvas).frame(
         {
@@ -447,6 +466,7 @@ void NodeEditorPanel::setupCanvas()
     m_canvasBeganConn = m_canvas->onInputBeganCb.connect([this](const Amethyst::InputObject &io) { onCanvasInputBegan(io); });
     m_canvasMovedConn = m_canvas->onInputChangedCb.connect([this](const Amethyst::InputObject &io) { onCanvasInputChanged(io); });
     m_canvasEndedConn = m_canvas->onInputEndedCb.connect([this](const Amethyst::InputObject &io) { onCanvasInputEnded(io); });
+    m_canvasWheelConn = m_canvas->onMouseWheelCb.connect([this](const Amethyst::InputObject &io) { onCanvasMouseWheel(io); });
 }
 
 void NodeEditorPanel::setupCanvasOverlays()
@@ -706,11 +726,43 @@ void NodeEditorPanel::onCanvasInputEnded(const Amethyst::InputObject &io)
     }
 }
 
+void NodeEditorPanel::onCanvasMouseWheel(const Amethyst::InputObject &io)
+{
+    const float zoom = io.delta.z > 0.0f ? m_zoom * WHEEL_ZOOM_STEP : m_zoom / WHEEL_ZOOM_STEP;
+    zoomAt(Amethyst::vec2(io.position.x, io.position.y) - m_canvas->absoluteContentPosition, zoom);
+}
+
 void NodeEditorPanel::setPan(Amethyst::vec2 pan)
 {
     m_pan = pan;
     m_content->setBaseProperties({.position = Amethyst::UDim2::fromOffset(pan.x, pan.y)});
-    m_canvasDots->setBaseStyleProperties({.backgroundPosition = pan});
+    m_canvasFineDots->setBaseStyleProperties({.backgroundPosition = pan});
+    m_canvasCoarseDots->setBaseStyleProperties({.backgroundPosition = pan});
+}
+
+void NodeEditorPanel::zoomAt(Amethyst::vec2 canvasPoint, float zoom)
+{
+    const float next = std::clamp(zoom, MIN_ZOOM, MAX_ZOOM);
+    const Amethyst::vec2 pan = canvasPoint - (canvasPoint - m_pan) * (next / m_zoom);
+    m_zoom = next;
+    m_content->setBaseProperties({.scale = next});
+    updateCanvasDotSpacing();
+    setPan(pan);
+}
+
+void NodeEditorPanel::updateCanvasDotSpacing()
+{
+    // the fine layer's spacing is the zoomed step times a power of the ratio that keeps it at or above the faded out
+    // spacing, so a dot of the coarse layer always sits on one of the fine layer
+    const float zoomedStep = m_canvasDotStep.x * m_zoom;
+    const float level = std::ceil(std::log(DOT_FADED_OUT_SPACING / zoomedStep) / std::log(DOT_LAYER_RATIO));
+    const float levelScale = std::pow(DOT_LAYER_RATIO, level);
+    const float fineSpacing = zoomedStep * levelScale;
+    const float fadeIn = std::clamp((fineSpacing - DOT_FADED_OUT_SPACING) / (DOT_FADED_IN_SPACING - DOT_FADED_OUT_SPACING), 0.0f, 1.0f);
+
+    const Amethyst::vec2 fineStep = m_canvasDotStep * (m_zoom * levelScale);
+    m_canvasFineDots->setBaseStyleProperties({.backgroundTransparency = 1.0f - fadeIn, .backgroundStep = fineStep});
+    m_canvasCoarseDots->setBaseStyleProperties({.backgroundStep = fineStep * DOT_LAYER_RATIO});
 }
 
 void NodeEditorPanel::frameAllNodes()
@@ -727,7 +779,7 @@ void NodeEditorPanel::frameAllNodes()
         highest = Amethyst::max(highest, topLeft + view.frame->absoluteSize);
     }
 
-    setPan(m_canvas->absoluteSize * 0.5f - (lowest + highest) * 0.5f);
+    setPan(m_canvas->absoluteSize * 0.5f - (lowest + highest) * 0.5f * m_zoom);
 }
 
 void NodeEditorPanel::openAddNodeMenu(Amethyst::vec2 screenPos)
@@ -850,7 +902,7 @@ void NodeEditorPanel::fillAddNodeResults(std::string_view search)
 void NodeEditorPanel::addNodeFromCatalog(size_t catalogIndex)
 {
     const NodeCatalogEntry &entry = NODE_CATALOG[catalogIndex];
-    const Amethyst::vec2 canvasPos = m_addNodeScreenPos - m_content->absolutePosition;
+    const Amethyst::vec2 canvasPos = m_content->toLayout(m_addNodeScreenPos) - m_content->absolutePosition;
 
     const uint32_t nodeId = entry.textureKind == TextureNodeKind::NONE ? spawnNode(entry.type, canvasPos)
                                                                        : spawnTextureNode(entry.textureKind, entry.name, canvasPos);
@@ -886,11 +938,12 @@ uint32_t NodeEditorPanel::createNodeShell(Amethyst::vec2 canvasPos, std::string_
     auto *drag = view.frame->addExtension<Amethyst::UIDragDetector>();
     drag->mode = Amethyst::DragMode::FREE;
 
-    view.frame->track(view.frame->onInputBeganCb.connect([this, nodeId](const Amethyst::InputObject &io) {
+    Amethyst::Frame *frame = view.frame;
+    view.frame->track(view.frame->onInputBeganCb.connect([this, nodeId, frame](const Amethyst::InputObject &io) {
         if (io.type == Amethyst::InputType::MOUSE_BUTTON_1) {
             selectNode(nodeId, false);
         } else if (io.type == Amethyst::InputType::MOUSE_BUTTON_2) {
-            showNodeMenu(nodeId, Amethyst::vec2(io.position.x, io.position.y));
+            showNodeMenu(nodeId, frame->toScreen(Amethyst::vec2(io.position.x, io.position.y)));
         }
     }));
 
@@ -1237,9 +1290,9 @@ uint32_t NodeEditorPanel::addPinRow(uint32_t nodeId, std::string_view name, Rapt
 
     const uint32_t pinId = m_pins.insert(std::move(pin));
     m_nodes[nodeId].pinIds.push_back(pinId);
-    socket->track(socket->onInputBeganCb.connect([this, pinId](const Amethyst::InputObject &io) {
+    socket->track(socket->onInputBeganCb.connect([this, pinId, socket](const Amethyst::InputObject &io) {
         if (io.type == Amethyst::InputType::MOUSE_BUTTON_1) {
-            beginConnection(pinId, Amethyst::vec2(io.position.x, io.position.y));
+            beginConnection(pinId, socket->toScreen(Amethyst::vec2(io.position.x, io.position.y)));
         }
     }));
     return pinId;
@@ -1481,7 +1534,7 @@ uint32_t NodeEditorPanel::findPinAt(Amethyst::vec2 screenPos) const
         if (pin.socket == nullptr) {
             return;
         }
-        const Amethyst::vec2 offset = pin.socket->absolutePosition + pin.socket->absoluteSize * 0.5f - screenPos;
+        const Amethyst::vec2 offset = pin.socket->toScreen(pin.socket->absolutePosition + pin.socket->absoluteSize * 0.5f) - screenPos;
         const float distance = offset.x * offset.x + offset.y * offset.y;
         if (distance < bestDistance) {
             bestDistance = distance;
@@ -1557,7 +1610,7 @@ void NodeEditorPanel::beginConnection(uint32_t pinId, Amethyst::vec2 screenPos)
 void NodeEditorPanel::updateConnectionDrag(Amethyst::vec2 screenPos)
 {
     // the wire sits at the wire layer's origin, and has no layout of its own yet on the frame it is created
-    const Amethyst::vec2 cursor = screenPos - m_wireLayer->absolutePosition;
+    const Amethyst::vec2 cursor = m_wireLayer->toLayout(screenPos) - m_wireLayer->absolutePosition;
     const Amethyst::vec2 cursorBend = -s_wireBendFor(m_pins[m_connectSrcPinId].isOutput);
     // the first two knots follow the source pin, so only the cursor's end is placed here
     std::vector<Amethyst::vec2> knots = m_dragWire->getKnots();

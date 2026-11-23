@@ -267,12 +267,25 @@ class NodeEditorPanel : public Panel {
     void onCanvasInputBegan(const Amethyst::InputObject &io);
     void onCanvasInputChanged(const Amethyst::InputObject &io);
     void onCanvasInputEnded(const Amethyst::InputObject &io);
+    void onCanvasMouseWheel(const Amethyst::InputObject &io);
 
     /**
      * @brief Moves the view over the canvas, carrying the nodes and the dots under them
      * @param pan The content's offset from the canvas's top left
      */
     void setPan(Amethyst::vec2 pan);
+
+    /**
+     * @brief Sets how large the graph is drawn, keeping the content under a point of the canvas in place
+     * @param canvasPoint The point to zoom around, relative to the canvas's top left
+     * @param zoom The new zoom, clamped to the zoom range
+     */
+    void zoomAt(Amethyst::vec2 canvasPoint, float zoom);
+
+    /**
+     * @brief Spaces the two canvas dot layers for the current zoom, fading the fine layer out as it grows dense
+     */
+    void updateCanvasDotSpacing(void);
 
     /**
      * @brief Moves the view so every node sits in the middle of the canvas
@@ -501,7 +514,8 @@ class NodeEditorPanel : public Panel {
 
   private:
     Amethyst::Frame *m_canvas = nullptr;
-    Amethyst::Frame *m_canvasDots = nullptr;
+    Amethyst::Frame *m_canvasFineDots = nullptr;
+    Amethyst::Frame *m_canvasCoarseDots = nullptr;
     Amethyst::Frame *m_content = nullptr;
     Amethyst::Frame *m_wireLayer = nullptr;
     Amethyst::ContextMenu *m_nodeMenu = nullptr;
@@ -515,10 +529,13 @@ class NodeEditorPanel : public Panel {
     Amethyst::EventConnection m_canvasBeganConn;
     Amethyst::EventConnection m_canvasMovedConn;
     Amethyst::EventConnection m_canvasEndedConn;
+    Amethyst::EventConnection m_canvasWheelConn;
 
     bool m_panning = false;
     Amethyst::vec2 m_pan{0.0f};
     Amethyst::vec2 m_panLastMouse{0.0f};
+    float m_zoom = 1.0f;
+    Amethyst::vec2 m_canvasDotStep{0.0f};
 
     std::unordered_map<uint32_t, NodeView> m_nodes;
     Rapture::FreeList<PinView> m_pins;
