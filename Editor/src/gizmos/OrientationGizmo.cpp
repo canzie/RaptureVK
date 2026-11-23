@@ -150,10 +150,10 @@ Amethyst::EventResult OrientationGizmo::onInputBegan(const Amethyst::InputObject
     return Amethyst::EventResult::CONSUMED;
 }
 
-Amethyst::EventResult OrientationGizmo::onMouseMoved(int32_t x, int32_t y)
+Amethyst::EventResult OrientationGizmo::onMouseMoved(Amethyst::vec2 position)
 {
-    setHoveredAxisEnd(findAxisEndAt(Amethyst::vec2(static_cast<float>(x), static_cast<float>(y)) - absolutePosition));
-    return Canvas::onMouseMoved(x, y);
+    setHoveredAxisEnd(findAxisEndAt(position - absolutePosition));
+    return Canvas::onMouseMoved(position);
 }
 
 Amethyst::EventResult OrientationGizmo::onMouseLeave()

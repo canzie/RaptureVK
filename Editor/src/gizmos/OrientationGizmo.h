@@ -30,7 +30,7 @@ class OrientationGizmo : public Amethyst::Canvas {
 
   protected:
     Amethyst::EventResult onInputBegan(const Amethyst::InputObject &input) override;
-    Amethyst::EventResult onMouseMoved(int32_t x, int32_t y) override;
+    Amethyst::EventResult onMouseMoved(Amethyst::vec2 position) override;
     Amethyst::EventResult onMouseLeave(void) override;
 
   private:
